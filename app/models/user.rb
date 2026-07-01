@@ -53,13 +53,8 @@ class User < ApplicationRecord
     find_signed!(token, purpose: :password_reset)
   end
 
-  # Get the last login timestamp
-  def last_login_at
-    sessions.order(created_at: :desc).first&.created_at
-  end
-
   # Check if user has ever logged in
   def ever_logged_in?
-    sessions.exists?
+    last_login_at.present?
   end
 end
