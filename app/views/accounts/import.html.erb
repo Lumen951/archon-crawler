@@ -2,7 +2,7 @@
   <div class="flex items-center justify-between">
     <div>
       <h1 class="text-3xl font-bold text-gray-900">导入公众号</h1>
-      <p class="text-gray-600 mt-1">从 JSON 文件导入微信公众号</p>
+      <p class="text-gray-600 mt-1">从 JSON、CSV 或 XLSX 文件导入微信公众号</p>
     </div>
     <%= link_to "← 返回公众号列表", accounts_path, class: "btn btn-secondary" %>
   </div>
@@ -11,18 +11,18 @@
   <div class="card">
     <div class="border-b border-gray-200 mb-6">
       <nav class="-mb-px flex space-x-8">
-        <button onclick="showTab('paste')" id="tab-paste" class="tab-button active border-b-2 border-primary text-primary py-4 px-1 text-sm font-medium">
-          粘贴 JSON
-        </button>
-        <button onclick="showTab('upload')" id="tab-upload" class="tab-button text-gray-500 hover:text-gray-700 py-4 px-1 text-sm font-medium">
+        <button onclick="showTab('upload')" id="tab-upload" class="tab-button active border-b-2 border-primary text-primary py-4 px-1 text-sm font-medium">
           上传文件
+        </button>
+        <button onclick="showTab('paste')" id="tab-paste" class="tab-button text-gray-500 hover:text-gray-700 py-4 px-1 text-sm font-medium">
+          粘贴 JSON
         </button>
       </nav>
     </div>
 
     <%= form_with url: import_json_accounts_path, method: :post, multipart: true, id: "import-form" do |f| %>
       <!-- Paste JSON Tab -->
-      <div id="paste-tab" class="tab-content">
+      <div id="paste-tab" class="tab-content hidden">
         <div class="space-y-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">
@@ -54,11 +54,11 @@
       </div>
 
       <!-- Upload File Tab -->
-      <div id="upload-tab" class="tab-content hidden">
+      <div id="upload-tab" class="tab-content">
         <div class="space-y-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">
-              上传 JSON 文件
+              上传 JSON / CSV / XLSX 文件
             </label>
             <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-gray-400 transition-colors">
               <div class="space-y-1 text-center">
@@ -68,11 +68,11 @@
                 <div class="flex text-sm text-gray-600">
                   <label for="file-upload" class="relative cursor-pointer bg-white rounded-md font-medium text-primary hover:text-blue-700 focus-within:outline-none">
                     <span>上传文件</span>
-                    <%= f.file_field :json_file, id: "file-upload", accept: ".json", class: "sr-only", onchange: "updateFileName(this)" %>
+                    <%= f.file_field :json_file, id: "file-upload", accept: ".json,.csv,.xlsx", class: "sr-only", onchange: "updateFileName(this)" %>
                   </label>
                   <p class="pl-1">或拖放文件至此</p>
                 </div>
-                <p class="text-xs text-gray-500">仅支持 JSON 文件</p>
+                <p class="text-xs text-gray-500">支持 .json、.csv、.xlsx 文件</p>
                 <p id="file-name" class="text-sm text-gray-700 font-medium mt-2"></p>
               </div>
             </div>
@@ -92,18 +92,23 @@
   <div class="card bg-blue-50 border-blue-200">
     <h3 class="font-semibold text-blue-900 mb-3">💡 导入提示</h3>
     <ul class="space-y-2 text-sm text-blue-800">
-      <li>• JSON 必须包含 "accounts" 数组，其中包含公众号对象</li>
-      <li>• 必填字段：<code class="bg-blue-100 px-1 rounded">fakeid</code> 和 <code class="bg-blue-100 px-1 rounded">nickname</code></li>
-      <li>• 可选字段：<code class="bg-blue-100 px-1 rounded">round_head_img</code>、<code class="bg-blue-100 px-1 rounded">articles</code></li>
+      <li>• JSON 仍需包含 <code class="bg-blue-100 px-1 rounded">accounts</code> 数组</li>
+      <li>• CSV/XLSX 只识别必填列：<code class="bg-blue-100 px-1 rounded">fakeid</code> 和 <code class="bg-blue-100 px-1 rounded">nickname</code></li>
+      <li>• 可选列：<code class="bg-blue-100 px-1 rounded">round_head_img</code>、<code class="bg-blue-100 px-1 rounded">articles</code>、<code class="bg-blue-100 px-1 rounded">total_articles</code></li>
+      <li>• 额外列会被自动忽略，列顺序不限</li>
       <li>• 重复的公众号（相同 fakeid）将被跳过</li>
       <li>• 所有导入的公众号将被设置为"活跃"状态</li>
     </ul>
   </div>
 
   <!-- Example Download -->
-  <div class="card">
-    <h3 class="font-semibold text-gray-900 mb-3">📄 示例模板</h3>
-    <p class="text-sm text-gray-600 mb-3">下载示例 JSON 模板以开始使用：</p>
+  <div class="card space-y-4">
+    <div>
+      <h3 class="font-semibold text-gray-900 mb-3">📄 示例模板</h3>
+      <p class="text-sm text-gray-600 mb-3">JSON 可下载模板；CSV/XLSX 请至少包含以下列头：</p>
+      <pre class="bg-gray-50 border border-gray-200 rounded p-3 text-xs overflow-x-auto"><code>fakeid,nickname,round_head_img</code></pre>
+    </div>
+
     <a href="data:text/json;charset=utf-8,<%= CGI.escape({
       version: "1.0",
       usefor: "wechat-article-exporter",
@@ -125,7 +130,7 @@
       <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
       </svg>
-      下载模板
+      下载 JSON 模板
     </a>
   </div>
 </div>

@@ -13,63 +13,31 @@ class AccountsController < ApplicationController
   end
 
   def import_json
-    begin
-      json_data = if params[:json_text].present?
-                    # Parse from textarea
-                    JSON.parse(params[:json_text])
-                  elsif params[:json_file].present?
-                    # Parse from uploaded file
-                    JSON.parse(params[:json_file].read)
-                  else
-                    flash[:error] = "请提供 JSON 数据或上传文件"
-                    redirect_to import_accounts_path and return
-                  end
+    result = if params[:json_text].present?
+               Accounts::Importer.import_text(params[:json_text])
+             elsif params[:json_file].present?
+               Accounts::Importer.import_file(params[:json_file])
+             else
+               flash[:error] = "请提供 JSON 数据或上传文件"
+               redirect_to import_accounts_path and return
+             end
 
-      # Validate JSON structure
-      unless json_data.is_a?(Hash) && json_data["accounts"].is_a?(Array)
-        flash[:error] = "无效的 JSON 格式。期望结构：{ \"accounts\": [...] }"
-        redirect_to import_accounts_path and return
-      end
-
-      imported = 0
-      skipped = 0
-      errors = []
-
-      json_data["accounts"].each do |data|
-        next unless data["fakeid"].present? && data["nickname"].present?
-
-        account = Account.find_or_initialize_by(fakeid: data["fakeid"])
-
-        if account.new_record?
-          account.nickname = data["nickname"]
-          account.round_head_img = data["round_head_img"]
-          account.status = :active
-          account.total_articles = data["articles"] || 0
-
-          if account.save
-            imported += 1
-          else
-            errors << "#{data['nickname']}: #{account.errors.full_messages.join(', ')}"
-          end
-        else
-          skipped += 1
-        end
-      end
-
-      if errors.any?
-        flash[:error] = "部分公众号导入失败：#{errors.join('; ')}"
-      elsif imported > 0
-        flash[:success] = "成功导入 #{imported} 个公众号（#{skipped} 个重复已跳过）"
-      else
-        flash[:warning] = "没有新公众号需要导入（#{skipped} 个已存在）"
-      end
-
-    rescue JSON::ParserError => e
-      flash[:error] = "无效的 JSON 格式：#{e.message}"
-    rescue StandardError => e
-      flash[:error] = "导入失败：#{e.message}"
+    if result.errors.any?
+      flash[:error] = "部分公众号导入失败：#{result.errors.join('; ')}"
+    elsif result.imported_count > 0
+      flash[:success] = success_message_for(result)
+    elsif result.invalid_count > 0
+      flash[:warning] = "没有新公众号需要导入（#{result.skipped_count} 个已存在，#{result.invalid_count} 行缺少必填字段）"
+    else
+      flash[:warning] = "没有新公众号需要导入（#{result.skipped_count} 个已存在）"
     end
 
+    redirect_to accounts_path
+  rescue ArgumentError => e
+    flash[:error] = e.message
+    redirect_to accounts_path
+  rescue StandardError => e
+    flash[:error] = "导入失败：#{e.message}"
     redirect_to accounts_path
   end
 
@@ -102,4 +70,14 @@ class AccountsController < ApplicationController
     flash[:success] = "公众号状态已更新"
     redirect_to accounts_path
   end
+
+  private
+
+  def success_message_for(result)
+    message = "成功导入 #{result.imported_count} 个公众号（#{result.skipped_count} 个重复已跳过）"
+    return message if result.invalid_count.zero?
+
+    "#{message}，#{result.invalid_count} 行缺少必填字段已跳过"
+  end
 end
+
