@@ -44,19 +44,16 @@
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-right">
               <div class="flex items-center justify-end gap-2">
-                <%= link_to admin_user_path(user), class: "h-8 px-3 rounded-lg border border-border-primary bg-bg-card hover:border-brand hover:text-brand text-xs font-semibold transition inline-flex items-center" do %>
-                  查看
+                <% unless user == current_user %>
+                  <%= button_to admin_user_path(user), method: :delete, data: { turbo_confirm: "确定要删除此用户吗？" }, class: "h-8 px-3 rounded-lg border border-red-200 bg-bg-card text-red-600 hover:border-red-400 hover:bg-red-50 text-xs font-semibold transition" do %>
+                    删除
+                  <% end %>
                 <% end %>
                 <%= link_to edit_admin_user_path(user), class: "h-8 px-3 rounded-lg border border-border-primary bg-bg-card hover:border-brand hover:text-brand text-xs font-semibold transition inline-flex items-center" do %>
                   编辑
                 <% end %>
-                <%= button_to reset_password_admin_user_path(user), method: :post, data: { confirm: "确定要重置此用户的密码吗？" }, class: "h-8 px-3 rounded-lg border border-yellow-200 bg-bg-card text-yellow-700 hover:border-yellow-400 hover:bg-yellow-50 text-xs font-semibold transition" do %>
+                <%= button_to reset_password_admin_user_path(user), method: :post, data: { turbo_confirm: "确定要重置此用户的密码吗？" }, class: "h-8 px-3 rounded-lg border border-yellow-200 bg-bg-card text-yellow-700 hover:border-yellow-400 hover:bg-yellow-50 text-xs font-semibold transition" do %>
                   重置密码
-                <% end %>
-                <% unless user == current_user %>
-                  <%= button_to admin_user_path(user), method: :delete, data: { confirm: "确定要删除此用户吗？" }, class: "h-8 px-3 rounded-lg border border-red-200 bg-bg-card text-red-600 hover:border-red-400 hover:bg-red-50 text-xs font-semibold transition" do %>
-                    删除
-                  <% end %>
                 <% end %>
               </div>
             </td>
