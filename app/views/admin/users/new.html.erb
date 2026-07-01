@@ -1,0 +1,89 @@
+<div class="flex justify-center">
+  <div class="w-full max-w-2xl">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
+      <div class="p-6 border-b border-slate-200">
+        <h3 class="text-xl font-bold text-slate-900">创建用户</h3>
+      </div>
+      <div class="p-6">
+        <%= form_with model: [:admin, @user], local: true do |form| %>
+          <% if @user.errors.any? %>
+            <div class="mb-4 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-xl text-sm">
+              <p class="font-semibold mb-1"><%= @user.errors.count %>个错误阻止了保存：</p>
+              <ul class="list-disc list-inside space-y-0.5">
+                <% @user.errors.full_messages.each do |message| %>
+                  <li><%= message %></li>
+                <% end %>
+              </ul>
+            </div>
+          <% end %>
+
+          <div class="mb-4">
+            <%= form.label :email_address, "邮箱", class: "block text-sm font-medium text-slate-700 mb-1" %>
+            <%= form.email_field :email_address, class: "w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200", required: true, autofocus: true %>
+          </div>
+
+          <div class="mb-4">
+            <%= form.label :name, "姓名", class: "block text-sm font-medium text-slate-700 mb-1" %>
+            <%= form.text_field :name, class: "w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200" %>
+          </div>
+
+          <div class="mb-4">
+            <%= form.label :role, "角色", class: "block text-sm font-medium text-slate-700 mb-1" %>
+            <%= form.select :role, User.roles.keys.map { |role| [role == "admin" ? "管理员" : "用户", role] }, {}, class: "w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200" %>
+          </div>
+
+          <div class="mb-4">
+            <%= form.label :password, "密码（可选，留空则自动生成）", class: "block text-sm font-medium text-slate-700 mb-1" %>
+            <%= form.password_field :password, class: "w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200", autocomplete: "new-password" %>
+            <small class="text-xs text-slate-500 mt-1 block">如果留空，系统将自动生成一个随机密码</small>
+          </div>
+
+          <div class="mb-6">
+            <%= form.label :password_confirmation, "确认密码", class: "block text-sm font-medium text-slate-700 mb-1" %>
+            <%= form.password_field :password_confirmation, class: "w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200", autocomplete: "new-password" %>
+          </div>
+
+          <hr class="my-6 border-slate-200">
+
+          <div class="mb-6">
+            <label class="block text-sm font-semibold text-slate-700 mb-3">通知方式</label>
+            <div class="space-y-3">
+              <div class="flex items-start">
+                <%= radio_button_tag :notification_method, "magic_link", true, class: "mt-1 rounded border-slate-300" %>
+                <%= label_tag "notification_method_magic_link", class: "ml-2 flex-1" do %>
+                  <div class="flex items-center gap-2 mb-1">
+                    <strong class="text-sm text-slate-900">发送邀请邮件（魔法链接）</strong>
+                  </div>
+                  <small class="text-xs text-slate-500 block">向用户邮箱发送一次性登录链接，有效期 7 天</small>
+                <% end %>
+              </div>
+              <div class="flex items-start">
+                <%= radio_button_tag :notification_method, "generated_password", false, class: "mt-1 rounded border-slate-300" %>
+                <%= label_tag "notification_method_generated_password", class: "ml-2 flex-1" do %>
+                  <div class="flex items-center gap-2 mb-1">
+                    <strong class="text-sm text-slate-900">发送登录凭证（自动生成密码）</strong>
+                  </div>
+                  <small class="text-xs text-slate-500 block">系统自动生成密码并通过邮件发送给用户</small>
+                <% end %>
+              </div>
+              <div class="flex items-start">
+                <%= radio_button_tag :notification_method, "manual", false, class: "mt-1 rounded border-slate-300" %>
+                <%= label_tag "notification_method_manual", class: "ml-2 flex-1" do %>
+                  <div class="flex items-center gap-2 mb-1">
+                    <strong class="text-sm text-slate-900">手动分享凭证（不发送邮件）</strong>
+                  </div>
+                  <small class="text-xs text-slate-500 block">创建后在页面上显示凭证，由您手动分享给用户</small>
+                <% end %>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex gap-3">
+            <%= form.submit "创建用户", class: "px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-semibold cursor-pointer" %>
+            <%= link_to "取消", admin_users_path, class: "px-5 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors text-sm font-semibold" %>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+</div>

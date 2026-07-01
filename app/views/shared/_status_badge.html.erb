@@ -1,0 +1,17 @@
+<%
+  badge_class = case status.to_s
+                when 'completed', 'active'
+                  'success'
+                when 'running', 'pending'
+                  'info'
+                when 'paused'
+                  'warning'
+                when 'failed', 'inactive'
+                  'error'
+                else
+                  'secondary'
+                end
+%>
+<span class="status-badge <%= badge_class %>">
+  <%= status.to_s.humanize %>
+</span>

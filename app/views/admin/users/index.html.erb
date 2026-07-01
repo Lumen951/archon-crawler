@@ -1,0 +1,122 @@
+<div class="space-y-8">
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <h2 class="text-3xl font-bold text-text-primary">用户管理</h2>
+    <%= link_to new_admin_user_path, class: "h-10 px-5 rounded-xl bg-brand text-white hover:bg-brand-dark font-semibold text-sm transition inline-flex items-center justify-center gap-2 shadow-[0_7px_16px_rgba(59,130,246,.14)]" do %>
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+      </svg>
+      创建用户
+    <% end %>
+  </div>
+
+  <!-- Desktop Table -->
+  <div class="hidden md:block bg-bg-card border border-border-primary rounded-2xl overflow-hidden shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+    <table class="min-w-full divide-y divide-border-primary">
+      <thead class="bg-bg-secondary">
+        <tr>
+          <th class="px-6 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">邮箱</th>
+          <th class="px-6 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">角色</th>
+          <th class="px-6 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">最后登录</th>
+          <th class="px-6 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">创建时间</th>
+          <th class="px-6 py-3 text-right text-xs font-semibold text-text-secondary uppercase tracking-wider">操作</th>
+        </tr>
+      </thead>
+      <tbody class="bg-bg-card divide-y divide-border-primary">
+        <% @users.each do |user| %>
+          <tr class="hover:bg-bg-secondary transition">
+            <td class="px-6 py-4 text-sm text-text-primary font-medium"><%= user.email_address %></td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <% if user.admin? %>
+                <span class="status-badge inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-800">管理员</span>
+              <% else %>
+                <span class="status-badge inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-800">用户</span>
+              <% end %>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-text-secondary">
+              <% if user.ever_logged_in? %>
+                <%= user.last_login_at.strftime("%Y-%m-%d %H:%M") %>
+              <% else %>
+                <span class="text-text-muted">从未登录</span>
+              <% end %>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-text-secondary">
+              <%= user.created_at.strftime("%Y-%m-%d %H:%M") %>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-right">
+              <div class="flex items-center justify-end gap-2">
+                <%= link_to admin_user_path(user), class: "h-8 px-3 rounded-lg border border-border-primary bg-bg-card hover:border-brand hover:text-brand text-xs font-semibold transition inline-flex items-center" do %>
+                  查看
+                <% end %>
+                <%= link_to edit_admin_user_path(user), class: "h-8 px-3 rounded-lg border border-border-primary bg-bg-card hover:border-brand hover:text-brand text-xs font-semibold transition inline-flex items-center" do %>
+                  编辑
+                <% end %>
+                <%= button_to reset_password_admin_user_path(user), method: :post, data: { confirm: "确定要重置此用户的密码吗？" }, class: "h-8 px-3 rounded-lg border border-yellow-200 bg-bg-card text-yellow-700 hover:border-yellow-400 hover:bg-yellow-50 text-xs font-semibold transition" do %>
+                  重置密码
+                <% end %>
+                <% unless user == current_user %>
+                  <%= button_to admin_user_path(user), method: :delete, data: { confirm: "确定要删除此用户吗？" }, class: "h-8 px-3 rounded-lg border border-red-200 bg-bg-card text-red-600 hover:border-red-400 hover:bg-red-50 text-xs font-semibold transition" do %>
+                    删除
+                  <% end %>
+                <% end %>
+              </div>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Mobile Cards -->
+  <div class="md:hidden space-y-4">
+    <% @users.each do |user| %>
+      <div class="bg-bg-card border border-border-primary rounded-xl p-4 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+        <div class="flex items-start justify-between mb-3">
+          <div class="flex-1 min-w-0">
+            <div class="font-semibold text-text-primary mb-2 truncate"><%= user.email_address %></div>
+            <div class="flex items-center gap-2">
+              <% if user.admin? %>
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-800">管理员</span>
+              <% else %>
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-800">用户</span>
+              <% end %>
+            </div>
+          </div>
+        </div>
+
+        <div class="space-y-2 text-sm">
+          <div class="flex justify-between">
+            <span class="text-text-secondary">最后登录:</span>
+            <span class="text-text-primary">
+              <% if user.ever_logged_in? %>
+                <%= user.last_login_at.strftime("%Y-%m-%d %H:%M") %>
+              <% else %>
+                <span class="text-text-muted">从未登录</span>
+              <% end %>
+            </span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-text-secondary">创建时间:</span>
+            <span class="text-text-primary"><%= user.created_at.strftime("%Y-%m-%d %H:%M") %></span>
+          </div>
+        </div>
+
+        <div class="mt-4 pt-3 border-t border-border-primary grid grid-cols-2 gap-2">
+          <%= link_to admin_user_path(user), class: "h-9 px-4 rounded-lg bg-bg-secondary text-brand hover:bg-brand hover:text-white font-semibold text-sm transition inline-flex items-center justify-center" do %>
+            查看
+          <% end %>
+          <%= link_to edit_admin_user_path(user), class: "h-9 px-4 rounded-lg bg-bg-secondary text-brand hover:bg-brand hover:text-white font-semibold text-sm transition inline-flex items-center justify-center" do %>
+            编辑
+          <% end %>
+          <%= button_to reset_password_admin_user_path(user), method: :post, data: { confirm: "确定要重置此用户的密码吗？" }, class: "h-9 px-4 rounded-lg bg-yellow-100 text-yellow-700 hover:bg-yellow-200 font-semibold text-sm transition" do %>
+            重置密码
+          <% end %>
+          <% unless user == current_user %>
+            <%= button_to admin_user_path(user), method: :delete, data: { confirm: "确定要删除此用户吗？" }, class: "h-9 px-4 rounded-lg bg-red-100 text-red-600 hover:bg-red-200 font-semibold text-sm transition" do %>
+              删除
+            <% end %>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+</div>

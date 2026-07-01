@@ -1,1 +1,135 @@
 @import "tailwindcss";
+
+@theme {
+  --font-sans: system-ui, -apple-system, sans-serif;
+
+  --color-bg-primary:   var(--bg-primary);
+  --color-bg-secondary: var(--bg-secondary);
+  --color-bg-card:      var(--bg-card);
+  --color-bg-header:    var(--bg-header);
+
+  --color-border-primary:   var(--border-primary);
+  --color-border-secondary: var(--border-secondary);
+
+  --color-text-primary:   var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted:     var(--text-muted);
+
+  --color-brand:      var(--brand);
+  --color-brand-dark: var(--brand-dark);
+  --color-brand-soft: var(--brand-soft);
+
+  --color-primary: var(--color-primary);
+  --color-success: var(--color-success);
+  --color-warning: var(--color-warning);
+  --color-error: var(--color-error);
+}
+
+@layer base {
+  :root {
+    --brand: #3b82f6;
+    --brand-dark: #2563eb;
+    --brand-soft: #eff6ff;
+
+    --bg-page: #f7f8fb;
+    --bg-surface: #ffffff;
+    --bg-muted: #f0f3f7;
+    --bg-primary: var(--bg-page);
+    --bg-secondary: var(--bg-muted);
+    --bg-card: var(--bg-surface);
+    --bg-header: rgba(255, 255, 255, 0.86);
+
+    --border: #dde3ec;
+    --border-strong: #cbd4df;
+    --border-primary: var(--border);
+    --border-secondary: var(--border-strong);
+
+    --text-main: #1f2933;
+    --text-primary: var(--text-main);
+    --text-secondary: #6b7280;
+    --text-muted: #9ca3af;
+
+    --color-primary: #2563eb;
+    --color-success: #10b981;
+    --color-warning: #f59e0b;
+    --color-error: #ef4444;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+  }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--border-secondary); }
+
+  ::selection { background: var(--brand); color: white; }
+
+  :focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+}
+
+header {
+  background-color: var(--bg-header) !important;
+  border-color: var(--border-primary) !important;
+  box-shadow: 0 1px 0 rgba(255,255,255,.76), 0 14px 42px rgba(15, 23, 42, .045);
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  header { background-color: var(--bg-surface) !important; }
+}
+
+@layer components {
+  .status-badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .status-badge.success {
+    @apply bg-green-100 text-green-800;
+  }
+
+  .status-badge.warning {
+    @apply bg-yellow-100 text-yellow-800;
+  }
+
+  .status-badge.error {
+    @apply bg-red-100 text-red-800;
+  }
+
+  .status-badge.info {
+    @apply bg-blue-100 text-blue-800;
+  }
+
+  .status-badge.secondary {
+    @apply bg-gray-100 text-gray-800;
+  }
+
+  .btn {
+    @apply px-4 py-2 rounded-lg font-medium transition-colors duration-200;
+  }
+
+  .btn-primary {
+    @apply bg-primary text-white hover:bg-blue-700;
+  }
+
+  .btn-secondary {
+    @apply bg-gray-200 text-gray-800 hover:bg-gray-300;
+  }
+
+  .btn-danger {
+    @apply bg-red-600 text-white hover:bg-red-700;
+  }
+
+  .card {
+    @apply bg-bg-card border border-border-primary rounded-[24px] p-6 shadow-sm;
+  }
+
+  .stat-card {
+    @apply bg-white border border-gray-200 rounded-xl p-6;
+  }
+}

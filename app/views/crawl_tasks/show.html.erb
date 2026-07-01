@@ -1,0 +1,110 @@
+<div class="space-y-6">
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-3xl font-bold text-gray-900">抓取任务详情</h1>
+      <p class="text-gray-600 mt-1">
+        <%= link_to "← 返回所有任务", crawl_tasks_path, class: "text-primary hover:underline" %>
+      </p>
+    </div>
+    <div class="flex items-center space-x-3">
+      <% if @crawl_task.running? %>
+        <%= button_to "暂停", pause_crawl_task_path(@crawl_task), method: :post, class: "btn btn-warning" %>
+      <% elsif @crawl_task.paused? %>
+        <%= button_to "恢复", resume_crawl_task_path(@crawl_task), method: :post, class: "btn btn-primary" %>
+      <% end %>
+    </div>
+  </div>
+
+  <!-- Task Info Card -->
+  <div class="card">
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <h2 class="text-xl font-semibold text-gray-900">
+          <% if @crawl_task.account_ids.nil? %>
+            全部活跃公众号
+          <% else %>
+            <%= @crawl_task.account_count %> 个公众号
+          <% end %>
+        </h2>
+        <p class="text-sm text-gray-600 mt-1">
+          <%= @crawl_task.account_names.first(5).join("、") %>
+          <% if @crawl_task.account_count > 5 %>
+            等 <%= @crawl_task.account_count %> 个
+          <% end %>
+        </p>
+      </div>
+      <%= render 'shared/status_badge', status: @crawl_task.status %>
+    </div>
+
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+      <div>
+        <p class="text-sm text-gray-600">已抓取文章</p>
+        <p class="text-2xl font-bold text-gray-900"><%= @crawl_task.progress %></p>
+      </div>
+      <div>
+        <p class="text-sm text-gray-600">累计错误</p>
+        <p class="text-2xl font-bold <%= @crawl_task.error_count > 0 ? 'text-red-600' : 'text-gray-900' %>"><%= @crawl_task.error_count %></p>
+      </div>
+      <div>
+        <p class="text-sm text-gray-600">开始时间</p>
+        <p class="text-lg font-semibold text-gray-900"><%= @crawl_task.started_at&.strftime('%Y-%m-%d %H:%M') || '无' %></p>
+      </div>
+      <div>
+        <p class="text-sm text-gray-600">完成时间</p>
+        <p class="text-lg font-semibold text-gray-900"><%= @crawl_task.completed_at&.strftime('%Y-%m-%d %H:%M') || '无' %></p>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 md:grid-cols-2 gap-4 mt-4">
+      <div>
+        <p class="text-sm text-gray-600">公众号并发</p>
+        <p class="text-lg font-semibold text-gray-900"><%= @crawl_task.effective_account_concurrency %></p>
+      </div>
+      <div>
+        <p class="text-sm text-gray-600">文章并发</p>
+        <p class="text-lg font-semibold text-gray-900"><%= @crawl_task.effective_article_concurrency %></p>
+      </div>
+    </div>
+
+    <% if @crawl_task.error_message.present? %>
+      <div class="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+        <p class="text-sm font-medium text-red-900">错误：</p>
+        <p class="text-sm text-red-700 mt-1"><%= @crawl_task.error_message %></p>
+      </div>
+    <% end %>
+  </div>
+
+  <!-- Recent Logs -->
+  <div class="card">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-xl font-bold text-gray-900">最近日志</h2>
+      <%= link_to "查看所有日志 →", logs_crawl_task_path(@crawl_task), class: "text-primary hover:underline text-sm font-medium" %>
+    </div>
+
+    <% if @recent_logs.any? %>
+      <div class="space-y-2 font-mono text-sm">
+        <% @recent_logs.each do |log| %>
+          <div class="flex items-start space-x-3 py-2 border-b border-gray-100 last:border-0">
+            <span class="text-xs text-gray-500 whitespace-nowrap">
+              <%= log.logged_at.strftime('%H:%M:%S') %>
+            </span>
+            <span class="px-2 py-0.5 rounded text-xs font-medium <%= case log.level when 'error' then 'bg-red-100 text-red-800' when 'warn' then 'bg-yellow-100 text-yellow-800' when 'info' then 'bg-blue-100 text-blue-800' else 'bg-gray-100 text-gray-700' end %>">
+              <%= log.level.upcase %>
+            </span>
+            <span class="flex-1 <%= log.level == 'error' ? 'text-red-700' : 'text-gray-700' %>">
+              <%= log.message %>
+            </span>
+          </div>
+        <% end %>
+      </div>
+    <% else %>
+      <p class="text-gray-500 text-center py-8">
+        暂无日志
+        <% unless Option.verbose_mode? %>
+          <br>
+          <span class="text-sm">详细日志已禁用。在<%= link_to "设置", admin_settings_path, class: "text-primary underline" %>中启用</span>
+        <% end %>
+      </p>
+    <% end %>
+  </div>
+</div>

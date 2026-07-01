@@ -1,0 +1,97 @@
+<header class="sticky top-0 z-50 backdrop-blur-md bg-bg-header border-b border-border-primary">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+    <%= link_to root_path, class: "flex items-center gap-3 hover:opacity-80 transition" do %>
+      <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
+        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+      </div>
+      <span class="text-lg font-bold text-text-primary hidden sm:block">MP-Crawler</span>
+    <% end %>
+
+    <% if current_user %>
+      <!-- Desktop Navigation (hidden on mobile) -->
+      <nav class="hidden md:flex items-center gap-1">
+        <%= link_to root_path, class: "h-9 inline-flex items-center px-4 rounded-xl text-sm font-semibold transition #{current_page?(root_path) ? 'text-brand bg-brand-soft' : 'text-text-secondary hover:text-brand hover:bg-bg-card'}" do %>
+          仪表板
+        <% end %>
+        <%= link_to accounts_path, class: "h-9 inline-flex items-center px-4 rounded-xl text-sm font-semibold transition #{current_page?(accounts_path) ? 'text-brand bg-brand-soft' : 'text-text-secondary hover:text-brand hover:bg-bg-card'}" do %>
+          公众号
+        <% end %>
+        <%= link_to crawl_tasks_path, class: "h-9 inline-flex items-center px-4 rounded-xl text-sm font-semibold transition #{current_page?(crawl_tasks_path) ? 'text-brand bg-brand-soft' : 'text-text-secondary hover:text-brand hover:bg-bg-card'}" do %>
+          抓取任务
+        <% end %>
+      </nav>
+
+      <div class="flex items-center gap-2">
+        <% if current_user_is_admin? %>
+          <%= link_to admin_settings_path, class: "h-9 px-3 rounded-xl border border-border-primary bg-bg-card hover:border-brand hover:text-brand text-sm font-semibold transition inline-flex items-center gap-2" do %>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+            </svg>
+            <span class="hidden sm:inline">设置</span>
+          <% end %>
+        <% end %>
+
+        <div class="relative" data-controller="dropdown">
+          <button data-action="click->dropdown#toggle" class="h-10 flex items-center gap-2 px-2 sm:px-3 rounded-xl hover:bg-bg-card transition">
+            <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-sm font-bold">
+              <%= current_user.email_address[0].upcase %>
+            </div>
+            <span class="text-sm font-medium hidden sm:block"><%= current_user.email_address.split('@').first %></span>
+            <svg class="w-4 h-4 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+          </button>
+
+          <div data-dropdown-target="panel" class="hidden absolute right-0 top-14 w-64 bg-bg-card rounded-2xl border border-border-primary shadow-[0_22px_70px_rgba(15,23,42,.14)] overflow-hidden z-50">
+            <div class="flex items-center gap-3 px-4 py-4 border-b border-border-secondary">
+              <div class="w-11 h-11 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold">
+                <%= current_user.email_address[0].upcase %>
+              </div>
+              <div class="min-w-0 flex-1">
+                <p class="font-semibold text-sm truncate"><%= current_user.email_address.split('@').first %></p>
+                <p class="text-xs text-text-secondary truncate"><%= current_user.email_address %></p>
+              </div>
+            </div>
+
+            <div>
+              <%= link_to edit_profile_path, class: "w-full flex items-center gap-3 px-4 py-3 text-sm hover:bg-bg-secondary transition" do %>
+                <svg class="w-4 h-4 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                </svg>
+                个人资料
+              <% end %>
+
+              <% if current_user_is_admin? %>
+                <%= link_to admin_users_path, class: "w-full flex items-center gap-3 px-4 py-3 text-sm hover:bg-bg-secondary transition" do %>
+                  <svg class="w-4 h-4 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+                  </svg>
+                  用户管理
+                <% end %>
+              <% end %>
+            </div>
+
+            <div class="border-t border-border-secondary">
+              <%= button_to session_path, method: :delete, class: "w-full flex items-center gap-3 px-4 py-3 text-sm hover:bg-bg-secondary transition text-left" do %>
+                <svg class="w-4 h-4 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                </svg>
+                <span class="text-red-500">退出登录</span>
+              <% end %>
+            </div>
+          </div>
+        </div>
+      </div>
+    <% else %>
+      <%= link_to new_session_path, class: "h-10 px-4 rounded-xl border border-border-primary bg-bg-card hover:border-brand hover:text-brand text-sm font-semibold transition flex items-center gap-2" do %>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/>
+        </svg>
+        登录
+      <% end %>
+    <% end %>
+  </div>
+</header>

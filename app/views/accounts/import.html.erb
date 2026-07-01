@@ -1,0 +1,189 @@
+<div class="space-y-6">
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-3xl font-bold text-gray-900">导入公众号</h1>
+      <p class="text-gray-600 mt-1">从 JSON 文件导入微信公众号</p>
+    </div>
+    <%= link_to "← 返回公众号列表", accounts_path, class: "btn btn-secondary" %>
+  </div>
+
+  <!-- Import Methods Tabs -->
+  <div class="card">
+    <div class="border-b border-gray-200 mb-6">
+      <nav class="-mb-px flex space-x-8">
+        <button onclick="showTab('paste')" id="tab-paste" class="tab-button active border-b-2 border-primary text-primary py-4 px-1 text-sm font-medium">
+          粘贴 JSON
+        </button>
+        <button onclick="showTab('upload')" id="tab-upload" class="tab-button text-gray-500 hover:text-gray-700 py-4 px-1 text-sm font-medium">
+          上传文件
+        </button>
+      </nav>
+    </div>
+
+    <%= form_with url: import_json_accounts_path, method: :post, multipart: true, id: "import-form" do |f| %>
+      <!-- Paste JSON Tab -->
+      <div id="paste-tab" class="tab-content">
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              JSON 数据
+            </label>
+            <textarea name="json_text" rows="15" placeholder='在此粘贴您的 JSON 数据...'
+                      class="w-full px-4 py-3 border border-gray-300 rounded-lg font-mono text-sm focus:ring-2 focus:ring-primary focus:border-transparent"></textarea>
+            <p class="mt-2 text-sm text-gray-500">
+              期望格式：
+            </p>
+            <pre class="mt-2 bg-gray-50 border border-gray-200 rounded p-3 text-xs overflow-x-auto"><code>{
+  "accounts": [
+    {
+      "fakeid": "MzkzNjIwNjYwOQ==",
+      "nickname": "Account Name",
+      "round_head_img": "http://...",
+      "articles": 100
+    }
+  ]
+}</code></pre>
+          </div>
+
+          <div class="flex justify-end">
+            <button type="submit" class="btn btn-primary">
+              从文本导入
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Upload File Tab -->
+      <div id="upload-tab" class="tab-content hidden">
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              上传 JSON 文件
+            </label>
+            <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-gray-400 transition-colors">
+              <div class="space-y-1 text-center">
+                <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                  <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                <div class="flex text-sm text-gray-600">
+                  <label for="file-upload" class="relative cursor-pointer bg-white rounded-md font-medium text-primary hover:text-blue-700 focus-within:outline-none">
+                    <span>上传文件</span>
+                    <%= f.file_field :json_file, id: "file-upload", accept: ".json", class: "sr-only", onchange: "updateFileName(this)" %>
+                  </label>
+                  <p class="pl-1">或拖放文件至此</p>
+                </div>
+                <p class="text-xs text-gray-500">仅支持 JSON 文件</p>
+                <p id="file-name" class="text-sm text-gray-700 font-medium mt-2"></p>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex justify-end">
+            <button type="submit" class="btn btn-primary">
+              从文件导入
+            </button>
+          </div>
+        </div>
+      </div>
+    <% end %>
+  </div>
+
+  <!-- Help Section -->
+  <div class="card bg-blue-50 border-blue-200">
+    <h3 class="font-semibold text-blue-900 mb-3">💡 导入提示</h3>
+    <ul class="space-y-2 text-sm text-blue-800">
+      <li>• JSON 必须包含 "accounts" 数组，其中包含公众号对象</li>
+      <li>• 必填字段：<code class="bg-blue-100 px-1 rounded">fakeid</code> 和 <code class="bg-blue-100 px-1 rounded">nickname</code></li>
+      <li>• 可选字段：<code class="bg-blue-100 px-1 rounded">round_head_img</code>、<code class="bg-blue-100 px-1 rounded">articles</code></li>
+      <li>• 重复的公众号（相同 fakeid）将被跳过</li>
+      <li>• 所有导入的公众号将被设置为"活跃"状态</li>
+    </ul>
+  </div>
+
+  <!-- Example Download -->
+  <div class="card">
+    <h3 class="font-semibold text-gray-900 mb-3">📄 示例模板</h3>
+    <p class="text-sm text-gray-600 mb-3">下载示例 JSON 模板以开始使用：</p>
+    <a href="data:text/json;charset=utf-8,<%= CGI.escape({
+      version: "1.0",
+      usefor: "wechat-article-exporter",
+      accounts: [
+        {
+          fakeid: "example_fakeid_1",
+          nickname: "Example Account 1",
+          round_head_img: "http://example.com/avatar1.png",
+          articles: 100
+        },
+        {
+          fakeid: "example_fakeid_2",
+          nickname: "Example Account 2",
+          round_head_img: "http://example.com/avatar2.png",
+          articles: 200
+        }
+      ]
+    }.to_json) %>" download="accounts_template.json" class="btn btn-secondary inline-flex items-center">
+      <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      </svg>
+      下载模板
+    </a>
+  </div>
+</div>
+
+<script>
+function showTab(tab) {
+  // Hide all tabs
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+  document.querySelectorAll('.tab-button').forEach(el => {
+    el.classList.remove('active', 'border-b-2', 'border-primary', 'text-primary');
+    el.classList.add('text-gray-500');
+  });
+
+  // Show selected tab
+  document.getElementById(tab + '-tab').classList.remove('hidden');
+  document.getElementById('tab-' + tab).classList.add('active', 'border-b-2', 'border-primary', 'text-primary');
+  document.getElementById('tab-' + tab).classList.remove('text-gray-500');
+}
+
+function updateFileName(input) {
+  const fileName = input.files[0]?.name;
+  const fileNameEl = document.getElementById('file-name');
+  if (fileName) {
+    fileNameEl.textContent = '📎 ' + fileName;
+  } else {
+    fileNameEl.textContent = '';
+  }
+}
+
+// Drag and drop support
+const uploadArea = document.querySelector('.border-dashed');
+if (uploadArea) {
+  ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+    uploadArea.addEventListener(eventName, preventDefaults, false);
+  });
+
+  function preventDefaults(e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  ['dragenter', 'dragover'].forEach(eventName => {
+    uploadArea.addEventListener(eventName, () => {
+      uploadArea.classList.add('border-primary', 'bg-blue-50');
+    }, false);
+  });
+
+  ['dragleave', 'drop'].forEach(eventName => {
+    uploadArea.addEventListener(eventName, () => {
+      uploadArea.classList.remove('border-primary', 'bg-blue-50');
+    }, false);
+  });
+
+  uploadArea.addEventListener('drop', (e) => {
+    const dt = e.dataTransfer;
+    const files = dt.files;
+    document.getElementById('file-upload').files = files;
+    updateFileName(document.getElementById('file-upload'));
+  }, false);
+}
+</script>

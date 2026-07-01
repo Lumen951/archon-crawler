@@ -7,7 +7,7 @@ image: mp_crawler
 # Deploy to these servers.
 servers:
   web:
-    - 192.168.0.1
+    - mp-crawler.miracleplus.com
   # job:
   #   hosts:
   #     - 192.168.0.1
@@ -20,9 +20,13 @@ servers:
 #
 # Don't use this when deploying to multiple web servers (then you have to terminate SSL at your load balancer).
 #
-# proxy:
-#   ssl: true
-#   host: app.example.com
+proxy:
+  run:
+    http_port: 6080
+    https_port: 6443
+    registry: docker.1ms.run
+  # ssl: true
+  host: mp-crawler.miracleplus.com
 
 # Where you keep your container images.
 registry:
@@ -91,8 +95,10 @@ builder:
   #   - RAILS_MASTER_KEY
 
 # Use a different ssh user than root
-# ssh:
-#   user: app
+ssh:
+  user: ubuntu
+  keys: 
+    - ~/.ssh/livekit.pem
 
 # Use accessory services (secrets come from .kamal/secrets).
 # accessories:

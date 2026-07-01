@@ -1,0 +1,83 @@
+<div class="space-y-6">
+  <div>
+    <h2 class="text-2xl font-bold text-slate-900 mb-6">用户详情</h2>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
+      <div class="p-4 border-b border-slate-200">
+        <h5 class="text-base font-bold text-slate-900">基本信息</h5>
+      </div>
+      <div class="p-6">
+        <dl class="space-y-3">
+          <div class="flex">
+            <dt class="w-32 text-sm font-medium text-slate-600">邮箱</dt>
+            <dd class="flex-1 text-sm text-slate-900"><%= @user.email_address %></dd>
+          </div>
+
+          <% if @user.name.present? %>
+            <div class="flex">
+              <dt class="w-32 text-sm font-medium text-slate-600">姓名</dt>
+              <dd class="flex-1 text-sm text-slate-900"><%= @user.name %></dd>
+            </div>
+          <% end %>
+
+          <div class="flex">
+            <dt class="w-32 text-sm font-medium text-slate-600">角色</dt>
+            <dd class="flex-1">
+              <% if @user.admin? %>
+                <span class="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs font-semibold">管理员</span>
+              <% else %>
+                <span class="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-xs font-semibold">用户</span>
+              <% end %>
+            </dd>
+          </div>
+
+          <div class="flex">
+            <dt class="w-32 text-sm font-medium text-slate-600">创建时间</dt>
+            <dd class="flex-1 text-sm text-slate-900"><%= @user.created_at.strftime("%Y-%m-%d %H:%M") %></dd>
+          </div>
+
+          <div class="flex">
+            <dt class="w-32 text-sm font-medium text-slate-600">最后登录</dt>
+            <dd class="flex-1 text-sm text-slate-900">
+              <% if @user.ever_logged_in? %>
+                <%= @user.last_login_at.strftime("%Y-%m-%d %H:%M") %>
+              <% else %>
+                <span class="text-slate-400">从未登录</span>
+              <% end %>
+            </dd>
+          </div>
+        </dl>
+
+        <div class="mt-6 flex flex-wrap gap-2">
+          <%= link_to "编辑", edit_admin_user_path(@user), class: "px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-semibold" %>
+          <%= button_to "重置密码", reset_password_admin_user_path(@user), method: :post, data: { confirm: "确定要重置此用户的密码吗？" }, class: "px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors text-sm font-semibold" %>
+          <%= link_to "返回", admin_users_path, class: "px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors text-sm font-semibold" %>
+          <% unless @user == current_user %>
+            <%= button_to "删除", admin_user_path(@user), method: :delete, data: { confirm: "确定要删除此用户吗？" }, class: "px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-semibold" %>
+          <% end %>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
+      <div class="p-4 border-b border-slate-200">
+        <h5 class="text-base font-bold text-slate-900">登录历史</h5>
+      </div>
+      <div class="p-6">
+        <% if @sessions.any? %>
+          <div class="space-y-2">
+            <% @sessions.each do |session| %>
+              <div class="p-3 bg-slate-50 rounded-lg">
+                <small class="text-xs text-slate-600"><%= session.created_at.strftime("%Y-%m-%d %H:%M:%S") %></small>
+              </div>
+            <% end %>
+          </div>
+        <% else %>
+          <p class="text-sm text-slate-500">暂无登录记录</p>
+        <% end %>
+      </div>
+    </div>
+  </div>
+</div>

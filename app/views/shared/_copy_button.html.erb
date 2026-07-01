@@ -1,0 +1,33 @@
+<%#
+  Reusable copy button with visual feedback
+  Usage:
+    render 'shared/copy_button', text: "text to copy", size: "sm"
+
+  Options:
+    - text: (required) The text to copy to clipboard
+    - size: "sm" or "md" (default: "sm")
+%>
+
+<% size ||= "sm" %>
+<% button_class = size == "sm" ? "p-1.5" : "p-2" %>
+<% icon_class = size == "sm" ? "h-4 w-4" : "h-5 w-5" %>
+
+<button
+  type="button"
+  data-controller="clipboard"
+  data-clipboard-text-value="<%= text %>"
+  data-action="click->clipboard#copy"
+  data-clipboard-target="button"
+  class="<%= button_class %> text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+  title="复制到剪贴板"
+>
+  <!-- Copy icon (default) -->
+  <svg data-clipboard-target="icon" class="<%= icon_class %>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+  </svg>
+
+  <!-- Check icon (shown after copy) -->
+  <svg data-clipboard-target="checkIcon" class="<%= icon_class %> hidden text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+  </svg>
+</button>
