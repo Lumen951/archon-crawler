@@ -57,7 +57,7 @@
           <%= render 'shared/copy_button', text: accounts_list_rss_url %>
         </div>
         <div class="flex items-center gap-2">
-          <span class="text-sm text-text-secondary">活跃公众号:</span>
+          <span class="text-sm text-text-secondary">启用的公众号:</span>
           <%= link_to "RSS", active_accounts_list_rss_path,
               class: "text-sm text-brand hover:text-brand-dark font-semibold transition",
               target: "_blank",
@@ -76,7 +76,7 @@
     </div>
 
     <div class="bg-bg-card border border-border-primary rounded-xl p-6 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
-      <div class="text-sm font-medium text-text-secondary">活跃公众号</div>
+      <div class="text-sm font-medium text-text-secondary">启用的公众号</div>
       <div class="mt-2 text-3xl font-bold text-green-600"><%= @active_accounts %></div>
     </div>
 
@@ -124,7 +124,7 @@
                   <div class="text-sm font-medium text-text-primary">
                     <%= link_to crawl_task_path(task) do %>
                       <% if task.account_ids.nil? %>
-                        全部活跃公众号
+                        全部启用的公众号
                       <% else %>
                         <%= task.account_count %> 个公众号
                       <% end %>
@@ -164,7 +164,7 @@
               <div class="flex-1">
                 <div class="text-sm font-semibold text-text-primary mb-2">
                   <% if task.account_ids.nil? %>
-                    全部活跃公众号
+                    全部启用的公众号
                   <% else %>
                     <%= task.account_count %> 个公众号
                   <% end %>

@@ -48,7 +48,7 @@ class CrawlTasksController < ApplicationController
 
     task = CrawlTask.create!(account_ids: nil, status: :pending)
     CrawlJob.perform_later(task.id)
-    flash[:success] = "已为所有活跃公众号创建抓取任务"
+    flash[:success] = "已为所有启用的公众号创建抓取任务"
     redirect_to crawl_tasks_path
   end
 end

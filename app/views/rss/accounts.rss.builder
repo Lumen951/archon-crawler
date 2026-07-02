@@ -13,7 +13,7 @@ xml.rss version: "2.0" do
         xml.description "#{account.article_count_summary}#{account.last_crawled_at ? " | 最后抓取: #{account.last_crawled_at.strftime('%Y-%m-%d %H:%M')}" : ''}"
         xml.pubDate (account.last_crawled_at || account.created_at).rfc822
         xml.guid account_url(account), isPermaLink: "true"
-        xml.category account.active? ? "活跃" : "不活跃"
+        xml.category account.active? ? "启用" : "停用"
       end
     end
   end

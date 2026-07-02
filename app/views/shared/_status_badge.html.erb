@@ -11,7 +11,25 @@
                 else
                   'secondary'
                 end
+  status_label = case status.to_s
+                 when 'completed'
+                   '已完成'
+                 when 'running'
+                   '运行中'
+                 when 'paused'
+                   '已暂停'
+                 when 'pending'
+                   '待处理'
+                 when 'failed'
+                   '失败'
+                 when 'active'
+                   '启用'
+                 when 'inactive'
+                   '停用'
+                 else
+                   status.to_s.humanize
+                 end
 %>
 <span class="status-badge <%= badge_class %>">
-  <%= status.to_s.humanize %>
+  <%= status_label %>
 </span>

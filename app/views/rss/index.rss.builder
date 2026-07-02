@@ -1,7 +1,7 @@
 xml.instruct! :xml, version: "1.0"
 xml.rss version: "2.0" do
   xml.channel do
-    xml.title "所有公众号 - #{@period_label}"
+    xml.title "所有公众号文章 - #{@period_label}"
     xml.description "所有公众号文章RSS订阅 - #{@period_label}"
     xml.link all_accounts_rss_url(period: params[:period])
     xml.language "zh-CN"
