@@ -1,3 +1,7 @@
+<% content_for :head do %>
+  <meta name="turbo-cache-control" content="no-cache">
+<% end %>
+
 <div class="space-y-8">
   <%= turbo_stream_from :crawl_tasks %>
 
