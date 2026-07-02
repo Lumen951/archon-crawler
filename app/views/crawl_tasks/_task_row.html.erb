@@ -1,0 +1,64 @@
+<tr id="<%= dom_id(task, :row) %>" class="hover:bg-bg-secondary transition">
+  <td class="px-6 py-4 whitespace-nowrap">
+    <div class="text-sm font-medium text-text-primary">
+      <% if task.account_ids.nil? %>
+        全部活跃公众号
+      <% else %>
+        <%= task.account_count %> 个公众号
+      <% end %>
+    </div>
+  </td>
+  <td class="px-6 py-4 whitespace-nowrap">
+    <%= render 'shared/status_badge', status: task.status %>
+    <% if task.error_message.present? %>
+      <div class="mt-1 text-xs text-red-600 max-w-xs truncate" title="<%= task.error_message %>">
+        <%= task.error_message %>
+      </div>
+    <% end %>
+  </td>
+  <td class="px-6 py-4 whitespace-nowrap">
+    <span class="text-sm text-text-secondary"><%= task.progress %> 篇文章</span>
+  </td>
+  <td class="px-6 py-4 whitespace-nowrap">
+    <% if task.error_count > 0 %>
+      <span class="text-sm text-red-600 font-semibold"><%= task.error_count %></span>
+    <% else %>
+      <span class="text-sm text-text-muted">0</span>
+    <% end %>
+  </td>
+  <td class="px-6 py-4 whitespace-nowrap text-sm text-text-secondary">
+    <% if task.started_at %>
+      <%= time_ago_in_words(task.started_at) %>前
+    <% else %>
+      待开始
+    <% end %>
+  </td>
+  <td class="px-6 py-4 whitespace-nowrap text-sm text-text-secondary">
+    <% if task.completed_at && task.started_at %>
+      <%= distance_of_time_in_words(task.started_at, task.completed_at) %>
+    <% elsif task.running? %>
+      运行中...
+    <% else %>
+      -
+    <% end %>
+  </td>
+  <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+    <div class="flex items-center justify-end gap-2">
+      <% if task.running? %>
+        <%= button_to pause_crawl_task_path(task), method: :post, class: "h-8 px-3 rounded-lg bg-yellow-100 text-yellow-700 hover:bg-yellow-200 text-xs font-semibold transition" do %>
+          暂停
+        <% end %>
+      <% elsif task.paused? %>
+        <%= button_to resume_crawl_task_path(task), method: :post, class: "h-8 px-3 rounded-lg bg-brand text-white hover:bg-brand-dark text-xs font-semibold transition" do %>
+          恢复
+        <% end %>
+      <% end %>
+      <%= link_to crawl_task_path(task), class: "text-brand hover:text-brand-dark font-semibold transition" do %>
+        详情
+      <% end %>
+      <%= link_to logs_crawl_task_path(task), class: "text-brand hover:text-brand-dark font-semibold transition" do %>
+        日志
+      <% end %>
+    </div>
+  </td>
+</tr>

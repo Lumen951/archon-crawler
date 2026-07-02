@@ -1,6 +1,8 @@
 class CrawlTask < ApplicationRecord
   has_many :crawl_logs, dependent: :destroy
 
+  after_update_commit :broadcast_task_updates
+
   enum :status, { pending: 0, running: 1, paused: 2, completed: 3, failed: 4 }
 
   scope :active, -> { where(status: [:pending, :running]) }
@@ -30,6 +32,16 @@ class CrawlTask < ApplicationRecord
 
   def increment_error_count!
     increment!(:error_count)
+    broadcast_updates
+  end
+
+  def increment_progress!
+    increment!(:progress)
+    broadcast_updates
+  end
+
+  def broadcast_updates
+    broadcast_task_updates
   end
 
   def log(level, message, context: nil)
@@ -75,5 +87,30 @@ class CrawlTask < ApplicationRecord
     else
       Account.active.count
     end
+  end
+
+  private
+
+  def broadcast_task_updates
+    broadcast_replace_to(
+      :crawl_tasks,
+      target: ActionView::RecordIdentifier.dom_id(self, :row),
+      partial: "crawl_tasks/task_row",
+      locals: { task: self }
+    )
+
+    broadcast_replace_to(
+      :crawl_tasks,
+      target: ActionView::RecordIdentifier.dom_id(self, :card),
+      partial: "crawl_tasks/task_card",
+      locals: { task: self }
+    )
+
+    broadcast_replace_to(
+      [self, :show],
+      target: ActionView::RecordIdentifier.dom_id(self, :show_body),
+      partial: "crawl_tasks/show_body",
+      locals: { crawl_task: self, recent_logs: crawl_logs.recent.limit(50) }
+    )
   end
 end
