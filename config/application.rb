@@ -24,5 +24,8 @@ module MpCrawler
     config.time_zone = "Beijing"
     # config.eager_load_paths << Rails.root.join("extras")
     config.i18n.default_locale = :"zh-CN"
+
+    # https://edgeguides.rubyonrails.org/configuring.html#config-active-support-isolation-level
+    config.active_support.isolation_level = :fiber
   end
 end

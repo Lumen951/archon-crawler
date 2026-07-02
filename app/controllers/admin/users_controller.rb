@@ -118,17 +118,6 @@ class Admin::UsersController < Admin::BaseController
     end
   end
 
-  def magic_link_login
-    user = User.find_by_magic_link_token(params[:token])
-
-    if user
-      start_new_session_for(user)
-      redirect_to after_authentication_url, notice: "登录成功！"
-    else
-      redirect_to new_session_path, alert: "登录链接无效或已过期"
-    end
-  end
-
   private
 
   def set_user

@@ -89,8 +89,6 @@ class WechatCrawler
       offset += 20
       pages_crawled += 1
 
-      crawl_task.increment!(:progress, articles_data.size)
-
       sleep 0.5
     end
 
@@ -129,6 +127,7 @@ class WechatCrawler
       published_at: Time.at(article_data['create_time'].to_i)
     )
 
+    crawl_task.increment!(:progress, 1)
     crawl_task.log(:info, "已保存文章：#{article_data['title']}")
   rescue ActiveRecord::RecordInvalid => e
     crawl_task.log(:warn, "跳过重复文章：#{article_data['link']}")

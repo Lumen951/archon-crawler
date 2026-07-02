@@ -1,7 +1,9 @@
 Rails.application.routes.draw do
   # Authentication routes
-  resource :session, only: [:new, :create, :destroy]
-  get '/magic_link/:token', to: 'admin/users#magic_link_login', as: :magic_link
+  resource :session, only: [:new, :create, :destroy] do
+    post :magic_link
+  end
+  get '/magic_link/:token', to: 'sessions#magic_link_login', as: :magic_link
 
   root "dashboard#index"
 
