@@ -87,12 +87,6 @@
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                 <div class="flex items-center justify-end gap-2">
-                  <%= link_to crawl_task_path(task), class: "text-brand hover:text-brand-dark font-semibold transition" do %>
-                    详情
-                  <% end %>
-                  <%= link_to logs_crawl_task_path(task), class: "text-brand hover:text-brand-dark font-semibold transition" do %>
-                    日志
-                  <% end %>
                   <% if task.running? %>
                     <%= button_to pause_crawl_task_path(task), method: :post, class: "h-8 px-3 rounded-lg bg-yellow-100 text-yellow-700 hover:bg-yellow-200 text-xs font-semibold transition" do %>
                       暂停
@@ -101,6 +95,12 @@
                     <%= button_to resume_crawl_task_path(task), method: :post, class: "h-8 px-3 rounded-lg bg-brand text-white hover:bg-brand-dark text-xs font-semibold transition" do %>
                       恢复
                     <% end %>
+                  <% end %>
+                  <%= link_to crawl_task_path(task), class: "text-brand hover:text-brand-dark font-semibold transition" do %>
+                    详情
+                  <% end %>
+                  <%= link_to logs_crawl_task_path(task), class: "text-brand hover:text-brand-dark font-semibold transition" do %>
+                    日志
                   <% end %>
                 </div>
               </td>
