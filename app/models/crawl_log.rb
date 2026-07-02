@@ -1,5 +1,5 @@
 class CrawlLog < ApplicationRecord
-  belongs_to :crawl_task
+  belongs_to :crawl_task, touch: true
 
   LEVELS = %w[debug info warn error].freeze
 
