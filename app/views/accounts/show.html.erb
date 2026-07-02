@@ -29,6 +29,20 @@
             <%= render 'shared/copy_button', text: account_rss_url(@account.fakeid) %>
           </div>
         </div>
+
+        <div class="mt-5 flex flex-wrap items-center gap-2">
+          <%= button_to crawl_account_path(@account), method: :post, class: "h-9 px-4 rounded-lg bg-brand text-white hover:bg-brand-dark text-sm font-semibold transition" do %>
+            立即抓取
+          <% end %>
+          <%= button_to toggle_status_account_path(@account), method: :post, class: "h-9 px-4 rounded-lg border border-border-primary bg-bg-card hover:border-brand hover:text-brand text-sm font-semibold transition" do %>
+            <%= @account.active? ? "停用" : "启用" %>
+          <% end %>
+          <%= button_to account_path(@account), method: :delete,
+                form: { data: { turbo_confirm: "确定要删除该公众号及其文章数据吗？" } },
+                class: "h-9 px-4 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 text-sm font-semibold transition" do %>
+            删除公众号
+          <% end %>
+        </div>
       </div>
     </div>
   </div>

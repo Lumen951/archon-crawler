@@ -10,10 +10,12 @@ Rails.application.routes.draw do
   # Authenticated user routes (no admin required)
   get 'dashboard', to: 'dashboard#index', as: :dashboard
 
-  resources :accounts, only: [:index, :show] do
+  resources :accounts, only: [:index, :show, :destroy] do
     collection do
       get :import
+      get :search_preview
       post :import_json
+      post :import_search
     end
     member do
       post :crawl

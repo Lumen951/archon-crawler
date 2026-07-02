@@ -2,7 +2,7 @@
   <div class="flex items-center justify-between">
     <div>
       <h1 class="text-3xl font-bold text-gray-900">导入公众号</h1>
-      <p class="text-gray-600 mt-1">从 JSON、CSV 或 XLSX 文件导入微信公众号</p>
+      <p class="text-gray-600 mt-1">支持通过搜索 API 或 JSON、CSV、XLSX 文件导入微信公众号</p>
     </div>
     <%= link_to "← 返回公众号列表", accounts_path, class: "btn btn-secondary" %>
   </div>
@@ -11,13 +11,37 @@
   <div class="card">
     <div class="border-b border-gray-200 mb-6">
       <nav class="-mb-px flex space-x-8">
-        <button onclick="showTab('upload')" id="tab-upload" class="tab-button active border-b-2 border-primary text-primary py-4 px-1 text-sm font-medium">
+        <button type="button" onclick="showTab('search')" id="tab-search" class="tab-button active border-b-2 border-primary text-primary py-4 px-1 text-sm font-medium">
+          搜索导入
+        </button>
+        <button type="button" onclick="showTab('upload')" id="tab-upload" class="tab-button text-gray-500 hover:text-gray-700 py-4 px-1 text-sm font-medium">
           上传文件
         </button>
-        <button onclick="showTab('paste')" id="tab-paste" class="tab-button text-gray-500 hover:text-gray-700 py-4 px-1 text-sm font-medium">
+        <button type="button" onclick="showTab('paste')" id="tab-paste" class="tab-button text-gray-500 hover:text-gray-700 py-4 px-1 text-sm font-medium">
           粘贴 JSON
         </button>
       </nav>
+    </div>
+
+    <div id="search-tab" class="tab-content">
+      <%= form_with url: search_preview_accounts_path, method: :get, local: true, id: "search-form" do %>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              公众号关键词
+            </label>
+            <input type="text" id="search-keyword" name="keyword" placeholder="例如：清华大学、北大招生、复旦研究生"
+                   class="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent" required>
+            <p class="mt-2 text-sm text-gray-500">系统将调用搜索公众号 API，先展示可勾选的预览列表，再导入选中的公众号。</p>
+          </div>
+
+          <div class="flex justify-end">
+            <button type="submit" class="btn btn-primary">
+              搜索并导入
+            </button>
+          </div>
+        </div>
+      <% end %>
     </div>
 
     <%= form_with url: import_json_accounts_path, method: :post, multipart: true, id: "import-form" do |f| %>
@@ -54,7 +78,7 @@
       </div>
 
       <!-- Upload File Tab -->
-      <div id="upload-tab" class="tab-content">
+      <div id="upload-tab" class="tab-content hidden">
         <div class="space-y-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">
@@ -92,6 +116,7 @@
   <div class="card bg-blue-50 border-blue-200">
     <h3 class="font-semibold text-blue-900 mb-3">💡 导入提示</h3>
     <ul class="space-y-2 text-sm text-blue-800">
+      <li>• 搜索导入会调用 API：<code class="bg-blue-100 px-1 rounded">GET /api/public/v1/account?keyword=...</code></li>
       <li>• JSON 仍需包含 <code class="bg-blue-100 px-1 rounded">accounts</code> 数组</li>
       <li>• CSV/XLSX 只识别必填列：<code class="bg-blue-100 px-1 rounded">fakeid</code> 和 <code class="bg-blue-100 px-1 rounded">nickname</code></li>
       <li>• 可选列：<code class="bg-blue-100 px-1 rounded">round_head_img</code>、<code class="bg-blue-100 px-1 rounded">articles</code>、<code class="bg-blue-100 px-1 rounded">total_articles</code></li>
@@ -136,6 +161,8 @@
 </div>
 
 <script>
+showTab('search');
+
 function showTab(tab) {
   // Hide all tabs
   document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
@@ -158,6 +185,17 @@ function updateFileName(input) {
   } else {
     fileNameEl.textContent = '';
   }
+}
+
+const searchKeywordInput = document.getElementById('search-keyword');
+const searchForm = document.getElementById('search-form');
+if (searchKeywordInput && searchForm) {
+  searchKeywordInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      searchForm.requestSubmit();
+    }
+  });
 }
 
 // Drag and drop support

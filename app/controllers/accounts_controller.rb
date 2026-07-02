@@ -12,15 +12,43 @@ class AccountsController < ApplicationController
     # Show import form
   end
 
+  def search_preview
+    keyword = params[:keyword].to_s.strip
+
+    if keyword.blank?
+      flash[:error] = "请输入搜索关键词"
+      redirect_to import_accounts_path and return
+    end
+
+    @keyword = keyword
+    @search_accounts = Accounts::Importer.search(keyword)
+
+    if @search_accounts.empty?
+      flash[:warning] = "未搜索到匹配的公众号"
+      redirect_to import_accounts_path and return
+    end
+
+    render :import_preview
+  rescue ArgumentError => e
+    flash[:error] = e.message
+    redirect_to import_accounts_path
+  rescue WechatApiClient::ApiError => e
+    flash[:error] = "搜索失败：#{e.message}"
+    redirect_to import_accounts_path
+  rescue StandardError => e
+    flash[:error] = "搜索失败：#{e.message}"
+    redirect_to import_accounts_path
+  end
+
   def import_json
     result = if params[:json_text].present?
-               Accounts::Importer.import_text(params[:json_text])
-             elsif params[:json_file].present?
-               Accounts::Importer.import_file(params[:json_file])
-             else
-               flash[:error] = "请提供 JSON 数据或上传文件"
-               redirect_to import_accounts_path and return
-             end
+      Accounts::Importer.import_text(params[:json_text])
+    elsif params[:json_file].present?
+      Accounts::Importer.import_file(params[:json_file])
+    else
+      flash[:error] = "请提供 JSON 数据或上传文件"
+      redirect_to import_accounts_path and return
+    end
 
     if result.errors.any?
       flash[:error] = "部分公众号导入失败：#{result.errors.join('; ')}"
@@ -39,6 +67,49 @@ class AccountsController < ApplicationController
   rescue StandardError => e
     flash[:error] = "导入失败：#{e.message}"
     redirect_to accounts_path
+  end
+
+  def import_search
+    selected_fakeids = Array(params[:selected_fakeids]).map(&:to_s).map(&:strip).reject(&:blank?).uniq
+    accounts_data = params[:accounts_data] || {}
+
+    if selected_fakeids.empty?
+      flash[:error] = "请至少选择一个公众号"
+      redirect_to import_accounts_path and return
+    end
+
+    rows = selected_fakeids.filter_map do |fakeid|
+      data = accounts_data[fakeid] || accounts_data[fakeid.to_sym]
+      next unless data.respond_to?(:[])
+
+      {
+        fakeid: fakeid,
+        nickname: data["nickname"] || data[:nickname],
+        round_head_img: data["round_head_img"] || data[:round_head_img],
+        total_articles: data["total_articles"] || data[:total_articles] || data["articles"] || data[:articles]
+      }
+    end
+
+    result = Accounts::Importer.import_search_rows(rows)
+
+    if result.errors.any?
+      flash[:error] = "部分公众号导入失败：#{result.errors.join('; ')}"
+    elsif result.imported_count > 0
+      flash[:success] = success_message_for(result)
+    else
+      flash[:warning] = "没有新公众号需要导入（#{result.skipped_count} 个已存在）"
+    end
+
+    redirect_to accounts_path
+  rescue ArgumentError => e
+    flash[:error] = e.message
+    redirect_to import_accounts_path
+  rescue WechatApiClient::ApiError => e
+    flash[:error] = "搜索失败：#{e.message}"
+    redirect_to import_accounts_path
+  rescue StandardError => e
+    flash[:error] = "导入失败：#{e.message}"
+    redirect_to import_accounts_path
   end
 
   def crawl
@@ -68,7 +139,21 @@ class AccountsController < ApplicationController
     @account = Account.find(params[:id])
     @account.update!(status: @account.active? ? :inactive : :active)
     flash[:success] = "公众号状态已更新"
+    redirect_back fallback_location: accounts_path
+  end
+
+  def destroy
+    account = Account.find(params[:id])
+    name = account.nickname
+    account.destroy!
+    flash[:success] = "公众号 #{name} 已删除"
     redirect_to accounts_path
+  rescue ActiveRecord::RecordNotFound
+    flash[:error] = "公众号不存在"
+    redirect_to accounts_path
+  rescue StandardError => e
+    flash[:error] = "删除失败：#{e.message}"
+    redirect_back fallback_location: accounts_path
   end
 
   private
