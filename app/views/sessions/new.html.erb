@@ -29,6 +29,14 @@
           <%= form.submit "发送魔法登录链接", class: "w-full py-2.5 bg-white text-slate-700 font-semibold rounded-lg text-sm border border-slate-200 hover:border-blue-400 hover:text-blue-600 transition-colors cursor-pointer" %>
         <% end %>
       </div>
+
+      <% if Rails.env.development? || Rails.env.test? %>
+        <hr class="my-6 border-slate-200">
+        <div>
+          <%= button_to "🚀 开发者快速登录", dev_login_session_path, method: :post, class: "w-full py-2.5 bg-emerald-600 text-white font-semibold rounded-lg text-sm hover:bg-emerald-700 transition-colors cursor-pointer" %>
+          <p class="text-xs text-slate-400 mt-2 text-center">dev@example.com · 仅开发环境可见</p>
+        </div>
+      <% end %>
     </div>
   </div>
 </div>

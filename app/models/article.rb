@@ -1,10 +1,12 @@
 class Article < ApplicationRecord
   belongs_to :account
+  belongs_to :crawl_task, optional: true
 
   validates :url, presence: true, uniqueness: true
 
   scope :recent, -> { order(published_at: :desc) }
   scope :today, -> { where("published_at >= ?", Time.current.beginning_of_day) }
+  scope :yesterday, -> { where(published_at: Time.current.beginning_of_day - 1.day...Time.current.beginning_of_day) }
   scope :last_7_days, -> { where("published_at >= ?", 7.days.ago) }
   scope :last_month, -> { where("published_at >= ?", 1.month.ago) }
 

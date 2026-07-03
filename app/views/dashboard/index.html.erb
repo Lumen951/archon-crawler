@@ -26,6 +26,13 @@
           <%= render 'shared/copy_button', text: all_accounts_rss_url(period: 'today') %>
         </div>
         <div class="flex items-center gap-2">
+          <span class="text-sm text-text-secondary">昨天:</span>
+          <%= link_to "RSS", all_accounts_rss_path(period: 'yesterday'),
+              class: "text-sm text-brand hover:text-brand-dark font-semibold transition",
+              target: "_blank",
+              title: all_accounts_rss_url(period: 'yesterday') %>
+          <%= render 'shared/copy_button', text: all_accounts_rss_url(period: 'yesterday') %>
+        <div class="flex items-center gap-2">
           <span class="text-sm text-text-secondary">最近7天:</span>
           <%= link_to "RSS", all_accounts_rss_path(period: '7days'),
               class: "text-sm text-brand hover:text-brand-dark font-semibold transition",
@@ -69,7 +76,7 @@
   </div>
 
   <!-- Stats Cards -->
-  <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
     <div class="bg-bg-card border border-border-primary rounded-xl p-6 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
       <div class="text-sm font-medium text-text-secondary">公众号总数</div>
       <div class="mt-2 text-3xl font-bold text-text-primary"><%= @total_accounts %></div>
@@ -105,106 +112,6 @@
       <% end %>
     </div>
 
-    <% if @recent_tasks.any? %>
-      <!-- Desktop Table -->
-      <div class="hidden md:block bg-bg-card border border-border-primary rounded-2xl overflow-hidden shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
-        <table class="min-w-full divide-y divide-border-primary">
-          <thead class="bg-bg-secondary">
-            <tr>
-              <th class="px-6 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">范围</th>
-              <th class="px-6 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">状态</th>
-              <th class="px-6 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">进度</th>
-              <th class="px-6 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">开始时间</th>
-            </tr>
-          </thead>
-          <tbody class="bg-bg-card divide-y divide-border-primary">
-            <% @recent_tasks.each do |task| %>
-              <tr class="table-row hover:bg-bg-secondary transition">
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <div class="text-sm font-medium text-text-primary">
-                    <%= link_to crawl_task_path(task) do %>
-                      <% if task.account_ids.nil? %>
-                        全部启用的公众号
-                      <% else %>
-                        <%= task.account_count %> 个公众号
-                      <% end %>
-                    <% end %>
-                  </div>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <%= render 'shared/status_badge', status: task.status %>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <span class="text-sm text-text-secondary">
-                    <% if task.total %>
-                      <%= task.progress %> / <%= task.total %> (<%= task.progress_percentage %>%)
-                    <% else %>
-                      <%= task.progress %> 篇文章
-                    <% end %>
-                  </span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-text-secondary">
-                  <% if task.started_at %>
-                    <%= time_ago_in_words(task.started_at) %>前
-                  <% else %>
-                    待开始
-                  <% end %>
-                </td>
-              <% end %>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- Mobile Cards -->
-      <div class="md:hidden space-y-3">
-        <% @recent_tasks.each do |task| %>
-          <%= link_to crawl_task_path(task), class: "block bg-bg-card border border-border-primary rounded-xl p-4 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)] hover:border-brand transition" do %>
-            <div class="flex items-start justify-between mb-3">
-              <div class="flex-1">
-                <div class="text-sm font-semibold text-text-primary mb-2">
-                  <% if task.account_ids.nil? %>
-                    全部启用的公众号
-                  <% else %>
-                    <%= task.account_count %> 个公众号
-                  <% end %>
-                </div>
-                <%= render 'shared/status_badge', status: task.status %>
-              </div>
-            </div>
-
-            <div class="space-y-2 text-sm">
-              <div class="flex justify-between">
-                <span class="text-text-secondary">进度:</span>
-                <span class="text-text-primary font-medium">
-                  <% if task.total %>
-                    <%= task.progress %> / <%= task.total %> (<%= task.progress_percentage %>%)
-                  <% else %>
-                    <%= task.progress %> 篇文章
-                  <% end %>
-                </span>
-              </div>
-              <div class="flex justify-between">
-                <span class="text-text-secondary">开始时间:</span>
-                <span class="text-text-primary">
-                  <% if task.started_at %>
-                    <%= time_ago_in_words(task.started_at) %>前
-                  <% else %>
-                    待开始
-                  <% end %>
-                </span>
-              </div>
-            </div>
-          <% end %>
-        <% end %>
-      </div>
-    <% else %>
-      <div class="bg-bg-card border border-border-primary rounded-2xl text-center py-12 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
-        <svg class="w-16 h-16 mx-auto text-text-muted mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-        </svg>
-        <p class="text-text-secondary">暂无抓取任务</p>
-      </div>
-    <% end %>
+    <%= render 'crawl_tasks/tasks_table', tasks: @recent_tasks %>
   </div>
 </div>

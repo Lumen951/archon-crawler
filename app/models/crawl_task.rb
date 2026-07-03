@@ -1,5 +1,6 @@
 class CrawlTask < ApplicationRecord
   has_many :crawl_logs, dependent: :destroy
+  has_many :articles, dependent: :nullify
 
   after_update_commit :broadcast_task_updates
 

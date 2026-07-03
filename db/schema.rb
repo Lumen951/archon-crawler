@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_01_093628) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_03_005846) do
   create_table "accounts", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "fakeid", null: false
@@ -30,6 +30,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_01_093628) do
     t.text "content_html"
     t.text "content_markdown"
     t.string "cover_url"
+    t.integer "crawl_task_id"
     t.datetime "created_at", null: false
     t.text "digest"
     t.datetime "published_at"
@@ -37,6 +38,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_01_093628) do
     t.datetime "updated_at", null: false
     t.string "url", null: false
     t.index ["account_id"], name: "index_articles_on_account_id"
+    t.index ["crawl_task_id"], name: "index_articles_on_crawl_task_id"
     t.index ["published_at"], name: "index_articles_on_published_at"
     t.index ["url"], name: "index_articles_on_url", unique: true
   end
@@ -110,6 +112,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_01_093628) do
   end
 
   add_foreign_key "articles", "accounts"
+  add_foreign_key "articles", "crawl_tasks"
   add_foreign_key "crawl_logs", "crawl_tasks"
   add_foreign_key "sessions", "users"
 end

@@ -2,6 +2,7 @@ Rails.application.routes.draw do
   # Authentication routes
   resource :session, only: [:new, :create, :destroy] do
     post :magic_link
+    post :dev_login
   end
   get '/magic_link/:token', to: 'sessions#magic_link_login', as: :magic_link
 
@@ -31,6 +32,7 @@ Rails.application.routes.draw do
       post :pause
       post :resume
       get :logs
+      get :articles
     end
   end
 

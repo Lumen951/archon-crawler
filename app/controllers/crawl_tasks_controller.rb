@@ -35,6 +35,11 @@ class CrawlTasksController < ApplicationController
     redirect_to crawl_tasks_path
   end
 
+  def articles
+    @crawl_task = CrawlTask.find(params[:id])
+    @articles = @crawl_task.articles.recent.page(params[:page]).per(20)
+  end
+
   def crawl_all
     unless SystemConfig.api_key_valid?
       flash[:error] = "API 密钥已过期。请在设置中更新。"

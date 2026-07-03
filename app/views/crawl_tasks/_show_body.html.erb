@@ -23,7 +23,15 @@
     <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mt-6">
       <div>
         <p class="text-sm text-gray-600">已抓取文章</p>
-        <p class="text-2xl font-bold text-gray-900"><%= crawl_task.progress %></p>
+        <p class="text-2xl font-bold text-gray-900">
+          <% if crawl_task.articles.any? %>
+            <%= link_to articles_crawl_task_path(crawl_task), class: "text-brand hover:text-brand-dark font-semibold transition" do %>
+              <%= crawl_task.progress %>
+            <% end %>
+          <% else %>
+            <%= crawl_task.progress %>
+          <% end %>
+        </p>
       </div>
       <div>
         <p class="text-sm text-gray-600">累计错误</p>

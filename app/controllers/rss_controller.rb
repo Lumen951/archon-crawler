@@ -8,6 +8,9 @@ class RssController < ApplicationController
     when 'today'
       @articles = @articles.today
       @period_label = "今天"
+    when 'yesterday'
+      @articles = @articles.yesterday
+      @period_label = "昨天"
     when '7days'
       @articles = @articles.last_7_days
       @period_label = "最近7天"

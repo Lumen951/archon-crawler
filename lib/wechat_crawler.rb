@@ -117,6 +117,7 @@ class WechatCrawler
 
     Article.create!(
       account: account,
+      crawl_task: crawl_task,
       title: article_data['title'],
       url: article_data['link'],
       author: article_data['author_name'],

@@ -1,0 +1,37 @@
+<% if tasks.any? %>
+  <!-- Desktop Table -->
+  <div class="hidden md:block bg-bg-card border border-border-primary rounded-2xl overflow-hidden shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+    <table class="min-w-full divide-y divide-border-primary">
+      <thead class="bg-bg-secondary">
+        <tr>
+          <th class="px-6 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">范围</th>
+          <th class="px-6 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">状态</th>
+          <th class="px-6 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">进度</th>
+          <th class="px-6 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">错误</th>
+          <th class="px-6 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">开始时间</th>
+          <th class="px-6 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">耗时</th>
+          <th class="px-6 py-3 text-right text-xs font-semibold text-text-secondary uppercase tracking-wider">操作</th>
+        </tr>
+      </thead>
+      <tbody class="bg-bg-card divide-y divide-border-primary">
+        <% tasks.each do |task| %>
+          <%= render 'crawl_tasks/task_row', task: task %>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Mobile Cards -->
+  <div class="md:hidden space-y-4">
+    <% tasks.each do |task| %>
+      <%= render 'crawl_tasks/task_card', task: task %>
+    <% end %>
+  </div>
+<% else %>
+  <div class="bg-bg-card border border-border-primary rounded-2xl text-center py-12 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+    <svg class="w-16 h-16 mx-auto text-text-muted mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+    </svg>
+    <p class="text-text-secondary">暂无抓取任务</p>
+  </div>
+<% end %>

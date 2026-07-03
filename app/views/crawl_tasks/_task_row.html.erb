@@ -17,7 +17,13 @@
     <% end %>
   </td>
   <td class="px-6 py-4 whitespace-nowrap">
-    <span class="text-sm text-text-secondary"><%= task.progress %> 篇文章</span>
+    <% if task.articles.any? %>
+      <%= link_to articles_crawl_task_path(task), class: "text-sm text-brand hover:text-brand-dark font-semibold transition" do %>
+        <%= task.progress %> 篇文章
+      <% end %>
+    <% else %>
+      <span class="text-sm text-text-secondary"><%= task.progress %> 篇文章</span>
+    <% end %>
   </td>
   <td class="px-6 py-4 whitespace-nowrap">
     <% if task.error_count > 0 %>
