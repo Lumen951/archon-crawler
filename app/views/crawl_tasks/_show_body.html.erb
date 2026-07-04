@@ -5,9 +5,9 @@
       <div>
         <h2 class="text-xl font-semibold text-gray-900">
           <% if crawl_task.account_ids.nil? %>
-            全部启用的公众号
+            全部启用的帐号
           <% else %>
-            <%= crawl_task.account_count %> 个公众号
+            <%= crawl_task.account_count %> 个帐号
           <% end %>
         </h2>
         <p class="text-sm text-gray-600 mt-1">
@@ -61,7 +61,7 @@
 
     <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mt-4">
       <div>
-        <p class="text-sm text-gray-600">公众号并发</p>
+        <p class="text-sm text-gray-600">帐号并发</p>
         <p class="text-lg font-semibold text-gray-900"><%= crawl_task.effective_account_concurrency %></p>
       </div>
       <div>

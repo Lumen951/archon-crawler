@@ -1,0 +1,237 @@
+require "async"
+require "async/semaphore"
+
+class RednoteCrawler
+  NOTE_URL_BASE = "https://www.xiaohongshu.com/explore"
+
+  def self.crawl(crawl_task)
+    accounts = crawl_task.resolved_accounts.where(type: "RednoteAccount").to_a
+    account_concurrency = crawl_task.effective_account_concurrency
+    max_pages = Option.max_crawl_pages
+
+    crawl_task.update!(status: :running, started_at: Time.current)
+    crawl_task.clear_old_logs
+    crawl_task.log(:info, "开始抓取小红书任务，共 #{accounts.size} 个帐号")
+    crawl_task.log(:info, "帐号并发：#{account_concurrency}，最大页数：#{max_pages == -1 ? '无限制' : max_pages}")
+
+    start_time = Time.current
+    total_new = 0
+    total_skip = 0
+    total_error = 0
+
+    Async do |_task|
+      semaphore = Async::Semaphore.new(account_concurrency)
+
+      accounts.each_with_index do |account, index|
+        break if crawl_task.reload.paused?
+        break if crawl_task.error_threshold_exceeded?
+
+        crawl_task.log(:info, "排队抓取帐号 [#{index + 1}/#{accounts.size}]：#{account.nickname}")
+        semaphore.async do
+          result = crawl_account(account, crawl_task, max_pages)
+          total_new   += result[:new_count]   if result
+          total_skip  += result[:skip_count]  if result
+          total_error += result[:error_count]  if result
+        end
+      end
+    end
+
+    elapsed = (Time.current - start_time).round(1)
+    crawl_task.log(:info, "小红书任务全部完成，耗时 #{elapsed} 秒：新增 #{total_new} 篇，跳过 #{total_skip} 篇，失败 #{total_error} 篇")
+
+    crawl_task.reload
+    if crawl_task.running?
+      if crawl_task.error_threshold_exceeded?
+        crawl_task.mark_failed!("累计错误数（#{crawl_task.error_count}）超过阈值，任务终止")
+      else
+        crawl_task.mark_complete!
+      end
+    end
+  rescue RednoteApiClient::ApiKeyMissingError => e
+    crawl_task.log(:error, "小红书 API 密钥未配置：#{e.message}")
+    crawl_task.update!(status: :paused, error_message: e.message)
+  rescue StandardError => e
+    crawl_task.mark_failed!(e.message)
+    Rails.logger.error("RednoteCrawler CrawlTask##{crawl_task.id} 失败：#{e.message}")
+    Rails.logger.error(e.backtrace.join("\n"))
+  end
+
+  private
+
+  def self.crawl_account(account, crawl_task, max_pages)
+    crawl_task.log(:info, "开始抓取小红书帐号：#{account.nickname} (fakeid: #{account.fakeid})")
+    page = 1
+    new_count = 0
+    skip_count = 0
+    error_count = 0
+    start_time = Time.current
+
+    loop do
+      break if crawl_task.reload.paused?
+      break if crawl_task.error_threshold_exceeded?
+
+      if max_pages > 0 && page > max_pages
+        crawl_task.log(:info, "#{account.nickname}: 已达到最大页数限制（#{max_pages} 页）")
+        break
+      end
+
+      crawl_task.log(:info, "#{account.nickname}: 正在获取第 #{page} 页笔记列表... (fakeid: #{account.fakeid})")
+      # begin
+        # crawl_task.log(:info, "#{account.nickname}: 调用 RednoteApiClient.get_user_notes...")
+        data = RednoteApiClient.get_user_notes(account.fakeid, page: page)
+        # crawl_task.log(:info, "#{account.nickname}: API 调用完成，data.class=#{data.class}, data.nil?=#{data.nil?}")
+      # rescue => e
+      #   crawl_task.log(:error, "#{account.nickname}: API 调用异常: #{e.class}: #{e.message}")
+      #   crawl_task.log(:error, "#{account.nickname}: 异常 backtrace: #{e.backtrace&.first(5)&.join(' | ')}")
+      #   raise
+      # end
+
+      if data.nil?
+        crawl_task.log(:warn, "#{account.nickname}: API 返回 nil，可能请求失败")
+        break
+      end
+
+      crawl_task.log(:info, "#{account.nickname}: API 响应 keys: #{data.keys.join(', ')}")
+      notes = data&.dig("notes") || []
+
+      if notes.empty?
+        crawl_task.log(:info, "#{account.nickname}: 已到达末尾（第 #{page} 页无更多笔记），原始数据：#{data.inspect.truncate(500)}")
+        break
+      end
+
+      total_pages = data["total_pages"].to_i
+      crawl_task.log(:info, "#{account.nickname}: 第 #{page} 页获取了 #{notes.size} 篇笔记 (共 #{total_pages} 页)")
+
+      notes.each_with_index do |note_info, index|
+        break if crawl_task.error_threshold_exceeded?
+        note_id = note_info["noteId"] || note_info["id"]
+        title = note_info["title"].presence || "(无标题)"
+        crawl_task.log(:info, "#{account.nickname}: [#{index + 1}/#{notes.size}] 正在处理笔记 #{note_id}：#{title}")
+
+        result = fetch_and_save_note(note_info, account, crawl_task)
+        case result
+        when :saved
+          new_count += 1
+        when :skipped
+          skip_count += 1
+        when :error
+          error_count += 1
+        end
+      end
+
+      break if total_pages > 0 && page >= total_pages
+
+      page += 1
+      crawl_task.log(:info, "#{account.nickname}: 等待 1 秒后获取下一页...")
+      sleep 1
+    end
+
+    elapsed = (Time.current - start_time).round(1)
+    account.update!(last_crawled_at: Time.current, total_articles: account.articles.count)
+    crawl_task.log(:info, "#{account.nickname}: 小红书抓取完成，耗时 #{elapsed} 秒 — 新增 #{new_count} 篇，跳过 #{skip_count} 篇，失败 #{error_count} 篇")
+
+    { new_count: new_count, skip_count: skip_count, error_count: error_count }
+  rescue RednoteApiClient::ApiKeyMissingError
+    crawl_task.log(:error, "#{account.nickname}: API 密钥缺失，向上抛出")
+    raise
+  rescue StandardError => e
+    crawl_task.increment_error_count!
+    crawl_task.log(:error, "#{account.nickname}: 抓取出错 - #{e.class}: #{e.message}")
+    crawl_task.log(:error, "#{account.nickname}: 异常 backtrace: #{e.backtrace&.first(5)&.join(' | ')}")
+    Rails.logger.error("RednoteAccount #{account.fakeid} crawl error: #{e.class}: #{e.message}")
+    Rails.logger.error(e.backtrace&.first(10)&.join("\n"))
+    { new_count: new_count, skip_count: skip_count, error_count: error_count + 1 }
+  end
+
+  def self.fetch_and_save_note(note_info, account, crawl_task)
+    note_id = note_info["noteId"] || note_info["id"]
+    return :error if note_id.blank?
+
+    note_url = "#{NOTE_URL_BASE}/#{note_id}"
+
+    if Article.exists?(url: note_url)
+      crawl_task.log(:debug, "跳过重复笔记：#{note_info['title']} (#{note_id})")
+      return :skipped
+    end
+
+    # Fetch full detail
+    crawl_task.log(:debug, "正在获取笔记详情：#{note_id}")
+    detail_data = fetch_note_detail_with_retry(note_id, crawl_task)
+    unless detail_data
+      crawl_task.log(:warn, "笔记 #{note_id} 详情获取失败，跳过")
+      return :error
+    end
+
+    note_card      = detail_data["note_card"] || {}
+    interact_info  = note_card["interact_info"] || {}
+
+    title = note_card["title"].presence || note_info["title"].presence || "(无标题)"
+    desc  = note_card["desc"].to_s.strip
+
+    # First image as cover
+    images = note_card["image_list"] || []
+    cover_url = images.first&.then { |img| img["url"] || img["url_default"] || img["url_pre"] }
+
+    # Tags → digest suffix
+    tags    = (note_card["tag_list"] || []).filter_map { |t| "##{t['name']}" if t["name"].present? }.join(" ")
+    digest  = [ desc.truncate(200), tags.presence ].compact.join(" ")
+
+    create_time  = note_card["time"] || note_info["time"]
+    published_at = create_time.present? ? Time.at(create_time.to_s.length > 10 ? create_time.to_i / 1000 : create_time.to_i) : nil
+
+    Article.create!(
+      account:          account,
+      crawl_task:       crawl_task,
+      title:            title,
+      url:              note_url,
+      author:           note_card.dig("user", "nickname").presence || account.nickname,
+      digest:           digest,
+      cover_url:        cover_url,
+      content_markdown: desc,
+      content_html:     desc.present? ? "<p>#{ERB::Util.html_escape(desc)}</p>" : nil,
+      published_at:     published_at
+    )
+
+    crawl_task.increment_progress!
+    crawl_task.log(:info, "已保存笔记：#{title} (#{note_id})")
+    :saved
+  rescue ActiveRecord::RecordInvalid
+    crawl_task.log(:debug, "跳过重复笔记（数据库冲突）：#{note_url}")
+    :skipped
+  rescue StandardError => e
+    crawl_task.increment_error_count!
+    crawl_task.log(:error, "保存笔记 #{note_id} 失败：#{e.message}")
+    :error
+  end
+
+  def self.fetch_note_detail_with_retry(note_id, crawl_task, max_retries: 3)
+    retries = 0
+    begin
+      result = RednoteApiClient.get_note_detail(note_id)
+      crawl_task.log(:debug, "笔记 #{note_id} 详情获取成功")
+      result
+    rescue RednoteApiClient::ApiRateLimitError
+      retries += 1
+      if retries <= max_retries
+        wait = 2 ** retries
+        crawl_task.log(:warn, "小红书限流，#{wait} 秒后重试（#{retries}/#{max_retries}）笔记 #{note_id}")
+        sleep wait
+        retry
+      else
+        crawl_task.log(:error, "笔记 #{note_id} 超过重试次数（#{max_retries}），跳过")
+        nil
+      end
+    rescue StandardError => e
+      retries += 1
+      if retries <= max_retries
+        wait = 2 ** retries
+        crawl_task.log(:warn, "获取笔记 #{note_id} 详情失败（#{retries}/#{max_retries}），#{wait} 秒后重试：#{e.message}")
+        sleep wait
+        retry
+      else
+        crawl_task.log(:error, "笔记 #{note_id} 详情获取失败（已重试 #{max_retries} 次）：#{e.message}")
+        nil
+      end
+    end
+  end
+end

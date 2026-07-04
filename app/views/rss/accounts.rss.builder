@@ -1,8 +1,8 @@
 xml.instruct! :xml, version: "1.0"
 xml.rss version: "2.0" do
   xml.channel do
-    xml.title "公众号列表 - 全部"
-    xml.description "所有公众号列表RSS订阅"
+    xml.title "帐号列表 - 全部"
+    xml.description "所有帐号列表RSS订阅"
     xml.link accounts_list_rss_url
     xml.language "zh-CN"
 

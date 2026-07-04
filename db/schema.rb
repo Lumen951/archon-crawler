@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_03_005846) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_04_100000) do
   create_table "accounts", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "fakeid", null: false
@@ -19,9 +19,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_03_005846) do
     t.string "round_head_img"
     t.integer "status", default: 0
     t.integer "total_articles", default: 0
+    t.string "type", null: false
     t.datetime "updated_at", null: false
     t.index ["fakeid"], name: "index_accounts_on_fakeid", unique: true
     t.index ["status"], name: "index_accounts_on_status"
+    t.index ["type"], name: "index_accounts_on_type"
   end
 
   create_table "articles", force: :cascade do |t|
@@ -87,15 +89,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_03_005846) do
     t.string "user_agent"
     t.integer "user_id", null: false
     t.index ["user_id"], name: "index_sessions_on_user_id"
-  end
-
-  create_table "system_configs", force: :cascade do |t|
-    t.datetime "created_at", null: false
-    t.datetime "expires_at"
-    t.string "key", null: false
-    t.datetime "updated_at", null: false
-    t.text "value"
-    t.index ["key"], name: "index_system_configs_on_key", unique: true
   end
 
   create_table "users", force: :cascade do |t|

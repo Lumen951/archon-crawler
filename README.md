@@ -6,7 +6,7 @@ A Ruby on Rails application for crawling WeChat official account articles and pr
 
 ## 功能特性 / Features
 
-- 🔍 **公众号管理** - Import and manage WeChat official accounts
+- 🔍 **帐号管理** - Import and manage WeChat official accounts
 - 📰 **文章抓取** - Async concurrent crawling with pause/resume support
 - 📅 **定时调度** - Schedule automatic crawls (hourly/daily/weekly)
 - 📡 **RSS订阅** - Generate RSS feeds for each account
@@ -35,7 +35,7 @@ bundle install
 rails db:create db:migrate
 ```
 
-### 3. 导入公众号 / Import Accounts
+### 3. 导入帐号 / Import Accounts
 
 **Option 1: Web UI (Recommended)**
 
@@ -87,7 +87,7 @@ rails server
 ### 定时抓取 / Scheduled Crawling
 
 1. 访问 `/admin/crawl_schedules`
-2. 选择公众号、频率和并发数
+2. 选择帐号、频率和并发数
 3. 创建定时任务
 4. 添加 cron job:
 
@@ -97,7 +97,7 @@ rails server
 
 ### RSS 订阅 / RSS Feed
 
-每个公众号的 RSS 地址:
+每个帐号的 RSS 地址:
 
 ```
 http://localhost:3000/rss/{fakeid}
@@ -172,7 +172,7 @@ end
 1. 检查 API Key 是否有效
 2. 查看 CrawlJob 的 error_message
 3. 确认网络连接
-4. 验证公众号已开启搜索功能
+4. 验证帐号已开启搜索功能
 
 ### 无法访问
 

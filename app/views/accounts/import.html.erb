@@ -1,38 +1,54 @@
 <div class="space-y-6">
   <div class="flex items-center justify-between">
     <div>
-      <h1 class="text-3xl font-bold text-gray-900">导入公众号</h1>
-      <p class="text-gray-600 mt-1">支持通过搜索 API 或 JSON、CSV、XLSX 文件导入微信公众号</p>
+      <h1 class="text-3xl font-bold text-gray-900">导入帐号</h1>
+      <p class="text-gray-600 mt-1">支持导入微信公众号和小红书帐号</p>
     </div>
-    <%= link_to "← 返回公众号列表", accounts_path, class: "btn btn-secondary" %>
+    <%= link_to "← 返回帐号列表", accounts_path, class: "btn btn-secondary" %>
   </div>
 
+  <!-- Platform Tabs -->
+  <div class="border-b border-gray-200">
+    <nav class="-mb-px flex space-x-8">
+      <button type="button" onclick="showPlatform('wechat')" id="platform-tab-wechat"
+              class="platform-tab border-b-2 border-primary text-primary py-3 px-1 text-base font-semibold flex items-center gap-2">
+        <span>💬</span> 微信公众号
+      </button>
+      <button type="button" onclick="showPlatform('rednote')" id="platform-tab-rednote"
+              class="platform-tab border-b-2 border-transparent text-gray-500 hover:text-gray-700 py-3 px-1 text-base font-semibold flex items-center gap-2">
+        <span>📕</span> 小红书
+      </button>
+    </nav>
+  </div>
+
+  <!-- ===== WeChat ===== -->
+  <div id="platform-wechat" class="space-y-6">
   <!-- Import Methods Tabs -->
   <div class="card">
     <div class="border-b border-gray-200 mb-6">
       <nav class="-mb-px flex space-x-8">
-        <button type="button" onclick="showTab('search')" id="tab-search" class="tab-button active border-b-2 border-primary text-primary py-4 px-1 text-sm font-medium">
+        <button type="button" onclick="showTab('search', 'wechat')" id="wechat-tab-search" class="wechat-tab tab-button active border-b-2 border-primary text-primary py-4 px-1 text-sm font-medium">
           搜索导入
         </button>
-        <button type="button" onclick="showTab('upload')" id="tab-upload" class="tab-button text-gray-500 hover:text-gray-700 py-4 px-1 text-sm font-medium">
-          上传文件
-        </button>
-        <button type="button" onclick="showTab('paste')" id="tab-paste" class="tab-button text-gray-500 hover:text-gray-700 py-4 px-1 text-sm font-medium">
+        <button type="button" onclick="showTab('paste', 'wechat')" id="wechat-tab-paste" class="wechat-tab tab-button text-gray-500 hover:text-gray-700 py-4 px-1 text-sm font-medium">
           粘贴 JSON
+        </button>
+        <button type="button" onclick="showTab('upload', 'wechat')" id="wechat-tab-upload" class="wechat-tab tab-button text-gray-500 hover:text-gray-700 py-4 px-1 text-sm font-medium">
+          上传文件
         </button>
       </nav>
     </div>
 
-    <div id="search-tab" class="tab-content">
+    <div id="wechat-search-tab" class="wechat-tab-content">
       <%= form_with url: search_preview_accounts_path, method: :get, local: true, id: "search-form" do %>
         <div class="space-y-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">
-              公众号关键词
+              帐号关键词
             </label>
             <input type="text" id="search-keyword" name="keyword" placeholder="例如：清华大学、北大招生、复旦研究生"
                    class="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent" required>
-            <p class="mt-2 text-sm text-gray-500">系统将调用搜索公众号 API，先展示可勾选的预览列表，再导入选中的公众号。</p>
+            <p class="mt-2 text-sm text-gray-500">系统将调用搜索帐号 API，先展示可勾选的预览列表，再导入选中的帐号。</p>
           </div>
 
           <div class="flex justify-end">
@@ -46,7 +62,7 @@
 
     <%= form_with url: import_json_accounts_path, method: :post, multipart: true, id: "import-form" do |f| %>
       <!-- Paste JSON Tab -->
-      <div id="paste-tab" class="tab-content hidden">
+      <div id="wechat-paste-tab" class="wechat-tab-content hidden">
         <div class="space-y-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">
@@ -78,7 +94,7 @@
       </div>
 
       <!-- Upload File Tab -->
-      <div id="upload-tab" class="tab-content hidden">
+      <div id="wechat-upload-tab" class="wechat-tab-content hidden">
         <div class="space-y-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">
@@ -121,8 +137,8 @@
       <li>• CSV/XLSX 只识别必填列：<code class="bg-blue-100 px-1 rounded">fakeid</code> 和 <code class="bg-blue-100 px-1 rounded">nickname</code></li>
       <li>• 可选列：<code class="bg-blue-100 px-1 rounded">round_head_img</code>、<code class="bg-blue-100 px-1 rounded">articles</code>、<code class="bg-blue-100 px-1 rounded">total_articles</code></li>
       <li>• 额外列会被自动忽略，列顺序不限</li>
-      <li>• 重复的公众号（相同 fakeid）将被跳过</li>
-      <li>• 所有导入的公众号将被设置为"启用"状态</li>
+      <li>• 重复的帐号（相同 fakeid）将被跳过</li>
+      <li>• 所有导入的帐号将被设置为"启用"状态</li>
     </ul>
   </div>
 
@@ -158,75 +174,147 @@
       下载 JSON 模板
     </a>
   </div>
+  </div> <!-- end platform-wechat -->
+
+  <!-- ===== RedNote ===== -->
+  <div id="platform-rednote" class="hidden space-y-6">
+    <div class="card">
+      <div class="border-b border-gray-200 mb-6">
+        <nav class="-mb-px flex space-x-8">
+          <button type="button" onclick="showTab('paste', 'rednote')" id="rednote-tab-paste"
+                  class="rednote-tab tab-button active border-b-2 border-rose-500 text-rose-600 py-4 px-1 text-sm font-medium">
+            粘贴 JSON
+          </button>
+          <button type="button" onclick="showTab('upload', 'rednote')" id="rednote-tab-upload"
+                  class="rednote-tab tab-button text-gray-500 hover:text-gray-700 py-4 px-1 text-sm font-medium">
+            上传文件
+          </button>
+        </nav>
+      </div>
+
+      <%= form_with url: import_rednote_json_accounts_path, method: :post, multipart: true do |f| %>
+        <div id="rednote-paste-tab" class="rednote-tab-content">
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">JSON 数据</label>
+              <textarea name="rednote_json_text" rows="12" placeholder="在此粘贴小红书帐号 JSON..."
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg font-mono text-sm focus:ring-2 focus:ring-rose-400 focus:border-transparent"></textarea>
+              <p class="mt-2 text-sm text-gray-500">期望格式（直接数组，或包含 accounts 键的对象）：</p>
+              <pre class="mt-2 bg-gray-50 border border-gray-200 rounded p-3 text-xs overflow-x-auto"><code>[\n  { "user_id": "abc123xxx", "nickname": "博主名字", "avatar": "https://...", "max_notes": 20 },\n  { "user_id": "def456xxx", "nickname": "另一个博主" }\n]</code></pre>
+            </div>
+            <div class="flex justify-end">
+              <button type="submit" class="h-10 px-5 rounded-xl bg-rose-500 text-white hover:bg-rose-600 font-semibold text-sm transition">导入帐号</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="rednote-upload-tab" class="rednote-tab-content hidden">
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">上传 JSON 文件</label>
+              <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-gray-400 transition-colors" id="rednote-drop-zone">
+                <div class="space-y-1 text-center">
+                  <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                    <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                  <div class="flex text-sm text-gray-600">
+                    <label for="rednote-file-upload" class="relative cursor-pointer bg-white rounded-md font-medium text-rose-600 hover:text-rose-700">
+                      <span>上传文件</span>
+                      <%= f.file_field :rednote_json_file, id: "rednote-file-upload", accept: ".json,.csv", class: "sr-only", onchange: "updateFileName(this, 'rednote-file-name')" %>
+                    </label>
+                    <p class="pl-1">或拖放文件至此</p>
+                  </div>
+                  <p class="text-xs text-gray-500">支持 .json、.csv 文件</p>
+                  <p id="rednote-file-name" class="text-sm text-gray-700 font-medium mt-2"></p>
+                </div>
+              </div>
+            </div>
+            <div class="flex justify-end">
+              <button type="submit" class="h-10 px-5 rounded-xl bg-rose-500 text-white hover:bg-rose-600 font-semibold text-sm transition">从文件导入</button>
+            </div>
+          </div>
+        </div>
+      <% end %>
+    </div>
+
+    <div class="card bg-rose-50 border-rose-200">
+      <h3 class="font-semibold text-rose-900 mb-3">💡 小红书导入提示</h3>
+      <ul class="space-y-1 text-sm text-rose-800">
+        <li>• 必填字段：<code class="bg-rose-100 px-1 rounded">user_id</code>（小红书用户 ID）、<code class="bg-rose-100 px-1 rounded">nickname</code></li>
+        <li>• 可选字段：<code class="bg-rose-100 px-1 rounded">avatar</code>（头像 URL）、<code class="bg-rose-100 px-1 rounded">max_notes</code>（最大抓取篇数，目前仅记录）</li>
+        <li>• JSON 可以是数组，也可以是包含 <code class="bg-rose-100 px-1 rounded">accounts</code> 或 <code class="bg-rose-100 px-1 rounded">users</code> 键的对象</li>        <li>• CSV 需包含列 <code class="bg-rose-100 px-1 rounded">user_id</code>、<code class="bg-rose-100 px-1 rounded">name</code>，可选 <code class="bg-rose-100 px-1 rounded">image</code>（头像）；同 CSV 内重复的 user_id 自动去重</li>        <li>• 重复的帐号（相同 user_id）将被跳过</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3 class="font-semibold text-gray-900 mb-3">📄 小红书模板下载</h3>
+      <a href="data:text/json;charset=utf-8,<%= CGI.escape([
+        { user_id: "abc123example", nickname: "博主A", avatar: "https://example.com/avatar1.jpg", max_notes: 20 },
+        { user_id: "def456example", nickname: "博主B", avatar: "https://example.com/avatar2.jpg", max_notes: 10 }
+      ].to_json) %>" download="rednote_accounts_template.json" class="btn btn-secondary inline-flex items-center">
+        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+        下载 JSON 模板
+      </a>
+    </div>
+  </div> <!-- end platform-rednote -->
+
 </div>
 
 <script>
-showTab('search');
-
-function showTab(tab) {
-  // Hide all tabs
-  document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-  document.querySelectorAll('.tab-button').forEach(el => {
-    el.classList.remove('active', 'border-b-2', 'border-primary', 'text-primary');
-    el.classList.add('text-gray-500');
-  });
-
-  // Show selected tab
-  document.getElementById(tab + '-tab').classList.remove('hidden');
-  document.getElementById('tab-' + tab).classList.add('active', 'border-b-2', 'border-primary', 'text-primary');
-  document.getElementById('tab-' + tab).classList.remove('text-gray-500');
-}
-
-function updateFileName(input) {
-  const fileName = input.files[0]?.name;
-  const fileNameEl = document.getElementById('file-name');
-  if (fileName) {
-    fileNameEl.textContent = '📎 ' + fileName;
-  } else {
-    fileNameEl.textContent = '';
-  }
-}
-
-const searchKeywordInput = document.getElementById('search-keyword');
-const searchForm = document.getElementById('search-form');
-if (searchKeywordInput && searchForm) {
-  searchKeywordInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      searchForm.requestSubmit();
-    }
-  });
-}
-
-// Drag and drop support
-const uploadArea = document.querySelector('.border-dashed');
-if (uploadArea) {
-  ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-    uploadArea.addEventListener(eventName, preventDefaults, false);
-  });
-
-  function preventDefaults(e) {
-    e.preventDefault();
-    e.stopPropagation();
+  function showPlatform(platform) {
+    ['wechat', 'rednote'].forEach(p => {
+      document.getElementById('platform-' + p).classList.toggle('hidden', p !== platform);
+      const tab = document.getElementById('platform-tab-' + p);
+      if (p === platform) {
+        tab.classList.add('border-primary', 'text-primary');
+        tab.classList.remove('border-transparent', 'text-gray-500');
+      } else {
+        tab.classList.remove('border-primary', 'text-primary');
+        tab.classList.add('border-transparent', 'text-gray-500');
+      }
+    });
   }
 
-  ['dragenter', 'dragover'].forEach(eventName => {
-    uploadArea.addEventListener(eventName, () => {
-      uploadArea.classList.add('border-primary', 'bg-blue-50');
-    }, false);
-  });
+  function showTab(tab, platform) {
+    const activeColors = platform === 'rednote' ? ['border-rose-500', 'text-rose-600'] : ['border-primary', 'text-primary'];
+    document.querySelectorAll('.' + platform + '-tab-content').forEach(el => el.classList.add('hidden'));
+    document.querySelectorAll('.' + platform + '-tab.tab-button').forEach(el => {
+      el.classList.remove(...activeColors);
+      el.classList.add('text-gray-500');
+    });
+    document.getElementById(platform + '-' + tab + '-tab').classList.remove('hidden');
+    const btn = document.getElementById(platform + '-tab-' + tab);
+    btn.classList.add(...activeColors);
+    btn.classList.remove('text-gray-500');
+  }
 
-  ['dragleave', 'drop'].forEach(eventName => {
-    uploadArea.addEventListener(eventName, () => {
-      uploadArea.classList.remove('border-primary', 'bg-blue-50');
-    }, false);
-  });
+  function updateFileName(input, targetId) {
+    const el = document.getElementById(targetId);
+    el.textContent = input.files[0]?.name ? '📎 ' + input.files[0].name : '';
+  }
 
-  uploadArea.addEventListener('drop', (e) => {
-    const dt = e.dataTransfer;
-    const files = dt.files;
-    document.getElementById('file-upload').files = files;
-    updateFileName(document.getElementById('file-upload'));
-  }, false);
-}
+  // Drag and drop
+  function setupDropZone(zoneId, inputId, fileNameId) {
+    const zone = document.getElementById(zoneId);
+    if (!zone) return;
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(e => zone.addEventListener(e, ev => { ev.preventDefault(); ev.stopPropagation(); }));
+    ['dragenter', 'dragover'].forEach(e => zone.addEventListener(e, () => zone.classList.add('border-primary', 'bg-blue-50')));
+    ['dragleave', 'drop'].forEach(e => zone.addEventListener(e, () => zone.classList.remove('border-primary', 'bg-blue-50')));
+    zone.addEventListener('drop', ev => {
+      const input = document.getElementById(inputId);
+      input.files = ev.dataTransfer.files;
+      updateFileName(input, fileNameId);
+    });
+  }
+  setupDropZone('rednote-drop-zone', 'rednote-file-upload', 'rednote-file-name');
+
+  const searchKeywordInput = document.getElementById('search-keyword');
+  const searchForm = document.getElementById('search-form');
+  if (searchKeywordInput && searchForm) {
+    searchKeywordInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); searchForm.requestSubmit(); }
+    });
+  }
 </script>

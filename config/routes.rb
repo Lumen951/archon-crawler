@@ -17,6 +17,7 @@ Rails.application.routes.draw do
       get :search_preview
       post :import_json
       post :import_search
+      post :import_rednote_json
     end
     member do
       post :crawl

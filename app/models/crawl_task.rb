@@ -20,11 +20,11 @@ class CrawlTask < ApplicationRecord
   end
 
   def effective_account_concurrency
-    account_concurrency || SystemConfig.default_account_concurrency
+    account_concurrency || Option.default_account_concurrency
   end
 
   def effective_article_concurrency
-    article_concurrency || SystemConfig.default_article_concurrency
+    article_concurrency || Option.default_article_concurrency
   end
 
   def error_threshold_exceeded?

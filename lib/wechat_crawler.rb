@@ -3,15 +3,15 @@ require 'async/semaphore'
 
 class WechatCrawler
   def self.crawl(crawl_task)
-    accounts = crawl_task.resolved_accounts.to_a
+    accounts = crawl_task.resolved_accounts.where(type: "WechatAccount").to_a
     account_concurrency = crawl_task.effective_account_concurrency
     article_concurrency = crawl_task.effective_article_concurrency
-    max_pages = SystemConfig.max_crawl_pages
+    max_pages = Option.max_crawl_pages
 
     crawl_task.update!(status: :running, started_at: Time.current)
     crawl_task.clear_old_logs
-    crawl_task.log(:info, "开始抓取任务，共 #{accounts.size} 个公众号")
-    crawl_task.log(:info, "公众号并发：#{account_concurrency}，文章并发：#{article_concurrency}")
+    crawl_task.log(:info, "开始抓取任务，共 #{accounts.size} 个帐号")
+    crawl_task.log(:info, "帐号并发：#{account_concurrency}，文章并发：#{article_concurrency}")
     crawl_task.log(:info, "最大页数：#{max_pages == -1 ? '无限制' : max_pages}")
 
     Async do |task|
@@ -47,7 +47,7 @@ class WechatCrawler
   private
 
   def self.crawl_account(account, crawl_task, article_concurrency, max_pages)
-    crawl_task.log(:info, "开始抓取公众号：#{account.nickname}")
+    crawl_task.log(:info, "开始抓取帐号：#{account.nickname}")
     article_semaphore = Async::Semaphore.new(article_concurrency)
 
     offset = 0
@@ -57,7 +57,7 @@ class WechatCrawler
       break if crawl_task.reload.paused?
       break if crawl_task.error_threshold_exceeded?
 
-      unless SystemConfig.api_key_valid?
+      unless Option.api_key_valid?
         crawl_task.log(:error, "API 密钥已过期 - 暂停抓取")
         crawl_task.update!(status: :paused, error_message: "API 密钥已过期")
         break

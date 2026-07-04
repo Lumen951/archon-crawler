@@ -17,7 +17,7 @@ class WechatApiClient
   end
 
   def self.headers
-    api_key = SystemConfig.api_key
+    api_key = Option.api_key
     raise ApiKeyExpiredError, "未配置 API 密钥" unless api_key
 
     {

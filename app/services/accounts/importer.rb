@@ -63,13 +63,13 @@ module Accounts
       response = WechatApiClient.search_account(keyword)
       rows = extract_accounts_from_search_response(response)
 
-      raise ArgumentError, "未搜索到匹配的公众号" if rows.empty?
+      raise ArgumentError, "未搜索到匹配的帐号" if rows.empty?
 
       rows
     end
 
     def import_search_rows(rows)
-      raise ArgumentError, "请至少选择一个公众号" if rows.blank?
+      raise ArgumentError, "请至少选择一个帐号" if rows.blank?
 
       import_rows(rows)
     end
@@ -122,7 +122,7 @@ module Accounts
 
     def extract_accounts_from_search_response(response)
       if response.is_a?(Hash) && response["code"].to_i != 0
-        message = response["message"].presence || response["msg"].presence || response["err_msg"].presence || "搜索公众号接口返回错误"
+        message = response["message"].presence || response["msg"].presence || response["err_msg"].presence || "搜索帐号接口返回错误"
         raise ArgumentError, message
       end
 

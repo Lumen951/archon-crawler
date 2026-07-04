@@ -3,9 +3,9 @@
     <div class="flex-1">
       <div class="text-sm font-semibold text-text-primary mb-1">
         <% if task.account_ids.nil? %>
-          全部启用的公众号
+          全部启用的帐号
         <% else %>
-          <%= task.account_count %> 个公众号
+          <%= task.account_count %> 个帐号
         <% end %>
       </div>
       <%= render 'shared/status_badge', status: task.status %>

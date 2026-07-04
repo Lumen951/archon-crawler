@@ -14,6 +14,15 @@ class CrawlJob < ApplicationJob
       return
     end
 
-    WechatCrawler.crawl(crawl_task)
+    accounts = crawl_task.resolved_accounts
+    has_wechat  = accounts.where(type: "WechatAccount").exists?
+    has_rednote = accounts.where(type: "RednoteAccount").exists?
+
+    WechatCrawler.crawl(crawl_task)  if has_wechat
+    RednoteCrawler.crawl(crawl_task) if has_rednote
+
+    unless has_wechat || has_rednote
+      crawl_task.mark_failed!("没有可抓取的帐号")
+    end
   end
 end

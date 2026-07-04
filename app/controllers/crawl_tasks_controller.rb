@@ -25,8 +25,17 @@ class CrawlTasksController < ApplicationController
   def resume
     @crawl_task = CrawlTask.find(params[:id])
 
-    unless SystemConfig.api_key_valid?
-      flash[:error] = "API 密钥已过期。请在设置中更新。"
+    accounts = @crawl_task.resolved_accounts
+    has_wechat  = accounts.where(type: "WechatAccount").exists?
+    has_rednote = accounts.where(type: "RednoteAccount").exists?
+
+    if has_wechat && !Option.api_key_valid?
+      flash[:error] = "微信 API 密鑰已过期。请在设置中更新。"
+      redirect_to crawl_tasks_path and return
+    end
+
+    if has_rednote && !Option.rednote_api_key_valid?
+      flash[:error] = "小红书 API 密鑰未配置。请在设置中添加 rednote_api_key。"
       redirect_to crawl_tasks_path and return
     end
 
@@ -41,8 +50,16 @@ class CrawlTasksController < ApplicationController
   end
 
   def crawl_all
-    unless SystemConfig.api_key_valid?
-      flash[:error] = "API 密钥已过期。请在设置中更新。"
+    has_wechat  = WechatAccount.active.exists?
+    has_rednote = RednoteAccount.active.exists?
+
+    if has_wechat && !Option.api_key_valid?
+      flash[:error] = "微信 API 密鑰已过期。请在设置中更新。"
+      redirect_to crawl_tasks_path and return
+    end
+
+    if has_rednote && !Option.rednote_api_key_valid?
+      flash[:error] = "小红书 API 密鑰未配置。请在设置中添加 rednote_api_key。"
       redirect_to crawl_tasks_path and return
     end
 
@@ -53,7 +70,7 @@ class CrawlTasksController < ApplicationController
 
     task = CrawlTask.create!(account_ids: nil, status: :pending)
     CrawlJob.perform_later(task.id)
-    flash[:success] = "已为所有启用的公众号创建抓取任务"
+    flash[:success] = "已为所有启用的帐号创建抓取任务"
     redirect_to crawl_tasks_path
   end
 end

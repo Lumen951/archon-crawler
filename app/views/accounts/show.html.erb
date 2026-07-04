@@ -5,7 +5,7 @@
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
         </svg>
-        返回公众号列表
+        返回帐号列表
       <% end %>
     </div>
 
@@ -38,9 +38,9 @@
             <%= @account.active? ? "停用" : "启用" %>
           <% end %>
           <%= button_to account_path(@account), method: :delete,
-                form: { data: { turbo_confirm: "确定要删除该公众号及其文章数据吗？" } },
+                form: { data: { turbo_confirm: "确定要删除该帐号及其文章数据吗？" } },
                 class: "h-9 px-4 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 text-sm font-semibold transition" do %>
-            删除公众号
+            删除帐号
           <% end %>
         </div>
       </div>
