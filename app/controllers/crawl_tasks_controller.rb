@@ -39,9 +39,16 @@ class CrawlTasksController < ApplicationController
       redirect_to crawl_tasks_path and return
     end
 
+    # 如果任务正在运行，先暂停它，让正在运行的 crawler 停止
+    if @crawl_task.running?
+      @crawl_task.pause!
+      # 等待一小段时间让正在运行的 crawler 检测到暂停状态并停止
+      sleep 1
+    end
+
     @crawl_task.resume!
-    flash[:success] = "抓取任务已恢复"
-    redirect_to crawl_tasks_path
+    flash[:success] = @crawl_task.failed_account_count > 0 ? "正在重试失败的帐号" : "抓取任务已恢复"
+    redirect_to crawl_task_path(@crawl_task)
   end
 
   def fail
