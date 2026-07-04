@@ -80,7 +80,7 @@
 
   <!-- Account Status -->
   <% if crawl_task.crawl_task_accounts.any? %>
-    <div class="card">
+    <div class="card" data-controller="collapsible">
       <div class="flex items-center justify-between mb-4">
         <h2 class="text-xl font-bold text-gray-900">帐号状态</h2>
         <div class="flex items-center space-x-4 text-sm">
@@ -93,30 +93,35 @@
         </div>
       </div>
 
+      <%
+        all_accounts = crawl_task.crawl_task_accounts.includes(:account).order(:id)
+        preview_limit = 10
+        has_more = all_accounts.size > preview_limit
+      %>
+
       <div class="space-y-2">
-        <% crawl_task.crawl_task_accounts.includes(:account).order(:id).each do |ta| %>
-          <div class="flex items-center justify-between py-2 px-3 rounded-lg <%= case ta.status when 'completed' then 'bg-green-50' when 'running' then 'bg-yellow-50' when 'failed' then 'bg-red-50' else 'bg-gray-50' end %>">
-            <div class="flex items-center space-x-3">
-              <span class="text-lg">
-                <%= case ta.status when 'completed' then '✓' when 'running' then '●' when 'failed' then '✗' else '○' end %>
-              </span>
-              <div>
-                <p class="font-medium text-gray-900"><%= ta.account.nickname %></p>
-                <% if ta.error_message.present? %>
-                  <p class="text-xs text-red-600 mt-0.5"><%= ta.error_message.truncate(100) %></p>
-                <% end %>
-              </div>
-            </div>
-            <div class="text-xs text-gray-500">
-              <% if ta.completed_at %>
-                <%= ta.completed_at.strftime('%H:%M:%S') %>
-              <% elsif ta.started_at %>
-                开始于 <%= ta.started_at.strftime('%H:%M:%S') %>
-              <% end %>
-            </div>
-          </div>
+        <% all_accounts.first(preview_limit).each do |ta| %>
+          <%= render 'account_status_row', ta: ta %>
         <% end %>
       </div>
+
+      <% if has_more %>
+        <div class="hidden space-y-2" data-collapsible-target="content">
+          <% all_accounts.drop(preview_limit).each do |ta| %>
+            <%= render 'account_status_row', ta: ta %>
+          <% end %>
+        </div>
+
+        <button type="button"
+                data-collapsible-target="toggle"
+                data-action="collapsible#toggle"
+                class="mt-3 w-full py-2 text-sm text-brand hover:text-brand-dark font-medium transition flex items-center justify-center gap-1">
+          展开剩余 <%= all_accounts.size - preview_limit %> 个帐号
+          <svg class="w-4 h-4 transition-transform" data-collapsible-target="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+          </svg>
+        </button>
+      <% end %>
     </div>
   <% end %>
 
