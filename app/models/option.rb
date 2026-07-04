@@ -70,6 +70,11 @@ class Option < ApplicationRecord
       (get('max_crawl_pages') || -1).to_i
     end
 
+    # Verbose logging mode
+    def verbose_mode?
+      get('crawler_verbose_mode') == 'true'
+    end
+
     # RedNote (Xiaohongshu) API key helpers
     def rednote_api_key
       get('rednote_api_key')
