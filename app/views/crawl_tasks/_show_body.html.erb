@@ -94,7 +94,7 @@
       </div>
 
       <%
-        all_accounts = crawl_task.crawl_task_accounts.includes(:account).order(:id)
+        all_accounts = crawl_task.crawl_task_accounts.includes(:account).order(Arel.sql("CASE status WHEN 0 THEN 0 WHEN 3 THEN 1 WHEN 1 THEN 2 WHEN 2 THEN 3 END"))
         preview_limit = 10
         has_more = all_accounts.size > preview_limit
       %>
