@@ -44,6 +44,13 @@ class CrawlTasksController < ApplicationController
     redirect_to crawl_tasks_path
   end
 
+  def fail
+    @crawl_task = CrawlTask.find(params[:id])
+    @crawl_task.mark_failed!("手动标记失败")
+    flash[:success] = "抓取任务已标记为失败"
+    redirect_to crawl_tasks_path
+  end
+
   def articles
     @crawl_task = CrawlTask.find(params[:id])
     @articles = @crawl_task.articles.recent.page(params[:page]).per(20)

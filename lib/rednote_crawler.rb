@@ -5,7 +5,7 @@ class RednoteCrawler
   NOTE_URL_BASE = "https://www.xiaohongshu.com/explore"
 
   def self.crawl(crawl_task)
-    accounts = crawl_task.resolved_accounts.where(type: "RednoteAccount").to_a
+    accounts = crawl_task.incomplete_accounts.where(type: "RednoteAccount").to_a
     account_concurrency = crawl_task.effective_account_concurrency
     max_pages = Option.max_crawl_pages
 
@@ -23,7 +23,7 @@ class RednoteCrawler
       semaphore = Async::Semaphore.new(account_concurrency)
 
       accounts.each_with_index do |account, index|
-        break if crawl_task.reload.paused?
+        break if crawl_task.reload.paused? || crawl_task.reload.failed?
         break if crawl_task.error_threshold_exceeded?
 
         crawl_task.log(:info, "排队抓取帐号 [#{index + 1}/#{accounts.size}]：#{account.nickname}")
@@ -59,6 +59,9 @@ class RednoteCrawler
   private
 
   def self.crawl_account(account, crawl_task, max_pages)
+    task_account = crawl_task.crawl_task_accounts.find_by(account: account)
+    task_account&.mark_running!
+
     crawl_task.log(:info, "开始抓取小红书帐号：#{account.nickname} (fakeid: #{account.fakeid})")
     page = 1
     new_count = 0
@@ -67,7 +70,7 @@ class RednoteCrawler
     start_time = Time.current
 
     loop do
-      break if crawl_task.reload.paused?
+      break if crawl_task.reload.paused? || crawl_task.reload.failed?
       break if crawl_task.error_threshold_exceeded?
 
       if max_pages > 0 && page > max_pages
@@ -126,13 +129,16 @@ class RednoteCrawler
 
     elapsed = (Time.current - start_time).round(1)
     account.update!(last_crawled_at: Time.current, total_articles: account.articles.count)
+    task_account&.mark_completed!
     crawl_task.log(:info, "#{account.nickname}: 小红书抓取完成，耗时 #{elapsed} 秒 — 新增 #{new_count} 篇，跳过 #{skip_count} 篇，失败 #{error_count} 篇")
 
     { new_count: new_count, skip_count: skip_count, error_count: error_count }
   rescue RednoteApiClient::ApiKeyMissingError
+    task_account&.mark_failed!("API 密钥缺失")
     crawl_task.log(:error, "#{account.nickname}: API 密钥缺失，向上抛出")
     raise
   rescue StandardError => e
+    task_account&.mark_failed!(e.message)
     crawl_task.increment_error_count!
     crawl_task.log(:error, "#{account.nickname}: 抓取出错 - #{e.class}: #{e.message}")
     crawl_task.log(:error, "#{account.nickname}: 异常 backtrace: #{e.backtrace&.first(5)&.join(' | ')}")

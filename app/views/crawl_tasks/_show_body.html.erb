@@ -78,6 +78,48 @@
     <% end %>
   </div>
 
+  <!-- Account Status -->
+  <% if crawl_task.crawl_task_accounts.any? %>
+    <div class="card">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-bold text-gray-900">帐号状态</h2>
+        <div class="flex items-center space-x-4 text-sm">
+          <span class="text-green-600">✓ 完成 <%= crawl_task.completed_account_count %></span>
+          <span class="text-yellow-600">● 进行中 <%= crawl_task.crawl_task_accounts.running.count %></span>
+          <span class="text-gray-500">○ 待处理 <%= crawl_task.crawl_task_accounts.pending.count %></span>
+          <% if crawl_task.failed_account_count > 0 %>
+            <span class="text-red-600">✗ 失败 <%= crawl_task.failed_account_count %></span>
+          <% end %>
+        </div>
+      </div>
+
+      <div class="space-y-2">
+        <% crawl_task.crawl_task_accounts.includes(:account).order(:id).each do |ta| %>
+          <div class="flex items-center justify-between py-2 px-3 rounded-lg <%= case ta.status when 'completed' then 'bg-green-50' when 'running' then 'bg-yellow-50' when 'failed' then 'bg-red-50' else 'bg-gray-50' end %>">
+            <div class="flex items-center space-x-3">
+              <span class="text-lg">
+                <%= case ta.status when 'completed' then '✓' when 'running' then '●' when 'failed' then '✗' else '○' end %>
+              </span>
+              <div>
+                <p class="font-medium text-gray-900"><%= ta.account.nickname %></p>
+                <% if ta.error_message.present? %>
+                  <p class="text-xs text-red-600 mt-0.5"><%= ta.error_message.truncate(100) %></p>
+                <% end %>
+              </div>
+            </div>
+            <div class="text-xs text-gray-500">
+              <% if ta.completed_at %>
+                <%= ta.completed_at.strftime('%H:%M:%S') %>
+              <% elsif ta.started_at %>
+                开始于 <%= ta.started_at.strftime('%H:%M:%S') %>
+              <% end %>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+
   <!-- Recent Logs -->
   <div class="card">
     <div class="flex items-center justify-between mb-4">

@@ -125,6 +125,10 @@ header {
     @apply bg-red-600 text-white hover:bg-red-700;
   }
 
+  .btn-warning {
+    @apply bg-yellow-500 text-white hover:bg-yellow-600;
+  }
+
   .card {
     @apply bg-bg-card border border-border-primary rounded-[24px] p-6 shadow-sm;
   }

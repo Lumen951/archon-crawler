@@ -32,6 +32,7 @@ Rails.application.routes.draw do
     member do
       post :pause
       post :resume
+      post :fail
       get :logs
       get :articles
     end

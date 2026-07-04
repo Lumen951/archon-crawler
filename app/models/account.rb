@@ -54,4 +54,12 @@ class Account < ApplicationRecord
   def rednote?
     is_a?(RednoteAccount)
   end
+
+  def self.ransackable_attributes(auth_object = nil)
+    %w[nickname fakeid status type]
+  end
+
+  def self.ransackable_associations(auth_object = nil)
+    %w[articles]
+  end
 end

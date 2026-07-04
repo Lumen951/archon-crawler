@@ -1,6 +1,7 @@
 class CrawlTask < ApplicationRecord
   has_many :crawl_logs, dependent: :destroy
   has_many :articles, dependent: :nullify
+  has_many :crawl_task_accounts, dependent: :destroy
 
   after_update_commit :broadcast_task_updates
 
@@ -58,14 +59,42 @@ class CrawlTask < ApplicationRecord
   end
 
   def resume!
-    update!(status: :running)
+    # 重置 failed 的 account 为 pending，以便重试
+    crawl_task_accounts.failed.update_all(status: :pending, error_message: nil, completed_at: nil)
+    update!(status: :running, error_message: nil)
     CrawlJob.perform_later(id)
+  end
+
+  # 初始化帐号追踪记录（task 开始时调用）
+  def setup_account_tracking!
+    resolved_accounts.find_each do |account|
+      crawl_task_accounts.find_or_create_by!(account: account)
+    end
+    update!(total: crawl_task_accounts.count)
+  end
+
+  # 只返回未完成的 account（用于 resume 时跳过已完成的）
+  def incomplete_accounts
+    Account.where(id: crawl_task_accounts.incomplete.select(:account_id))
+  end
+
+  def all_accounts_completed?
+    crawl_task_accounts.incomplete.count.zero?
+  end
+
+  def completed_account_count
+    crawl_task_accounts.completed.count
+  end
+
+  def failed_account_count
+    crawl_task_accounts.failed.count
   end
 
   def mark_complete!
     log(:info, "抓取成功完成")
     update!(status: :completed, completed_at: Time.current)
-    resolved_accounts.update_all(last_crawled_at: Time.current)
+    # 只更新实际完成的 account 的 last_crawled_at
+    Account.where(id: crawl_task_accounts.completed.select(:account_id)).update_all(last_crawled_at: Time.current)
   end
 
   def mark_failed!(error)

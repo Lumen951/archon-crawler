@@ -3,7 +3,7 @@ require 'async/semaphore'
 
 class WechatCrawler
   def self.crawl(crawl_task)
-    accounts = crawl_task.resolved_accounts.where(type: "WechatAccount").to_a
+    accounts = crawl_task.incomplete_accounts.where(type: "WechatAccount").to_a
     account_concurrency = crawl_task.effective_account_concurrency
     article_concurrency = crawl_task.effective_article_concurrency
     max_pages = Option.max_crawl_pages
@@ -18,7 +18,7 @@ class WechatCrawler
       account_semaphore = Async::Semaphore.new(account_concurrency)
 
       accounts.each do |account|
-        break if crawl_task.reload.paused?
+        break if crawl_task.reload.paused? || crawl_task.reload.failed?
         break if crawl_task.error_threshold_exceeded?
 
         account_semaphore.async do
@@ -47,6 +47,9 @@ class WechatCrawler
   private
 
   def self.crawl_account(account, crawl_task, article_concurrency, max_pages)
+    task_account = crawl_task.crawl_task_accounts.find_by(account: account)
+    task_account&.mark_running!
+
     crawl_task.log(:info, "开始抓取帐号：#{account.nickname}")
     article_semaphore = Async::Semaphore.new(article_concurrency)
 
@@ -54,7 +57,7 @@ class WechatCrawler
     pages_crawled = 0
 
     loop do
-      break if crawl_task.reload.paused?
+      break if crawl_task.reload.paused? || crawl_task.reload.failed?
       break if crawl_task.error_threshold_exceeded?
 
       unless Option.api_key_valid?
@@ -101,10 +104,13 @@ class WechatCrawler
     end
 
     account.update!(last_crawled_at: Time.current, total_articles: account.articles.count)
+    task_account&.mark_completed!
     crawl_task.log(:info, "#{account.nickname}: 抓取完成")
   rescue WechatApiClient::ApiKeyExpiredError
+    task_account&.mark_failed!("API 密钥已过期")
     raise
   rescue StandardError => e
+    task_account&.mark_failed!(e.message)
     crawl_task.increment_error_count!
     crawl_task.log(:error, "#{account.nickname}: 抓取出错 - #{e.message}")
     Rails.logger.error("Account #{account.fakeid} crawl error: #{e.message}")

@@ -2,13 +2,38 @@
   <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
     <div>
       <h1 class="text-3xl font-bold text-text-primary">帐号管理</h1>
-      <p class="text-text-secondary mt-2"><%= @accounts.count %> 个帐号</p>
+      <p class="text-text-secondary mt-2"><%= @accounts.total_count %> 个帐号</p>
     </div>
     <%= link_to import_accounts_path, class: "h-10 px-5 rounded-xl bg-brand text-white hover:bg-brand-dark font-semibold text-sm transition inline-flex items-center justify-center gap-2 shadow-[0_7px_16px_rgba(59,130,246,.14)]" do %>
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
       </svg>
       导入帐号
+    <% end %>
+  </div>
+
+  <!-- Search & Filters -->
+  <div class="bg-bg-card border border-border-primary rounded-2xl p-4 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+    <%= search_form_for @q, class: "flex flex-col sm:flex-row gap-3" do |f| %>
+      <div class="flex-1">
+        <%= f.search_field :nickname_or_fakeid_cont,
+            placeholder: "搜索帐号名称或 Fakeid...",
+            class: "w-full h-10 px-4 rounded-lg border border-border-primary bg-bg-secondary text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand text-sm transition" %>
+      </div>
+      <div class="flex gap-3">
+        <%= f.select :status_eq,
+            options_for_select([["全部状态", ""], ["活跃", 0], ["不维护", 1]], params.dig(:q, :status_eq)),
+            {},
+            class: "h-10 px-4 rounded-lg border border-border-primary bg-bg-secondary text-text-primary text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition" %>
+        <%= f.select :type_eq,
+            options_for_select([["全部平台", ""], ["微信公众号", "WechatAccount"], ["小红书", "RednoteAccount"]], params.dig(:q, :type_eq)),
+            {},
+            class: "h-10 px-4 rounded-lg border border-border-primary bg-bg-secondary text-text-primary text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition" %>
+        <%= f.submit "搜索", class: "h-10 px-5 rounded-lg bg-brand text-white hover:bg-brand-dark font-semibold text-sm transition cursor-pointer" %>
+        <% if params[:q].present? %>
+          <%= link_to "重置", accounts_path(reset: true), class: "h-10 px-5 rounded-lg border border-border-primary bg-bg-card hover:border-brand hover:text-brand font-semibold text-sm transition inline-flex items-center justify-center" %>
+        <% end %>
+      </div>
     <% end %>
   </div>
 
@@ -154,13 +179,23 @@
         </div>
       <% end %>
     </div>
+
+    <!-- Pagination -->
+    <div class="flex justify-center">
+      <%= paginate @accounts %>
+    </div>
   <% else %>
     <div class="bg-bg-card border border-border-primary rounded-2xl text-center py-12 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
       <svg class="w-16 h-16 mx-auto text-text-muted mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
       </svg>
       <p class="text-text-secondary mb-2">未找到帐号</p>
-      <p class="text-text-muted text-sm">使用导入功能添加微信公众号或小红书帐号</p>
+      <% if params[:q].present? %>
+        <p class="text-text-muted text-sm mb-4">没有符合搜索条件的帐号</p>
+        <%= link_to "清除搜索", accounts_path(reset: true), class: "text-brand hover:text-brand-dark font-semibold text-sm transition" %>
+      <% else %>
+        <p class="text-text-muted text-sm">使用导入功能添加微信公众号或小红书帐号</p>
+      <% end %>
     </div>
   <% end %>
 </div>

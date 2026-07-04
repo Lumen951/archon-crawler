@@ -23,6 +23,12 @@
         <span class="text-text-primary font-medium"><%= task.progress %> 篇文章</span>
       <% end %>
     </div>
+    <% if task.crawl_task_accounts.any? %>
+      <div class="flex justify-between">
+        <span class="text-text-secondary">帐号:</span>
+        <span class="text-text-primary font-medium"><%= task.completed_account_count %>/<%= task.crawl_task_accounts.count %> 完成</span>
+      </div>
+    <% end %>
     <% if task.error_count > 0 %>
       <div class="flex justify-between">
         <span class="text-text-secondary">错误:</span>
@@ -72,7 +78,10 @@
       <%= button_to pause_crawl_task_path(task), method: :post, class: "flex-1 h-9 px-4 rounded-lg bg-yellow-100 text-yellow-700 hover:bg-yellow-200 font-semibold text-sm transition" do %>
         暂停
       <% end %>
-    <% elsif task.paused? %>
+      <%= button_to fail_crawl_task_path(task), method: :post, data: { turbo_confirm: "确定要将此任务标记为失败吗？" }, class: "flex-1 h-9 px-4 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 font-semibold text-sm transition" do %>
+        失败
+      <% end %>
+    <% elsif task.paused? || task.failed? %>
       <%= button_to resume_crawl_task_path(task), method: :post, class: "flex-1 h-9 px-4 rounded-lg bg-brand text-white hover:bg-brand-dark font-semibold text-sm transition" do %>
         恢复
       <% end %>

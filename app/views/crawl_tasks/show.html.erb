@@ -15,7 +15,8 @@
     <div class="flex items-center space-x-3">
       <% if @crawl_task.running? %>
         <%= button_to "暂停", pause_crawl_task_path(@crawl_task), method: :post, class: "btn btn-warning" %>
-      <% elsif @crawl_task.paused? %>
+        <%= button_to "标记失败", fail_crawl_task_path(@crawl_task), method: :post, data: { turbo_confirm: "确定要将此任务标记为失败吗？" }, class: "btn btn-danger" %>
+      <% elsif @crawl_task.paused? || @crawl_task.failed? %>
         <%= button_to "恢复", resume_crawl_task_path(@crawl_task), method: :post, class: "btn btn-primary" %>
       <% end %>
     </div>

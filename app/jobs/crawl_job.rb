@@ -9,12 +9,15 @@ class CrawlJob < ApplicationJob
       crawl_task = CrawlTask.find(crawl_task_id)
     end
 
-    if crawl_task.completed? || crawl_task.failed?
+    if crawl_task.completed?
       Rails.logger.info("CrawlJob: Task ##{crawl_task.id} already #{crawl_task.status}, skipping")
       return
     end
 
-    accounts = crawl_task.resolved_accounts
+    # 初始化帐号追踪（已完成的 account 不会被重置）
+    crawl_task.setup_account_tracking!
+
+    accounts = crawl_task.incomplete_accounts
     has_wechat  = accounts.where(type: "WechatAccount").exists?
     has_rednote = accounts.where(type: "RednoteAccount").exists?
 

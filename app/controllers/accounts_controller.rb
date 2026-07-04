@@ -1,6 +1,11 @@
 class AccountsController < ApplicationController
+  include QueryPersistenceConcern
+
+  persist_query_for :index
+
   def index
-    @accounts = Account.all.order(created_at: :desc)
+    @q = Account.ransack(params[:q])
+    @accounts = @q.result(distinct: true).order(created_at: :desc).page(params[:page]).per(20)
   end
 
   def show

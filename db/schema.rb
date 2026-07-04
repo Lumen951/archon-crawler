@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_04_100000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_04_120000) do
   create_table "accounts", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "fakeid", null: false
@@ -56,6 +56,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_04_100000) do
     t.index ["crawl_task_id"], name: "index_crawl_logs_on_crawl_task_id"
     t.index ["level"], name: "index_crawl_logs_on_level"
     t.index ["logged_at"], name: "index_crawl_logs_on_logged_at"
+  end
+
+  create_table "crawl_task_accounts", force: :cascade do |t|
+    t.integer "account_id", null: false
+    t.datetime "completed_at"
+    t.integer "crawl_task_id", null: false
+    t.datetime "created_at", null: false
+    t.text "error_message"
+    t.datetime "started_at"
+    t.integer "status", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id"], name: "index_crawl_task_accounts_on_account_id"
+    t.index ["crawl_task_id", "account_id"], name: "idx_crawl_task_accounts_unique", unique: true
+    t.index ["crawl_task_id", "status"], name: "idx_crawl_task_accounts_status"
+    t.index ["crawl_task_id"], name: "index_crawl_task_accounts_on_crawl_task_id"
   end
 
   create_table "crawl_tasks", force: :cascade do |t|
@@ -107,5 +122,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_04_100000) do
   add_foreign_key "articles", "accounts"
   add_foreign_key "articles", "crawl_tasks"
   add_foreign_key "crawl_logs", "crawl_tasks"
+  add_foreign_key "crawl_task_accounts", "accounts"
+  add_foreign_key "crawl_task_accounts", "crawl_tasks"
   add_foreign_key "sessions", "users"
 end
