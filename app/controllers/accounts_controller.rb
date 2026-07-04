@@ -115,10 +115,10 @@ class AccountsController < ApplicationController
   def crawl
     @account = Account.find(params[:id])
 
-    unless Option.api_key_valid?
-      flash[:error] = "API 密钥已过期。请在设置中更新。"
-      redirect_to accounts_path and return
-    end
+    # unless Option.api_key_valid?
+    #   flash[:error] = "API 密钥已过期。请在设置中更新。"
+    #   redirect_to accounts_path and return
+    # end
 
     if CrawlTask.active.exists?
       flash[:error] = "已有活跃的抓取任务"

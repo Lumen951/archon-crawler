@@ -67,7 +67,7 @@ class Option < ApplicationRecord
     end
 
     def max_crawl_pages
-      (get('max_crawl_pages') || -1).to_i
+      (get('max_crawl_pages') || 1).to_i
     end
 
     # Verbose logging mode

@@ -76,15 +76,13 @@ class RednoteCrawler
       end
 
       crawl_task.log(:info, "#{account.nickname}: 正在获取第 #{page} 页笔记列表... (fakeid: #{account.fakeid})")
-      # begin
-        # crawl_task.log(:info, "#{account.nickname}: 调用 RednoteApiClient.get_user_notes...")
-        data = RednoteApiClient.get_user_notes(account.fakeid, page: page)
-        # crawl_task.log(:info, "#{account.nickname}: API 调用完成，data.class=#{data.class}, data.nil?=#{data.nil?}")
-      # rescue => e
-      #   crawl_task.log(:error, "#{account.nickname}: API 调用异常: #{e.class}: #{e.message}")
-      #   crawl_task.log(:error, "#{account.nickname}: 异常 backtrace: #{e.backtrace&.first(5)&.join(' | ')}")
-      #   raise
-      # end
+      data = Retryable.with_retry(
+        crawl_task: crawl_task,
+        context: "#{account.nickname}: 笔记列表获取 (page: #{page})",
+        retry_on: [RednoteApiClient::ApiRateLimitError, RednoteApiClient::ApiError]
+      ) do
+        RednoteApiClient.get_user_notes(account.fakeid, page: page)
+      end
 
       if data.nil?
         crawl_task.log(:warn, "#{account.nickname}: API 返回 nil，可能请求失败")
@@ -205,33 +203,13 @@ class RednoteCrawler
   end
 
   def self.fetch_note_detail_with_retry(note_id, crawl_task, max_retries: 3)
-    retries = 0
-    begin
-      result = RednoteApiClient.get_note_detail(note_id)
-      crawl_task.log(:debug, "笔记 #{note_id} 详情获取成功")
-      result
-    rescue RednoteApiClient::ApiRateLimitError
-      retries += 1
-      if retries <= max_retries
-        wait = 2 ** retries
-        crawl_task.log(:warn, "小红书限流，#{wait} 秒后重试（#{retries}/#{max_retries}）笔记 #{note_id}")
-        sleep wait
-        retry
-      else
-        crawl_task.log(:error, "笔记 #{note_id} 超过重试次数（#{max_retries}），跳过")
-        nil
-      end
-    rescue StandardError => e
-      retries += 1
-      if retries <= max_retries
-        wait = 2 ** retries
-        crawl_task.log(:warn, "获取笔记 #{note_id} 详情失败（#{retries}/#{max_retries}），#{wait} 秒后重试：#{e.message}")
-        sleep wait
-        retry
-      else
-        crawl_task.log(:error, "笔记 #{note_id} 详情获取失败（已重试 #{max_retries} 次）：#{e.message}")
-        nil
-      end
+    Retryable.with_retry(
+      crawl_task: crawl_task,
+      context: "笔记详情获取 (#{note_id})",
+      max_retries: max_retries,
+      retry_on: [RednoteApiClient::ApiRateLimitError, StandardError]
+    ) do
+      RednoteApiClient.get_note_detail(note_id)
     end
   end
 end

@@ -68,7 +68,15 @@ class WechatCrawler
         break
       end
 
-      response = WechatApiClient.get_articles(account.fakeid, begin_offset: offset, size: 20)
+      response = Retryable.with_retry(
+        crawl_task: crawl_task,
+        context: "#{account.nickname}: 文章列表获取 (offset: #{offset})",
+        retry_on: [WechatApiClient::ApiRateLimitError, StandardError]
+      ) do
+        WechatApiClient.get_articles(account.fakeid, begin_offset: offset, size: 20)
+      end
+      break unless response
+
       articles_data = response['articles'] || []
 
       if articles_data.empty?
@@ -138,20 +146,12 @@ class WechatCrawler
   end
 
   def self.download_with_retry(url, format, crawl_task, max_retries: 3)
-    retries = 0
-    begin
+    Retryable.with_retry(
+      crawl_task: crawl_task,
+      context: "下载 #{url} (#{format})",
+      max_retries: max_retries
+    ) do
       WechatApiClient.download_content(url, format: format)
-    rescue StandardError => e
-      retries += 1
-      if retries < max_retries
-        sleep_time = 2 ** retries
-        crawl_task.log(:warn, "重试 #{retries}/#{max_retries} 次下载 #{url}，#{sleep_time} 秒后重试")
-        sleep sleep_time
-        retry
-      else
-        crawl_task.log(:error, "在 #{max_retries} 次重试后下载 #{url} 失败：#{e.message}")
-        nil
-      end
     end
   end
 end

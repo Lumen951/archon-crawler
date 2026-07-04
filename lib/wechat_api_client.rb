@@ -4,9 +4,26 @@ require 'faraday/retry'
 class WechatApiClient
   BASE_URL = "https://down.mptext.top"
 
-  class ApiError < StandardError; end
-  class ApiKeyExpiredError < ApiError; end
-  class ApiRateLimitError < ApiError; end
+  class ApiError < StandardError
+    attr_reader :status_code
+
+    def initialize(message, status_code: nil)
+      super(message)
+      @status_code = status_code
+    end
+  end
+
+  class ApiKeyExpiredError < ApiError
+    def initialize(message = "API 密钥已过期或无效")
+      super(message, status_code: 401)
+    end
+  end
+
+  class ApiRateLimitError < ApiError
+    def initialize(message = "超出速率限制")
+      super(message, status_code: 429)
+    end
+  end
 
   def self.connection
     @connection ||= Faraday.new(url: BASE_URL) do |f|
@@ -65,14 +82,14 @@ class WechatApiClient
     when 200
       JSON.parse(response.body)
     when 401
-      raise ApiKeyExpiredError, "API 密钥已过期或无效"
+      raise ApiKeyExpiredError
     when 429
-      raise ApiRateLimitError, "超出速率限制"
+      raise ApiRateLimitError
     else
-      raise ApiError, "API 错误：#{response.status} - #{response.body}"
+      raise ApiError.new("API 错误：#{response.status} - #{response.body}", status_code: response.status)
     end
   rescue JSON::ParserError => e
-    raise ApiError, "无效的 JSON 响应：#{e.message}"
+    raise ApiError.new("无效的 JSON 响应：#{e.message}")
   end
 
   def self.handle_download_response(response)
@@ -80,11 +97,11 @@ class WechatApiClient
     when 200
       response.body
     when 401
-      raise ApiKeyExpiredError, "API 密钥已过期或无效"
+      raise ApiKeyExpiredError
     when 429
-      raise ApiRateLimitError, "超出速率限制"
+      raise ApiRateLimitError
     else
-      raise ApiError, "API 错误：#{response.status} - #{response.body}"
+      raise ApiError.new("API 错误：#{response.status} - #{response.body}", status_code: response.status)
     end
   end
 end

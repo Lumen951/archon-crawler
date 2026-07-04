@@ -4,9 +4,26 @@ require "faraday/retry"
 class RednoteApiClient
   BASE_URL = "https://api.yddm.com"
 
-  class ApiError < StandardError; end
-  class ApiKeyMissingError < ApiError; end
-  class ApiRateLimitError < ApiError; end
+  class ApiError < StandardError
+    attr_reader :status_code
+
+    def initialize(message, status_code: nil)
+      super(message)
+      @status_code = status_code
+    end
+  end
+
+  class ApiKeyMissingError < ApiError
+    def initialize(message = "API 密钥无效或未授权")
+      super(message, status_code: 401)
+    end
+  end
+
+  class ApiRateLimitError < ApiError
+    def initialize(message = "速率限制")
+      super(message, status_code: 429)
+    end
+  end
 
   def self.connection
     @connection ||= Faraday.new(url: BASE_URL) do |f|
@@ -49,17 +66,17 @@ class RednoteApiClient
       code = body["code"].to_i
       raise ApiRateLimitError, "API 速率限制（429）" if code == 429
       unless code == 0
-        raise ApiError, "API 返回错误 code=#{code}：#{body['msg'] || 'unknown'}"
+        raise ApiError.new("API 返回错误 code=#{code}：#{body['msg'] || 'unknown'}", status_code: response.status)
       end
       body["data"]
     when 401, 403
-      raise ApiKeyMissingError, "API 密钥无效或未授权（#{response.status}）"
+      raise ApiKeyMissingError.new("API 密钥无效或未授权（#{response.status}）")
     when 429
-      raise ApiRateLimitError, "HTTP 429 速率限制"
+      raise ApiRateLimitError.new("HTTP 429 速率限制")
     else
-      raise ApiError, "HTTP #{response.status}：#{response.body.truncate(200)}"
+      raise ApiError.new("HTTP #{response.status}：#{response.body.truncate(200)}", status_code: response.status)
     end
   rescue JSON::ParserError => e
-    raise ApiError, "无效的 JSON 响应：#{e.message}"
+    raise ApiError.new("无效的 JSON 响应：#{e.message}")
   end
 end
