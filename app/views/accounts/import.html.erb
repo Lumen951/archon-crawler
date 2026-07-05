@@ -63,7 +63,7 @@
         <div class="space-y-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">
-              上传 CSV 文件
+              上传 JSON / CSV 文件
             </label>
             <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-gray-400 transition-colors">
               <div class="space-y-1 text-center">
@@ -73,11 +73,11 @@
                 <div class="flex text-sm text-gray-600">
                   <label for="file-upload" class="relative cursor-pointer bg-white rounded-md font-medium text-primary hover:text-blue-700 focus-within:outline-none">
                     <span>上传文件</span>
-                    <%= f.file_field :json_file, id: "file-upload", accept: ".csv", class: "sr-only", onchange: "updateFileName(this)" %>
+                    <%= f.file_field :json_file, id: "file-upload", accept: ".json,.csv", class: "sr-only", onchange: "updateFileName(this)" %>
                   </label>
                   <p class="pl-1">或拖放文件至此</p>
                 </div>
-                <p class="text-xs text-gray-500">支持 .csv 文件</p>
+                <p class="text-xs text-gray-500">支持 .json 和 .csv 文件</p>
                 <p id="file-name" class="text-sm text-gray-700 font-medium mt-2"></p>
               </div>
             </div>

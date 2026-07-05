@@ -87,7 +87,7 @@ module Accounts
           next
         end
 
-        account = Account.find_or_initialize_by(fakeid: attributes[:fakeid])
+        account = WechatAccount.find_or_initialize_by(fakeid: attributes[:fakeid])
 
         if account.new_record?
           account.nickname = attributes[:nickname]
