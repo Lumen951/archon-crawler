@@ -5,6 +5,7 @@ class Admin::SettingsController < Admin::BaseController
     @rednote_api_key = Option.rednote_api_key
     @default_article_concurrency = Option.default_article_concurrency
     @default_account_concurrency = Option.default_account_concurrency
+    @max_crawl_pages = Option.max_crawl_pages
     @verbose_mode = Option[:crawler_verbose_mode]
     @log_retention_days = Option[:crawler_log_retention_days]
   end
@@ -30,6 +31,11 @@ class Admin::SettingsController < Admin::BaseController
     if params[:default_account_concurrency].present?
       Option.set('default_account_concurrency', params[:default_account_concurrency])
       flash[:success] = "默认账号并发数更新成功"
+    end
+
+    if params[:max_crawl_pages].present?
+      Option.set('max_crawl_pages', params[:max_crawl_pages])
+      flash[:success] = "最大抓取页数更新成功"
     end
 
     if params[:verbose_mode].present?

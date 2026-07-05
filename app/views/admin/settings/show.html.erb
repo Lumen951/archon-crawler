@@ -13,6 +13,7 @@
         <div class="flex items-center justify-between">
           <div>
             <p class="text-sm font-medium text-blue-900">当前 API 密钥</p>
+            <p class="text-sm text-blue-700 mt-1 font-mono"><%= mask_api_key(@api_key_value) %></p>
             <p class="text-sm text-blue-700 mt-1">
               过期时间：<%= @api_key_expires_at ? Time.parse(@api_key_expires_at).strftime('%Y-%m-%d %H:%M') : '永不过期' %>
               <% if @api_key_expires_at && Time.parse(@api_key_expires_at) < 24.hours.from_now %>
@@ -58,22 +59,22 @@
   <div class="card">
     <h2 class="text-xl font-bold text-gray-900 mb-4">小红书 API 密钥</h2>
 
+    <% if @rednote_api_key.present? %>
+      <div class="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+        <p class="text-sm font-medium text-green-900">当前 API 密钥</p>
+        <p class="text-sm text-green-700 mt-1 font-mono"><%= mask_api_key(@rednote_api_key) %></p>
+      </div>
+    <% end %>
+
     <%= form_with url: admin_settings_path, method: :patch, class: "space-y-4" do |f| %>
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-2">API 密钥</label>
-        <%= text_field_tag :rednote_api_key, @rednote_api_key,
+        <%= text_field_tag :rednote_api_key, nil,
             class: "w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent",
             placeholder: "输入小红书 API 密钥" %>
       </div>
 
-      <div class="flex items-center justify-between">
-        <div>
-          <% if @rednote_api_key.present? %>
-            <span class="text-sm text-green-600">✓ 已设置</span>
-          <% else %>
-            <span class="text-sm text-gray-500">未设置</span>
-          <% end %>
-        </div>
+      <div class="flex items-center justify-end">
         <button type="submit" class="btn btn-primary">保存小红书密钥</button>
       </div>
     <% end %>
@@ -99,6 +100,15 @@
                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
         <p class="mt-1 text-sm text-gray-500">
           每个帐号抓取时的并发请求数（5-50）。数值越高速度越快，但 API 负载也越大。
+        </p>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">最大抓取页数</label>
+        <input type="number" name="max_crawl_pages" value="<%= @max_crawl_pages %>" min="1" max="100"
+               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+        <p class="mt-1 text-sm text-gray-500">
+          每个帐号最多抓取的文章页数（1-100）。每页约20篇文章。
         </p>
       </div>
 
