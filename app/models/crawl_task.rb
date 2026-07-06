@@ -33,11 +33,11 @@ class CrawlTask < ApplicationRecord
   end
 
   def increment_error_count!
-    increment!(:error_count)
+    increment!(:error_count, touch: true)
   end
 
   def increment_progress!
-    increment!(:progress)
+    increment!(:progress, touch: true)
   end
 
   def broadcast_updates
