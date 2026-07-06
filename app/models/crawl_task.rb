@@ -3,7 +3,7 @@ class CrawlTask < ApplicationRecord
   has_many :articles, dependent: :nullify
   has_many :crawl_task_accounts, dependent: :destroy
 
-  after_update_commit :broadcast_task_updates
+  # after_update_commit :broadcast_task_updates
 
   enum :status, { pending: 0, running: 1, paused: 2, completed: 3, failed: 4 }
 
@@ -33,11 +33,13 @@ class CrawlTask < ApplicationRecord
   end
 
   def increment_error_count!
-    increment!(:error_count, touch: true)
+    increment!(:error_count)
+    broadcast_updates
   end
 
   def increment_progress!
-    increment!(:progress, touch: true)
+    increment!(:progress)
+    broadcast_updates
   end
 
   def broadcast_updates
