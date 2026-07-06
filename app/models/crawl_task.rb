@@ -122,19 +122,19 @@ class CrawlTask < ApplicationRecord
   private
 
   def broadcast_task_updates
-    broadcast_replace_to(
-      :crawl_tasks,
-      target: ActionView::RecordIdentifier.dom_id(self, :row),
-      partial: "crawl_tasks/task_row",
-      locals: { task: self }
-    )
+    # broadcast_replace_to(
+    #   :crawl_tasks,
+    #   target: ActionView::RecordIdentifier.dom_id(self, :row),
+    #   partial: "crawl_tasks/task_row",
+    #   locals: { task: self }
+    # )
 
-    broadcast_replace_to(
-      :crawl_tasks,
-      target: ActionView::RecordIdentifier.dom_id(self, :card),
-      partial: "crawl_tasks/task_card",
-      locals: { task: self }
-    )
+    # broadcast_replace_to(
+    #   :crawl_tasks,
+    #   target: ActionView::RecordIdentifier.dom_id(self, :card),
+    #   partial: "crawl_tasks/task_card",
+    #   locals: { task: self }
+    # )
 
     broadcast_replace_to(
       [self, :show],

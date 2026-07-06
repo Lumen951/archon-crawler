@@ -105,7 +105,7 @@
         <% end %>
       </div>
 
-      <% if has_more %>
+      <% if false && has_more %>
         <div class="hidden space-y-2" data-collapsible-target="content">
           <% all_accounts.drop(preview_limit).each do |ta| %>
             <%= render 'crawl_tasks/account_status_row', ta: ta %>
