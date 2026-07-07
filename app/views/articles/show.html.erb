@@ -1,0 +1,198 @@
+<div class="max-w-4xl mx-auto">
+  <!-- Header -->
+  <div class="mb-6">
+    <div class="mb-4">
+      <%= link_to account_path(@article.account), class: "inline-flex items-center gap-2 text-text-secondary hover:text-brand transition" do %>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+        </svg>
+        返回 <%= @article.account.nickname %>
+      <% end %>
+    </div>
+
+    <h1 class="text-2xl sm:text-3xl font-bold text-text-primary mb-4"><%= @article.title %></h1>
+
+    <div class="flex flex-wrap items-center gap-4 text-sm text-text-secondary">
+      <span class="inline-flex items-center gap-1.5">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+        </svg>
+        <%= @article.author.presence || @article.account.nickname %>
+      </span>
+
+      <% if @article.published_at %>
+        <span class="inline-flex items-center gap-1.5">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+          </svg>
+          <%= @article.published_at.strftime('%Y年%m月%d日') %>
+        </span>
+      <% end %>
+
+      <%= link_to @article.url, target: "_blank", rel: "noopener noreferrer",
+            class: "inline-flex items-center gap-1.5 text-brand hover:text-brand-dark font-medium transition" do %>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+        </svg>
+        查看原文
+      <% end %>
+    </div>
+  </div>
+
+  <!-- Cover Image -->
+  <% if @article.cover_url.present? %>
+    <div class="mb-8">
+      <img src="<%= @article.cover_url %>" alt="" class="w-full rounded-xl shadow-lg">
+    </div>
+  <% end %>
+
+  <!-- Content -->
+  <div class="bg-bg-card border border-border-primary rounded-2xl shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)] overflow-hidden">
+    <% if @cached_content.present? %>
+      <div class="p-6 sm:p-8 article-content">
+        <%= sanitize @cached_content,
+              tags: %w[p br h1 h2 h3 h4 h5 h6 strong em a img ul ol li blockquote pre code span div section],
+              attributes: %w[href src alt class style width height] %>
+      </div>
+    <% elsif @article.digest.present? %>
+      <div class="p-6 sm:p-8">
+        <p class="text-text-secondary"><%= @article.digest %></p>
+        <div class="mt-6 text-center">
+          <%= link_to @article.url, target: "_blank", rel: "noopener noreferrer",
+                class: "inline-flex items-center gap-2 text-brand hover:text-brand-dark font-medium transition" do %>
+            查看完整文章
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+            </svg>
+          <% end %>
+        </div>
+      </div>
+    <% else %>
+      <div class="p-6 sm:p-8 text-center">
+        <svg class="w-16 h-16 mx-auto text-text-muted mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+        <p class="text-text-secondary mb-4">暂无文章内容</p>
+        <%= link_to @article.url, target: "_blank", rel: "noopener noreferrer",
+              class: "inline-flex items-center gap-2 text-brand hover:text-brand-dark font-medium transition" do %>
+          前往原文查看
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+          </svg>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+
+  <!-- Navigation -->
+  <div class="mt-8 flex justify-between items-center">
+    <% prev_article = @article.account.articles.where("published_at < ?", @article.published_at || Time.current).order(published_at: :desc).first %>
+    <% next_article = @article.account.articles.where("published_at > ?", @article.published_at || Time.current).order(published_at: :asc).first %>
+
+    <div>
+      <% if prev_article %>
+        <%= link_to article_path(prev_article), class: "inline-flex items-center gap-2 text-text-secondary hover:text-brand transition" do %>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+          </svg>
+          <span class="hidden sm:inline"><%= prev_article.title.truncate(30) %></span>
+          <span class="sm:hidden">上一篇</span>
+        <% end %>
+      <% end %>
+    </div>
+
+    <div>
+      <% if next_article %>
+        <%= link_to article_path(next_article), class: "inline-flex items-center gap-2 text-text-secondary hover:text-brand transition" do %>
+          <span class="hidden sm:inline"><%= next_article.title.truncate(30) %></span>
+          <span class="sm:hidden">下一篇</span>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+          </svg>
+        <% end %>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<style>
+  .article-content {
+    line-height: 1.8;
+    color: var(--text-primary, #1f2937);
+  }
+
+  .article-content p {
+    margin-bottom: 1em;
+  }
+
+  .article-content img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 0.5rem;
+    margin: 1.5rem auto;
+    display: block;
+  }
+
+  .article-content h1, .article-content h2, .article-content h3,
+  .article-content h4, .article-content h5, .article-content h6 {
+    font-weight: 700;
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+    color: var(--text-primary, #111827);
+  }
+
+  .article-content h1 { font-size: 1.75rem; }
+  .article-content h2 { font-size: 1.5rem; }
+  .article-content h3 { font-size: 1.25rem; }
+
+  .article-content a {
+    color: var(--brand, #2563eb);
+    text-decoration: underline;
+  }
+
+  .article-content a:hover {
+    color: var(--brand-dark, #1d4ed8);
+  }
+
+  .article-content blockquote {
+    border-left: 4px solid var(--border-primary, #e5e7eb);
+    padding-left: 1rem;
+    margin: 1.5rem 0;
+    color: var(--text-secondary, #6b7280);
+    font-style: italic;
+  }
+
+  .article-content pre {
+    background: var(--bg-secondary, #f9fafb);
+    border: 1px solid var(--border-primary, #e5e7eb);
+    border-radius: 0.5rem;
+    padding: 1rem;
+    overflow-x: auto;
+    margin: 1.5rem 0;
+  }
+
+  .article-content code {
+    background: var(--bg-secondary, #f9fafb);
+    padding: 0.125rem 0.375rem;
+    border-radius: 0.25rem;
+    font-size: 0.875em;
+  }
+
+  .article-content pre code {
+    background: none;
+    padding: 0;
+  }
+
+  .article-content ul, .article-content ol {
+    margin: 1rem 0;
+    padding-left: 1.5rem;
+  }
+
+  .article-content li {
+    margin-bottom: 0.5rem;
+  }
+
+  .article-content section {
+    margin-bottom: 1rem;
+  }
+</style>
