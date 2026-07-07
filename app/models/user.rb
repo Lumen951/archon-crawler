@@ -57,4 +57,25 @@ class User < ApplicationRecord
   def ever_logged_in?
     last_login_at.present?
   end
+
+  # Find or create user from OAuth response
+  def self.from_oauth(user_hash)
+    if user_hash[:mp_id].blank?
+      raise ArgumentError, "No mp_id in OAuth response: #{user_hash.inspect}"
+    end
+
+    find_or_initialize_by(mp_id: user_hash[:mp_id]).tap do |user|
+      is_new = user.new_record?
+      user.email_address = user_hash[:email].to_s.strip.presence || "user-#{user_hash[:mp_id]}@miracleplus.com"
+      user.name = user_hash[:name].to_s.strip.presence
+      user.password = SecureRandom.hex(32) if is_new
+      user.role = :admin if is_new && !User.exists? # First user becomes admin
+      user.save!
+    end
+  end
+
+  # Check if user is OAuth-only (no password set)
+  def oauth_only?
+    password_digest.blank? && mp_id.present?
+  end
 end

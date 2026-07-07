@@ -1,7 +1,7 @@
 class SessionsController < ApplicationController
   MAGIC_LINK_REQUEST_NOTICE = "如果该邮箱可用，我们已发送登录链接，请检查收件箱。".freeze
 
-  allow_unauthenticated_access only: %i[ new create magic_link magic_link_login dev_login ]
+  allow_unauthenticated_access only: %i[ new create magic_link magic_link_login dev_login oauth_login oauth_callback ]
   rate_limit to: 10, within: 3.minutes, only: :create, with: -> { redirect_to new_session_path, alert: "Try again later." }
   rate_limit to: 5, within: 10.minutes, only: :magic_link, with: -> { redirect_to new_session_path, notice: MAGIC_LINK_REQUEST_NOTICE }
 
@@ -60,8 +60,51 @@ class SessionsController < ApplicationController
     redirect_to after_authentication_url, notice: "已以开发者身份登录"
   end
 
+  def oauth_login
+    provider = params[:provider]
+    unless Oauth2Client::PROVIDERS.include?(provider.to_sym)
+      redirect_to new_session_path, alert: "不支持的登录方式" and return
+    end
+
+    state = SecureRandom.hex(32)
+    session[:oauth_state] = state
+
+    client = oauth_client(provider)
+    redirect_to client.authorize_url(state:), allow_other_host: true
+  end
+
+  def oauth_callback
+    provider = params[:provider]
+
+    if params[:state] != session.delete(:oauth_state)
+      redirect_to new_session_path, alert: "登录验证失败，请重试" and return
+    end
+
+    client = oauth_client(provider)
+    user_hash = client.user_hash(params[:code])
+    user = User.from_oauth(user_hash)
+
+    start_new_session_for(user)
+    redirect_to after_authentication_url, notice: "登录成功！"
+  rescue Oauth2Client::OAuthError => e
+    Rails.logger.error "OAuth error: #{e.message}"
+    redirect_to new_session_path, alert: "登录失败：#{e.message}"
+  rescue StandardError => e
+    Rails.logger.error "OAuth error: #{e.class} - #{e.message}"
+    redirect_to new_session_path, alert: "登录失败，请重试"
+  end
+
   def destroy
     terminate_session
     redirect_to new_session_path, status: :see_other
+  end
+
+  private
+
+  def oauth_client(provider)
+    Oauth2Client.new(
+      provider: provider.to_sym,
+      url_options: { host: request.host, port: request.port, protocol: request.protocol }
+    )
   end
 end

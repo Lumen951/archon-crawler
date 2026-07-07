@@ -24,7 +24,11 @@
       <tbody class="bg-bg-card divide-y divide-border-primary">
         <% @users.each do |user| %>
           <tr class="hover:bg-bg-secondary transition">
-            <td class="px-6 py-4 text-sm text-text-primary font-medium"><%= user.email_address %></td>
+            <td class="px-6 py-4 text-sm text-text-primary font-medium">
+              <%= user.name.presence || '-' %>
+              <br />
+              <small><%= user.email_address %></small>
+            </td>
             <td class="px-6 py-4 whitespace-nowrap">
               <% if user.admin? %>
                 <span class="status-badge inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-800">管理员</span>

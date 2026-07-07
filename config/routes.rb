@@ -5,6 +5,8 @@ Rails.application.routes.draw do
     post :dev_login
   end
   get '/magic_link/:token', to: 'sessions#magic_link_login', as: :magic_link
+  get '/auth/:provider', to: 'sessions#oauth_login', as: :oauth_login
+  get '/oauth/:provider/callback', to: 'sessions#oauth_callback', as: :oauth_callback
 
   root "dashboard#index"
 

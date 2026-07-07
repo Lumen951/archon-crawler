@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_04_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_07_080246) do
   create_table "accounts", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "fakeid", null: false
@@ -111,11 +111,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_04_120000) do
     t.string "email_address", null: false
     t.datetime "email_confirmed_at"
     t.datetime "last_login_at"
+    t.string "mp_id"
     t.string "name"
-    t.string "password_digest", null: false
+    t.string "password_digest"
     t.integer "role", default: 0, null: false
     t.datetime "updated_at", null: false
     t.index ["email_address"], name: "index_users_on_email_address", unique: true
+    t.index ["mp_id"], name: "index_users_on_mp_id", unique: true
     t.index ["role"], name: "index_users_on_role"
   end
 

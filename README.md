@@ -61,9 +61,10 @@ MP-Crawler 是一个基于 Ruby on Rails 的应用，用于自动抓取微信公
 
 ### 6. 用户认证与权限
 - 基于 `has_secure_password` 的密码认证
+- **MiraclePlus OAuth 登录**（推荐）
 - Magic Link 邮箱登录（免密码）
 - 开发环境 dev_login 快捷登录
-- 角色系统：admin / user
+- 角色系统：admin / user（首个 OAuth 用户自动成为 admin）
 - 邮箱验证机制
 - `AdminMailer`：邀请邮件、登录链接邮件、新用户凭据邮件
 
@@ -218,6 +219,13 @@ GET /up                               # health check
 ```bash
 bundle install
 rails db:create db:migrate
+
+# 配置 MiraclePlus OAuth（推荐）
+# 编辑加密凭据文件，添加以下内容：
+EDITOR="code --wait" rails credentials:edit
+# mp_oauth:
+#   client_id: your_client_id
+#   client_secret: your_client_secret
 
 # 命令行导入帐号
 rails import:accounts
