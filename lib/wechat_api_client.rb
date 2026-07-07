@@ -81,10 +81,10 @@ class WechatApiClient
     case response.status
     when 200
       parsed_body = JSON.parse(response.body)
-      if parsed_body.dig("base_resp", "ret") == -1
+      if parsed_body.dig("base_resp", "ret") != 0
         raise ApiKeyExpiredError, "API 密钥已过期或无效"
       end
-      prased_body
+      parsed_body
     when 401
       raise ApiKeyExpiredError
     when 429

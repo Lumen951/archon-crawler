@@ -35,7 +35,7 @@ module Retryable
         retry
       else
         crawl_task.log(:error, "#{context}: 超过重试次数（#{max_retries}），放弃：#{e.class} - #{e.message}")
-        nil
+        raise e
       end
     end
   end
