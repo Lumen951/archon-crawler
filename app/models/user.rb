@@ -6,6 +6,15 @@ class User < ApplicationRecord
 
   enum :role, { user: 0, admin: 1 }, default: :user
 
+  store :settings, coder: JSON
+  store_accessor :settings, :notify_api_key_expiry
+
+  # Admins opt in to notifications explicitly
+  def notify_api_key_expiry?
+    return false unless admin?
+    notify_api_key_expiry == "1" || notify_api_key_expiry == true
+  end
+
   validates :email_address, presence: true, uniqueness: true, format: { with: URI::MailTo::EMAIL_REGEXP }
 
   def email_confirmed?

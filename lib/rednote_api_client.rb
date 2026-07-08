@@ -57,6 +57,21 @@ class RednoteApiClient
     handle_response(response)
   end
 
+  # Validate that the configured API key is accepted by the server.
+  # Returns true if valid, false if unauthorized, nil on network/unknown error.
+  def self.validate_key
+    hdrs = headers  # raises ApiKeyMissingError if key is absent
+    response = connection.post("/xhs/user_post3", { user_id: "618bdf350000000010004769", page: 1 }.to_json, hdrs)
+    body = JSON.parse(response.body)
+    Rails.logger.debug("RedNote API key validation response: #{body}")
+    response.status != 401 && response.status != 403 && body["code"].to_i == 0
+  rescue ApiKeyMissingError
+    false
+  rescue => e
+    Rails.logger.warn("RedNote API key validation error: #{e.message}")
+    nil
+  end
+
   private
 
   def self.handle_response(response)

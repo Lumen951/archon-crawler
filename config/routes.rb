@@ -59,7 +59,10 @@ Rails.application.routes.draw do
     end
     get 'users/:id/credentials', to: 'users#show_credentials', as: :user_credentials
 
-    resource :settings, only: [:show, :update]
+    resource :settings, only: [:show, :update] do
+      post :validate_wechat_key
+      post :validate_rednote_key
+    end
   end
 
   get "/rss", to: "rss#index", as: :all_accounts_rss, defaults: { format: 'rss' }

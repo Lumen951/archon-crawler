@@ -14,6 +14,19 @@
         <%= f.text_field :name, class: "w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" %>
       </div>
 
+      <% if @user.admin? %>
+        <div class="border-t pt-4">
+          <h3 class="text-lg font-medium mb-3">通知设置</h3>
+          <label class="flex items-center gap-2">
+            <%= hidden_field_tag "user[settings][notify_api_key_expiry]", "0" %>
+            <%= check_box_tag "user[settings][notify_api_key_expiry]", "1", @user.notify_api_key_expiry?,
+                  class: "rounded border-gray-300 text-blue-600 focus:ring-blue-500" %>
+            <span class="text-sm text-gray-700">API Key 过期时邮件通知</span>
+          </label>
+          <p class="text-sm text-gray-500 mt-1 ml-6">开启后，当 API Key 过期时系统将每日发送一封提醒邮件</p>
+        </div>
+      <% end %>
+
       <div class="flex justify-end">
         <%= f.submit "保存", class: "px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700" %>
       </div>

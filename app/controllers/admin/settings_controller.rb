@@ -8,6 +8,8 @@ class Admin::SettingsController < Admin::BaseController
     @max_crawl_pages = Option.max_crawl_pages
     @verbose_mode = Option[:crawler_verbose_mode]
     @log_retention_days = Option[:crawler_log_retention_days]
+    @wechat_key_check = Rails.cache.read('api_key_check:wechat')
+    @rednote_key_check = Rails.cache.read('api_key_check:rednote')
   end
 
   def update
@@ -48,6 +50,30 @@ class Admin::SettingsController < Admin::BaseController
       flash[:success] = "日志保留天数更新成功"
     end
 
+    redirect_to admin_settings_path
+  end
+
+  def validate_wechat_key
+    valid = WechatApiClient.validate_key
+    result = { valid: valid, checked_at: Time.current.iso8601 }
+    Rails.cache.write('api_key_check:wechat', result, expires_in: 2.hours)
+    flash[:success] = valid ? "✓ 微信 API 密钥有效" : "✗ 微信 API 密钥无效或已过期"
+    redirect_to admin_settings_path
+  rescue => e
+    Rails.logger.error("WeChat API key validation error: #{e.message}")
+    flash[:error] = "验证失败：#{e.message}"
+    redirect_to admin_settings_path
+  end
+
+  def validate_rednote_key
+    valid = RednoteApiClient.validate_key
+    result = { valid: valid, checked_at: Time.current.iso8601 }
+    Rails.cache.write('api_key_check:rednote', result, expires_in: 2.hours)
+    flash[:success] = valid ? "✓ 小红书 API 密钥有效" : "✗ 小红书 API 密钥无效"
+    redirect_to admin_settings_path
+  rescue => e
+    Rails.logger.error("RedNote API key validation error: #{e.message}")
+    flash[:error] = "验证失败：#{e.message}"
     redirect_to admin_settings_path
   end
 end

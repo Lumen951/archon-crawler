@@ -70,6 +70,7 @@ class WechatApiClient
   def self.validate_key
     response = connection.get('/api/public/v1/authkey', {}, headers)
     data = handle_response(response)
+    Rails.logger.debug("WeChat API key validation response: #{data}")
     data['code'] == 0
   rescue ApiKeyExpiredError
     false
@@ -81,7 +82,9 @@ class WechatApiClient
     case response.status
     when 200
       parsed_body = JSON.parse(response.body)
-      if parsed_body.dig("base_resp", "ret") != 0
+      ret = parsed_body.dig("base_resp", "ret")
+      if ret.present? && ret != 0
+        Rails.logger.warn("WeChat API returned error: #{parsed_body}")
         raise ApiKeyExpiredError, "API 密钥已过期或无效"
       end
       parsed_body

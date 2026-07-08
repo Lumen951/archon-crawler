@@ -1,0 +1,17 @@
+⚠️ API Key 已过期
+
+您好，<%= @user.name || @user.email_address %>
+
+以下 API Key 已过期，文章抓取功能已暂停：
+<% if @expired_keys.include?(:wechat) %>
+- 微信公众号 API Key
+<% end %>
+<% if @expired_keys.include?(:rednote) %>
+- 小红书 API Key
+<% end %>
+
+请尽快更新 API Key 以恢复抓取功能：
+<%= root_url %>admin/settings
+
+---
+此邮件由系统自动发送，每日最多一次。

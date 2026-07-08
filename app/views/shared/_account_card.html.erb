@@ -27,7 +27,7 @@
       <div class="mt-4 flex space-x-2">
         <%= button_to "立即抓取", crawl_admin_account_path(account), method: :post,
             class: "btn btn-primary text-sm",
-            disabled: !account.active? || !Option.api_key_valid? %>
+            disabled: !account.active? %>
         <%= button_to account.active? ? "停用" : "启用",
             toggle_status_admin_account_path(account),
             method: :post,

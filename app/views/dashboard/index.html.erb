@@ -4,6 +4,61 @@
     <p class="text-text-secondary mt-2">帐号文章抓取系统概览</p>
   </div>
 
+  <!-- API Key Status -->
+  <div class="bg-bg-card border border-border-primary rounded-xl p-5 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+    <h2 class="text-lg font-semibold text-text-primary mb-4 flex items-center gap-2">
+      <svg class="w-5 h-5 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
+      </svg>
+      API 密钥状态
+    </h2>
+    <div class="flex flex-wrap gap-6">
+      <%# WeChat API key status %>
+      <% wechat_check = @wechat_key_check %>
+      <div class="flex items-center gap-3">
+        <span class="text-sm text-text-secondary">微信 API：</span>
+        <% if wechat_check.nil? %>
+          <span class="text-sm text-gray-400">未验证</span>
+        <% elsif wechat_check[:valid] == true %>
+          <span class="text-sm font-semibold text-green-600">✓ 有效</span>
+        <% elsif wechat_check[:valid] == false %>
+          <span class="text-sm font-semibold text-red-600">✗ 无效</span>
+        <% else %>
+          <span class="text-sm font-semibold text-yellow-600">? 验证失败</span>
+        <% end %>
+        <% if wechat_check&.dig(:checked_at) %>
+          <span class="text-xs text-text-secondary">(<%= Time.parse(wechat_check[:checked_at]).strftime('%H:%M') %>)</span>
+        <% end %>
+        <%= button_to validate_wechat_key_admin_settings_path, method: :post,
+            class: "text-xs px-2 py-1 rounded border border-brand text-brand hover:bg-brand hover:text-white transition" do %>
+          手动验证
+        <% end %>
+      </div>
+
+      <%# RedNote API key status %>
+      <% rednote_check = @rednote_key_check %>
+      <div class="flex items-center gap-3">
+        <span class="text-sm text-text-secondary">小红书 API：</span>
+        <% if rednote_check.nil? %>
+          <span class="text-sm text-gray-400">未验证</span>
+        <% elsif rednote_check[:valid] == true %>
+          <span class="text-sm font-semibold text-green-600">✓ 有效</span>
+        <% elsif rednote_check[:valid] == false %>
+          <span class="text-sm font-semibold text-red-600">✗ 无效</span>
+        <% else %>
+          <span class="text-sm font-semibold text-yellow-600">? 验证失败</span>
+        <% end %>
+        <% if rednote_check&.dig(:checked_at) %>
+          <span class="text-xs text-text-secondary">(<%= Time.parse(rednote_check[:checked_at]).strftime('%H:%M') %>)</span>
+        <% end %>
+        <%= button_to validate_rednote_key_admin_settings_path, method: :post,
+            class: "text-xs px-2 py-1 rounded border border-brand text-brand hover:bg-brand hover:text-white transition" do %>
+          手动验证
+        <% end %>
+      </div>
+    </div>
+  </div>
+
   <!-- RSS Feed Section -->
     <h2 class="text-lg font-semibold text-text-primary mb-4 flex items-center gap-2">
       <svg class="w-5 h-5 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -44,6 +44,6 @@ class ProfilesController < ApplicationController
   private
 
   def user_params
-    params.require(:user).permit(:email_address, :name)
+    params.require(:user).permit(:email_address, :name, settings: [:notify_api_key_expiry])
   end
 end
