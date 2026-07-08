@@ -4,14 +4,14 @@ class ValidateApiKeysJob < ApplicationJob
   def perform
     expired_keys = []
 
-    if Option.api_key_expired?
+    unless WechatApiClient.validate_key
       expired_keys << :wechat
-      Rails.logger.warn "[ValidateApiKeysJob] WeChat API key has expired"
+      Rails.logger.warn "[ValidateApiKeysJob] WeChat API key is invalid or expired"
     end
 
-    if Option.rednote_api_key.blank?
+    unless RednoteApiClient.validate_key
       expired_keys << :rednote
-      Rails.logger.warn "[ValidateApiKeysJob] Rednote API key is missing"
+      Rails.logger.warn "[ValidateApiKeysJob] Rednote API key is invalid or expired"
     end
 
     return if expired_keys.empty?
