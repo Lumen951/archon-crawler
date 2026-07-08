@@ -10,7 +10,7 @@ class CrawlTask < ApplicationRecord
   scope :active, -> { where(status: [:pending, :running]) }
   scope :recent, -> { order(created_at: :desc) }
 
-  ERROR_THRESHOLD = 20
+  ERROR_THRESHOLD = 200
 
   def resolved_accounts
     if account_ids.present?
@@ -59,8 +59,8 @@ class CrawlTask < ApplicationRecord
   end
 
   def resume!
-    # 重置 failed 的 account 为 pending，以便重试
-    crawl_task_accounts.failed.update_all(status: :pending, error_message: nil, completed_at: nil)
+    # 重置 failed, running 的 account 为 pending，以便重试
+    crawl_task_accounts.failed.or(crawl_task_accounts.running).update_all(status: :pending, error_message: nil, completed_at: nil)
     update!(status: :running, error_message: nil, error_count: 0)
     CrawlJob.perform_later(id)
   end
