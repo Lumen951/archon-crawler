@@ -11,6 +11,7 @@ class CrawlTask < ApplicationRecord
   scope :recent, -> { order(created_at: :desc) }
 
   ERROR_THRESHOLD = 200
+  MAX_RETRIES = 5
 
   def resolved_accounts
     if account_ids.present?
@@ -61,7 +62,7 @@ class CrawlTask < ApplicationRecord
   def resume!
     # 重置 failed, running 的 account 为 pending，以便重试
     crawl_task_accounts.failed.or(crawl_task_accounts.running).update_all(status: :pending, error_message: nil, completed_at: nil)
-    update!(status: :running, error_message: nil, error_count: 0)
+    update!(status: :running, error_message: nil, error_count: 0, retry_count: 0)
     CrawlJob.perform_later(id)
   end
 
@@ -97,9 +98,33 @@ class CrawlTask < ApplicationRecord
     Account.where(id: crawl_task_accounts.completed.select(:account_id)).update_all(last_crawled_at: Time.current)
   end
 
+  # Mark complete if no failed accounts; otherwise schedule a retry (up to MAX_RETRIES times)
+  def mark_complete_or_schedule_retry!
+    if failed_account_count.zero?
+      mark_complete!
+    elsif can_retry?
+      delay = retry_delay_minutes
+      new_count = retry_count + 1
+      log(:warn, "有 #{failed_account_count} 个帐号抓取失败，#{delay} 分钟后自动重试 (#{new_count}/#{MAX_RETRIES})")
+      update!(status: :failed, error_message: "#{failed_account_count} 个帐号抓取失败，#{delay} 分钟后自动重试", completed_at: Time.current, retry_count: new_count)
+      CrawlJob.set(wait: delay.minutes).perform_later(id)
+    else
+      mark_failed!("有 #{failed_account_count} 个帐号抓取失败，已达到最大重试次数 (#{MAX_RETRIES})")
+    end
+  end
+
   def mark_failed!(error)
     log(:error, "抓取失败：#{error}")
     update!(status: :failed, error_message: error, completed_at: Time.current)
+  end
+
+  def can_retry?
+    retry_count < MAX_RETRIES
+  end
+
+  def retry_delay_minutes
+    # Exponential backoff: 5, 10, 20, 40, 60 minutes (capped at 60)
+    [5 * (2**retry_count), 60].min
   end
 
   def progress_percentage

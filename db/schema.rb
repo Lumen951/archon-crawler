@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_08_100000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_13_034431) do
   create_table "accounts", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "fakeid", null: false
@@ -36,6 +36,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_08_100000) do
     t.datetime "created_at", null: false
     t.text "digest"
     t.datetime "published_at"
+    t.json "raw_data"
     t.string "title", null: false
     t.datetime "updated_at", null: false
     t.string "url", null: false
@@ -82,6 +83,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_08_100000) do
     t.integer "error_count", default: 0
     t.text "error_message"
     t.integer "progress", default: 0
+    t.integer "retry_count", default: 0, null: false
     t.datetime "started_at"
     t.integer "status", default: 0
     t.integer "total"

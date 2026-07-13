@@ -25,19 +25,19 @@ class CrawlTasksController < ApplicationController
   def resume
     @crawl_task = CrawlTask.find(params[:id])
 
-    accounts = @crawl_task.resolved_accounts
-    has_wechat  = accounts.where(type: "WechatAccount").exists?
-    has_rednote = accounts.where(type: "RednoteAccount").exists?
+    # accounts = @crawl_task.resolved_accounts
+    # has_wechat  = accounts.where(type: "WechatAccount").exists?
+    # has_rednote = accounts.where(type: "RednoteAccount").exists?
 
-    if has_wechat && !Option.api_key_valid?
-      flash[:error] = "微信 API 密鑰已过期。请在设置中更新。"
-      redirect_to crawl_tasks_path and return
-    end
+    # if has_wechat && !Option.api_key_valid?
+    #   flash[:error] = "微信 API 密鑰已过期。请在设置中更新。"
+    #   redirect_to crawl_tasks_path and return
+    # end
 
-    if has_rednote && !Option.rednote_api_key_valid?
-      flash[:error] = "小红书 API 密鑰未配置。请在设置中添加 rednote_api_key。"
-      redirect_to crawl_tasks_path and return
-    end
+    # if has_rednote && !Option.rednote_api_key_valid?
+    #   flash[:error] = "小红书 API 密鑰未配置。请在设置中添加 rednote_api_key。"
+    #   redirect_to crawl_tasks_path and return
+    # end
 
     # 如果任务正在运行，先暂停它，让正在运行的 crawler 停止
     if @crawl_task.running?
@@ -64,18 +64,18 @@ class CrawlTasksController < ApplicationController
   end
 
   def crawl_all
-    has_wechat  = WechatAccount.active.exists?
-    has_rednote = RednoteAccount.active.exists?
+    # has_wechat  = WechatAccount.active.exists?
+    # has_rednote = RednoteAccount.active.exists?
 
-    if has_wechat && !Option.api_key_valid?
-      flash[:error] = "微信 API 密鑰已过期。请在设置中更新。"
-      redirect_to crawl_tasks_path and return
-    end
+    # if has_wechat && !Option.api_key_valid?
+    #   flash[:error] = "微信 API 密鑰已过期。请在设置中更新。"
+    #   redirect_to crawl_tasks_path and return
+    # end
 
-    if has_rednote && !Option.rednote_api_key_valid?
-      flash[:error] = "小红书 API 密鑰未配置。请在设置中添加 rednote_api_key。"
-      redirect_to crawl_tasks_path and return
-    end
+    # if has_rednote && !Option.rednote_api_key_valid?
+    #   flash[:error] = "小红书 API 密鑰未配置。请在设置中添加 rednote_api_key。"
+    #   redirect_to crawl_tasks_path and return
+    # end
 
     if CrawlTask.active.exists?
       flash[:error] = "已有活跃的抓取任务"

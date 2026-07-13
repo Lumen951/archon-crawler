@@ -47,6 +47,7 @@ MP-Crawler 是一个基于 Ruby on Rails 的应用，用于自动抓取微信公
 - `CrawlLog`：结构化日志记录
 - Turbo Streams 实时广播任务进度到 UI
 - 按帐号并发和文章并发分别控制
+- 自动重试：若有帐号抓取失败，自动调度重试（最多 5 次，指数退避）
 
 ### 4. 抓取日志
 - `CrawlLog`：结构化日志记录（debug/info/warn/error）
@@ -89,6 +90,7 @@ Article (文章)
 ├── belongs_to :account
 ├── belongs_to :crawl_task (optional)
 ├── validates :url, uniqueness: true
+├── raw_data (json - 原始 API 响应数据，微信为文章列表项，小红书为笔记详情完整响应)
 └── scope :recent, :today, :yesterday, :last_7_days, :last_month
 
 CrawlTask (抓取任务)
@@ -96,7 +98,9 @@ CrawlTask (抓取任务)
 ├── has_many :crawl_task_accounts
 ├── has_many :articles
 ├── enum status: { pending: 0, running: 1, paused: 2, completed: 3, failed: 4 }
-└── ERROR_THRESHOLD = 20
+├── ERROR_THRESHOLD = 200
+├── MAX_RETRIES = 5
+└── retry_count (自动重试次数，指数退避调度)
 
 CrawlTaskAccount (帐号抓取状态)
 ├── belongs_to :crawl_task
@@ -150,6 +154,7 @@ User (用户)
 **Retryable** (`lib/retryable.rb`)
 - 统一重试模块，支持指数退避
 - HTTP 状态码感知：5xx/429 可重试，4xx 立即失败
+- API 密钥错误（`ApiKeyExpiredError`、`ApiKeyMissingError`）不重试，立即失败
 - 可配置重试次数、重试异常类型
 
 **Accounts::Importer** (`app/services/accounts/importer.rb`)
@@ -281,10 +286,13 @@ rails crawl:cleanup_logs
 
 ### 4. 重试失败帐号
 
-任务运行中或完成后，如有失败帐号，显示 "重试失败帐号" 按钮：
+**自动重试**：任务完成时若有帐号失败，系统自动调度重试（最多 5 次，指数退避 5→10→20→40→60 分钟）。
+
+**手动重试**：任务运行中或完成后，如有失败帐号，显示 "重试失败帐号" 按钮：
 - 运行中：先暂停 → 重试失败帐号
 - 已完成：重新启动任务，只处理失败帐号
 - 已完成的帐号不会被重复抓取
+- 手动 resume 会重置自动重试计数器
 
 ### 5. 订阅 RSS
 
@@ -338,9 +346,10 @@ end
 ### 限流 (429)
 - `Retryable` 模块自动重试，指数退避（2s → 4s → 8s）
 - 超过重试次数后放弃
+- API 密钥错误不重试，立即失败并暂停任务
 
 ### 错误阈值
-- 累计错误 >= 20（`ERROR_THRESHOLD`）自动终止任务
+- 累计错误 >= 200（`ERROR_THRESHOLD`）自动终止任务
 - 每个帐号独立追踪错误
 
 ### 帐号级别重试
@@ -422,8 +431,16 @@ mp-crawler/
 - 过高可能触发限流
 
 ### 错误阈值
-- 累计 20 个错误自动终止任务
+- 累计 200 个错误自动终止任务
 - 防止无限重试导致资源浪费
+
+### 自动重试
+- 任务完成时若有帐号抓取失败，自动调度重试（而非直接标记为完成）
+- 最多重试 5 次（`CrawlTask::MAX_RETRIES`）
+- 指数退避：5 → 10 → 20 → 40 → 60 分钟（上限 60 分钟）
+- 重试时自动重置失败帐号为 pending，已完成帐号不会重复抓取
+- 超过最大重试次数后，任务标记为失败并记录原因
+- 手动 resume 会重置重试计数器
 
 ### ActionCable 注意事项
 - 曾因过度广播导致 62GB cable 数据库

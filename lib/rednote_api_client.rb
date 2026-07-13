@@ -5,24 +5,12 @@ class RednoteApiClient
   BASE_URL = "https://api.yddm.com"
 
   class ApiError < StandardError
-    attr_reader :status_code
-
-    def initialize(message, status_code: nil)
-      super(message)
-      @status_code = status_code
-    end
   end
 
   class ApiKeyMissingError < ApiError
-    def initialize(message = "API 密钥无效或未授权")
-      super(message, status_code: 401)
-    end
   end
 
   class ApiRateLimitError < ApiError
-    def initialize(message = "速率限制")
-      super(message, status_code: 429)
-    end
   end
 
   def self.connection
@@ -62,7 +50,7 @@ class RednoteApiClient
   def self.validate_key
     hdrs = headers  # raises ApiKeyMissingError if key is absent
     response = connection.post("/xhs/user_post3", { user_id: "618bdf350000000010004769", page: 1 }.to_json, hdrs)
-    body = JSON.parse(response.body)
+    body = JSON.parse(response.body.to_s.encode("UTF-8", invalid: :replace, undef: :replace, replace: ""))
     Rails.logger.debug("RedNote API key validation response: #{body}")
     response.status != 401 && response.status != 403 && body["code"].to_i == 0
   rescue ApiKeyMissingError
@@ -75,23 +63,24 @@ class RednoteApiClient
   private
 
   def self.handle_response(response)
+    body_str = response.body.to_s.encode("UTF-8", invalid: :replace, undef: :replace, replace: "")
     case response.status
     when 200
-      body = JSON.parse(response.body)
+      body = JSON.parse(body_str)
       code = body["code"].to_i
-      raise ApiRateLimitError, "API 速率限制（429）" if code == 429
+      raise ApiRateLimitError, "API 速率限制（429）：#{response.status} - #{body_str}" if code == 429
       unless code == 0
-        raise ApiError.new("API 返回错误 code=#{code}：#{body['msg'] || 'unknown'}", status_code: response.status)
+        raise ApiError, "API 返回错误 code=#{code}：#{body['msg'] || 'unknown'}：#{response.status} - #{body_str}"
       end
       body["data"]
     when 401, 403
-      raise ApiKeyMissingError.new("API 密钥无效或未授权（#{response.status}）")
+      raise ApiKeyMissingError, "API 密钥无效或未授权：#{response.status} - #{body_str}"
     when 429
-      raise ApiRateLimitError.new("HTTP 429 速率限制")
+      raise ApiRateLimitError, "HTTP 429 速率限制：#{response.status} - #{body_str}"
     else
-      raise ApiError.new("HTTP #{response.status}：#{response.body.truncate(200)}", status_code: response.status)
+      raise ApiError, "API 错误：#{response.status} - #{body_str}"
     end
   rescue JSON::ParserError => e
-    raise ApiError.new("无效的 JSON 响应：#{e.message}")
+    raise ApiError, "无效的 JSON 响应：#{e.message}"
   end
 end

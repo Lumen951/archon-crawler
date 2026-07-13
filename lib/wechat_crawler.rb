@@ -32,11 +32,11 @@ class WechatCrawler
       if crawl_task.error_threshold_exceeded?
         crawl_task.mark_failed!("累计错误数（#{crawl_task.error_count}）超过阈值，任务终止")
       else
-        crawl_task.mark_complete!
+        crawl_task.mark_complete_or_schedule_retry!
       end
     end
   rescue WechatApiClient::ApiKeyExpiredError => e
-    crawl_task.log(:error, "API 密钥已过期：#{e.message}")
+    crawl_task.log(:error, e.message)
     crawl_task.update!(status: :paused, error_message: e.message)
   rescue StandardError => e
     crawl_task.mark_failed!(e.message)
@@ -59,12 +59,6 @@ class WechatCrawler
     loop do
       break if crawl_task.reload.paused? || crawl_task.reload.failed?
       break if crawl_task.error_threshold_exceeded?
-
-      unless Option.api_key_valid?
-        crawl_task.log(:error, "API 密钥已过期 - 暂停抓取")
-        crawl_task.update!(status: :paused, error_message: "API 密钥已过期")
-        break
-      end
 
       if max_pages > 0 && pages_crawled >= max_pages
         crawl_task.log(:info, "#{account.nickname}: 已达到最大页数限制（#{max_pages} 页）")
@@ -106,13 +100,14 @@ class WechatCrawler
     account.update!(last_crawled_at: Time.current, total_articles: account.articles.count)
     task_account&.mark_completed!
     crawl_task.log(:info, "#{account.nickname}: 抓取完成")
-  rescue WechatApiClient::ApiKeyExpiredError
-    task_account&.mark_failed!("API 密钥已过期")
+  rescue WechatApiClient::ApiKeyExpiredError => e
+    task_account&.mark_failed!(e.message)
     raise
   rescue StandardError => e
     task_account&.mark_failed!(e.message)
     crawl_task.increment_error_count!
     crawl_task.log(:error, "#{account.nickname}: 抓取出错 - #{e.message}")
+    crawl_task.log(:error, "#{account.nickname}: 异常 backtrace: #{e.backtrace&.first(5)&.join(' | ')}")
     Rails.logger.error("Account #{account.fakeid} crawl error: #{e.message}")
   end
 
@@ -139,7 +134,8 @@ class WechatCrawler
       cover_url: article_data['cover'],
       content_markdown: markdown_content,
       content_html: html_content,
-      published_at: Time.at(article_data['create_time'].to_i)
+      published_at: Time.at(article_data['create_time'].to_i),
+      raw_data: article_data
     )
 
     crawl_task.increment_progress!
