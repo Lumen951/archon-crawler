@@ -15,16 +15,9 @@
     <div class="flex items-center space-x-3">
       <% if @crawl_task.running? %>
         <%= button_to "暂停", pause_crawl_task_path(@crawl_task), method: :post, class: "btn btn-warning" %>
-        <% if @crawl_task.failed_account_count > 0 %>
-          <%= button_to "重试失败帐号 (#{@crawl_task.failed_account_count})", resume_crawl_task_path(@crawl_task), method: :post, class: "btn btn-primary", data: { turbo_confirm: "这将暂停当前任务并重试 #{@crawl_task.failed_account_count} 个失败的帐号。确定继续吗？" } %>
-        <% end %>
         <%= button_to "标记失败", fail_crawl_task_path(@crawl_task), method: :post, data: { turbo_confirm: "确定要将此任务标记为失败吗？" }, class: "btn btn-danger" %>
-      <% elsif @crawl_task.paused? || @crawl_task.failed? || @crawl_task.completed? %>
-        <% if @crawl_task.failed_account_count > 0 %>
-          <%= button_to "重试失败帐号 (#{@crawl_task.failed_account_count})", resume_crawl_task_path(@crawl_task), method: :post, class: "btn btn-primary", data: { turbo_confirm: "确定要重试 #{@crawl_task.failed_account_count} 个失败的帐号吗？" } %>
-        <% elsif !@crawl_task.completed? %>
-          <%= button_to "恢复", resume_crawl_task_path(@crawl_task), method: :post, class: "btn btn-primary" %>
-        <% end %>
+      <% elsif @crawl_task.paused? || @crawl_task.failed? %>
+        <%= button_to "重试抓取未完成的帐号", resume_crawl_task_path(@crawl_task), method: :post, class: "btn btn-primary" %>
       <% end %>
     </div>
   </div>
