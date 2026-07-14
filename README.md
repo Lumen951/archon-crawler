@@ -45,7 +45,7 @@ MP-Crawler 是一个基于 Ruby on Rails 的应用，用于自动抓取微信公
 - `CrawlTask`：抓取任务，支持 pending/running/paused/completed/failed 状态
 - `CrawlTaskAccount`：按帐号追踪抓取状态，支持独立重试失败帐号
 - `CrawlLog`：结构化日志记录
-- Turbo Streams 实时广播任务进度到 UI
+- JS 轮询实时更新任务进度到 UI（指数退避，任务完成自动停止）
 - 按帐号并发和文章并发分别控制
 - 自动重试：若有帐号抓取失败，自动调度重试（最多 5 次，指数退避）
 
@@ -382,10 +382,11 @@ end
 
 ## 实时更新
 
-使用 Turbo Streams 广播任务进度：
-- `CrawlTask#broadcast_updates` → 广播到 `[task, :show]` 频道
-- 任务详情页实时更新进度、日志、状态
-- 注意：曾因过度广播导致 62GB cable 数据库问题，已修复
+使用 Stimulus 轮询控制器（`task_poller_controller.js`）更新任务进度：
+- 任务详情页自动轮询 `GET /crawl_tasks/:id/poll`，返回 Turbo Stream 替换页面内容
+- 指数退避：初始 3 秒，每次 ×1.5，上限 60 秒；状态变化时重置为快速轮询
+- 任务进入终态（completed/failed）后服务端返回 204，轮询自动停止
+- 标签页隐藏时暂停轮询，恢复可见时立即轮询
 
 ## 目录结构
 
@@ -468,10 +469,10 @@ mp-crawler/
 - 超过最大重试次数后，任务标记为失败并记录原因
 - 手动 resume 会重置重试计数器
 
-### ActionCable 注意事项
-- 曾因过度广播导致 62GB cable 数据库
-- 现仅在 `increment_progress!` 和 `increment_error_count!` 时广播
-- 广播目标限定为任务详情页 `[task, :show]`
+### 实时更新机制
+- 使用 JS 轮询替代 ActionCable 广播，避免 cable 数据库膨胀问题
+- 轮询控制器：`app/javascript/controllers/task_poller_controller.js`
+- 轮询端点：`CrawlTasksController#poll` → `poll.turbo_stream.erb`
 
 ## 后续计划
 
