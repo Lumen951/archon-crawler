@@ -66,8 +66,8 @@ class CrawlTasksController < ApplicationController
   def poll
     @crawl_task = CrawlTask.find(params[:id])
     @recent_logs = @crawl_task.crawl_logs.recent.limit(50)
-    # Return empty response if task is in a terminal state (no need to keep polling)
-    head :no_content unless @crawl_task.running? || @crawl_task.pending?
+    # Always return the Turbo Stream so the UI gets the final state update.
+    # The poller stops itself after rendering a terminal state.
   end
 
   def crawl_all

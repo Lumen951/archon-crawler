@@ -53,6 +53,14 @@ export default class extends Controller {
           if (html.trim().length > 0) {
             Turbo.renderStreamMessage(html)
             this._delay = this.intervalValue
+
+            // Stop polling if the task reached a terminal state
+            const el = document.querySelector("[data-task-status]")
+            const status = el?.dataset.taskStatus
+            if (status === "completed" || status === "failed") {
+              this._stopped = true
+              return
+            }
           }
         }
       } catch (_) {
