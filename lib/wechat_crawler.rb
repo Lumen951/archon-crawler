@@ -32,7 +32,7 @@ class WechatCrawler
       if crawl_task.error_threshold_exceeded?
         crawl_task.mark_failed!("累计错误数（#{crawl_task.error_count}）超过阈值，任务终止")
       else
-        crawl_task.mark_complete_or_schedule_retry!
+        # crawl_task.mark_complete_or_schedule_retry!
       end
     end
   rescue WechatApiClient::ApiKeyExpiredError => e
