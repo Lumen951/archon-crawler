@@ -51,7 +51,7 @@ class RednoteApiClient
   def self.validate_key
     hdrs = headers  # raises ApiKeyMissingError if key is absent
     response = connection.post("/xhs/user_post3", { user_id: "618bdf350000000010004769", page: 1 }.to_json, hdrs)
-    body = JSON.parse(response.body.to_s.encode("UTF-8", invalid: :replace, undef: :replace, replace: ""))
+    body = JSON.parse(response.body)
     Rails.logger.debug("RedNote API key validation response: #{body}")
     response.status != 401 && response.status != 403 && body["code"].to_i == 0
   rescue ApiKeyMissingError
@@ -64,7 +64,7 @@ class RednoteApiClient
   private
 
   def self.handle_response(response)
-    body_str = response.body.to_s.encode("UTF-8", invalid: :replace, undef: :replace, replace: "")
+    body_str = response.body
     case response.status
     when 200
       body = JSON.parse(body_str)
