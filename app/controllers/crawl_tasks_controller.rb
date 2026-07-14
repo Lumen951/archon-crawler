@@ -12,7 +12,10 @@ class CrawlTasksController < ApplicationController
 
   def logs
     @crawl_task = CrawlTask.find(params[:id])
-    @logs = @crawl_task.crawl_logs.recent.page(params[:page]).per(100)
+    @logs = @crawl_task.crawl_logs.recent
+    @logs = @logs.where(level: params[:level]) if params[:level].present?
+    @logs = @logs.where("message LIKE ?", "%#{params[:q]}%") if params[:q].present?
+    @logs = @logs.page(params[:page]).per(100)
   end
 
   def pause

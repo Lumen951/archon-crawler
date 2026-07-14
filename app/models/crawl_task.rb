@@ -6,7 +6,12 @@ class CrawlTask < ApplicationRecord
   enum :status, { pending: 0, running: 1, paused: 2, completed: 3, failed: 4 }
 
   scope :active, -> { where(status: [:pending, :running]) }
+  scope :terminal, -> { where(status: [:completed, :failed]) }
   scope :recent, -> { order(created_at: :desc) }
+
+  def self.cleanup_old_tasks(older_than: 1.week.ago)
+    terminal.where('created_at < ?', older_than).destroy_all.size
+  end
 
   ERROR_THRESHOLD = 200
   MAX_RETRIES = 5
