@@ -68,7 +68,7 @@ class WechatApiClient
   private
 
   def self.handle_response(response)
-    body = response.body.to_s.encode("UTF-8", invalid: :replace, undef: :replace, replace: "")
+    body = response.body#.to_s.encode("UTF-8", invalid: :replace, undef: :replace, replace: "")
     case response.status
     when 200
       parsed_body = JSON.parse(body)
