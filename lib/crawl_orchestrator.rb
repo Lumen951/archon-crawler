@@ -16,7 +16,7 @@ class CrawlOrchestrator
     article_concurrency = crawl_task.effective_article_concurrency
     max_pages = Option.max_crawl_pages
 
-    crawl_task.update!(status: :running, started_at: Time.current)
+    crawl_task.update!(status: :running, started_at: Time.current, error_count: 0)
     crawl_task.clear_old_logs
 
     platform_summary = accounts.group_by(&:platform_name).map { |name, list| "#{name} #{list.size}" }.join("，")
@@ -44,11 +44,8 @@ class CrawlOrchestrator
     crawl_task.log(:info, "任务全部完成，耗时 #{elapsed} 秒：完成 #{crawl_task.completed_account_count} 个帐号，失败 #{crawl_task.failed_account_count} 个帐号")
 
     if crawl_task.running?
-      if crawl_task.error_threshold_exceeded?
-        crawl_task.mark_failed!("累计错误数（#{crawl_task.error_count}）超过阈值，任务终止")
-      else
-        crawl_task.mark_complete_or_schedule_retry!
-      end
+      crawl_task.log(:warn, "累计错误数（#{crawl_task.error_count}）超过阈值，提前终止") if crawl_task.error_threshold_exceeded?
+      crawl_task.mark_complete_or_schedule_retry!
     end
   rescue StandardError => e
     crawl_task.mark_failed!(e.message)
