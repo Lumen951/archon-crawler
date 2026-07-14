@@ -4,7 +4,7 @@
       <%= case ta.status when 'completed' then '✓' when 'running' then '●' when 'failed' then '✗' else '○' end %>
     </span>
     <div>
-      <p class="font-medium text-gray-900"><%= ta.account.nickname %></p>
+      <p class="font-medium text-gray-900"><%= link_to ta.account.nickname, ta.account %></p>
       <% if ta.error_message.present? %>
         <p class="text-xs text-red-600 mt-0.5"><%= ta.error_message.truncate(100) %></p>
       <% end %>
