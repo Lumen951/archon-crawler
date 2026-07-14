@@ -39,6 +39,7 @@ Rails.application.routes.draw do
       post :fail
       get :logs
       get :articles
+      get :poll
     end
   end
 

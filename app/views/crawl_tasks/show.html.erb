@@ -2,9 +2,12 @@
   <meta name="turbo-cache-control" content="no-cache">
 <% end %>
 
-<div class="space-y-6">
-  <%= turbo_stream_from [@crawl_task, :show] %>
-
+<div class="space-y-6"
+     <% if @crawl_task.running? || @crawl_task.pending? %>
+       data-controller="task-poller"
+       data-task-poller-url-value="<%= poll_crawl_task_path(@crawl_task) %>"
+       data-task-poller-interval-value="3000"
+     <% end %>>
   <div class="flex items-center justify-between">
     <div>
       <h1 class="text-3xl font-bold text-gray-900">抓取任务详情</h1>

@@ -63,6 +63,13 @@ class CrawlTasksController < ApplicationController
     @articles = @crawl_task.articles.recent.page(params[:page]).per(20)
   end
 
+  def poll
+    @crawl_task = CrawlTask.find(params[:id])
+    @recent_logs = @crawl_task.crawl_logs.recent.limit(50)
+    # Return empty response if task is in a terminal state (no need to keep polling)
+    head :no_content unless @crawl_task.running? || @crawl_task.pending?
+  end
+
   def crawl_all
     # has_wechat  = WechatAccount.active.exists?
     # has_rednote = RednoteAccount.active.exists?
