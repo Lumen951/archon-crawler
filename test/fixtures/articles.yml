@@ -1,0 +1,18 @@
+one:
+  account: one
+  title: Test Article
+  url: https://example.com/article1
+  author: Test Author
+  digest: Test digest
+  content_html: <p>Test HTML content</p>
+  content_markdown: Test markdown content
+  published_at: 2024-01-01
+
+two:
+  account: one
+  title: Another Article
+  url: https://example.com/article2
+  author: Another Author
+  digest: Another digest
+  content_html: <p>Another HTML content</p>
+  published_at: 2024-01-02

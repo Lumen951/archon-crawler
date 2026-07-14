@@ -1,52 +1,11 @@
 require 'async'
 require 'async/semaphore'
 
-class WechatCrawler
-  def self.crawl(crawl_task)
-    accounts = crawl_task.incomplete_accounts.where(type: "WechatAccount").to_a
-    account_concurrency = crawl_task.effective_account_concurrency
-    article_concurrency = crawl_task.effective_article_concurrency
-    max_pages = Option.max_crawl_pages
-
-    crawl_task.update!(status: :running, started_at: Time.current)
-    crawl_task.clear_old_logs
-    crawl_task.log(:info, "开始抓取任务，共 #{accounts.size} 个帐号")
-    crawl_task.log(:info, "帐号并发：#{account_concurrency}，文章并发：#{article_concurrency}")
-    crawl_task.log(:info, "最大页数：#{max_pages == -1 ? '无限制' : max_pages}")
-
-    Async do |task|
-      account_semaphore = Async::Semaphore.new(account_concurrency)
-
-      accounts.each do |account|
-        break if crawl_task.reload.paused? || crawl_task.reload.failed?
-        break if crawl_task.error_threshold_exceeded?
-
-        account_semaphore.async do
-          crawl_account(account, crawl_task, article_concurrency, max_pages)
-        end
-      end
-    end
-
-    crawl_task.reload
-    if crawl_task.running?
-      if crawl_task.error_threshold_exceeded?
-        crawl_task.mark_failed!("累计错误数（#{crawl_task.error_count}）超过阈值，任务终止")
-      else
-        # crawl_task.mark_complete_or_schedule_retry!
-      end
-    end
-  rescue WechatApiClient::ApiKeyExpiredError => e
-    crawl_task.log(:error, e.message)
-    crawl_task.update!(status: :paused, error_message: e.message)
-  rescue StandardError => e
-    crawl_task.mark_failed!(e.message)
-    Rails.logger.error("CrawlTask##{crawl_task.id} 失败：#{e.message}")
-    Rails.logger.error(e.backtrace.join("\n"))
-  end
-
-  private
-
-  def self.crawl_account(account, crawl_task, article_concurrency, max_pages)
+# Crawls WeChat public accounts. Orchestration across accounts (concurrency,
+# pausing, retry scheduling) is handled by CrawlOrchestrator; this class only
+# knows how to crawl a single WeChat account's articles.
+class WechatCrawler < BaseCrawler
+  def self.crawl_account(account, crawl_task, article_concurrency:, max_pages:)
     task_account = crawl_task.crawl_task_accounts.find_by(account: account)
     task_account&.mark_running!
 

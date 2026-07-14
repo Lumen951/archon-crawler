@@ -1,0 +1,11 @@
+one:
+  type: WechatAccount
+  nickname: Test Account
+  fakeid: test_fakeid_1
+  status: active
+
+two:
+  type: WechatAccount
+  nickname: Another Account
+  fakeid: test_fakeid_2
+  status: active

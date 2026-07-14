@@ -8,6 +8,7 @@ class RednoteApiClient
   end
 
   class ApiKeyMissingError < ApiError
+    include CrawlerApiKeyError
   end
 
   class ApiRateLimitError < ApiError

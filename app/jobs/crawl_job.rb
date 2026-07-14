@@ -23,14 +23,11 @@ class CrawlJob < ApplicationJob
     # 初始化帐号追踪（已完成的 account 不会被重置）
     crawl_task.setup_account_tracking!
 
-    accounts = crawl_task.incomplete_accounts
-    has_wechat  = accounts.where(type: "WechatAccount").exists?
-    has_rednote = accounts.where(type: "RednoteAccount").exists?
-
-    WechatCrawler.crawl(crawl_task)  if has_wechat && !crawl_task.reload.failed?
-    RednoteCrawler.crawl(crawl_task) if has_rednote && !crawl_task.reload.failed?
-
-    unless has_wechat || has_rednote
+    if crawl_task.incomplete_accounts.exists?
+      # 所有平台的帐号在同一个循环中并发抓取（而非按平台分批顺序抓取），
+      # 新增平台只需实现对应的 Account#crawler_class，无需改动这里。
+      CrawlOrchestrator.crawl(crawl_task)
+    else
       crawl_task.mark_failed!("没有可抓取的帐号")
     end
   end

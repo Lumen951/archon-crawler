@@ -1,64 +1,16 @@
 require "async"
 require "async/semaphore"
 
-class RednoteCrawler
+# Crawls Rednote (Xiaohongshu) accounts. Orchestration across accounts
+# (concurrency, pausing, retry scheduling) is handled by CrawlOrchestrator;
+# this class only knows how to crawl a single Rednote account's notes.
+class RednoteCrawler < BaseCrawler
   NOTE_URL_BASE = "https://www.xiaohongshu.com/explore"
 
-  def self.crawl(crawl_task)
-    accounts = crawl_task.incomplete_accounts.where(type: "RednoteAccount").to_a
-    account_concurrency = crawl_task.effective_account_concurrency
-    max_pages = Option.max_crawl_pages
-
-    crawl_task.update!(status: :running, started_at: Time.current)
-    crawl_task.clear_old_logs
-    crawl_task.log(:info, "开始抓取小红书任务，共 #{accounts.size} 个帐号")
-    crawl_task.log(:info, "帐号并发：#{account_concurrency}，最大页数：#{max_pages == -1 ? '无限制' : max_pages}")
-
-    start_time = Time.current
-    total_new = 0
-    total_skip = 0
-    total_error = 0
-
-    Async do |_task|
-      semaphore = Async::Semaphore.new(account_concurrency)
-
-      accounts.each_with_index do |account, index|
-        break if crawl_task.reload.paused? || crawl_task.reload.failed?
-        break if crawl_task.error_threshold_exceeded?
-
-        crawl_task.log(:info, "排队抓取帐号 [#{index + 1}/#{accounts.size}]：#{account.nickname}")
-        semaphore.async do
-          result = crawl_account(account, crawl_task, max_pages)
-          total_new   += result[:new_count]   if result
-          total_skip  += result[:skip_count]  if result
-          total_error += result[:error_count]  if result
-        end
-      end
-    end
-
-    elapsed = (Time.current - start_time).round(1)
-    crawl_task.log(:info, "小红书任务全部完成，耗时 #{elapsed} 秒：新增 #{total_new} 篇，跳过 #{total_skip} 篇，失败 #{total_error} 篇")
-
-    crawl_task.reload
-    if crawl_task.running?
-      if crawl_task.error_threshold_exceeded?
-        crawl_task.mark_failed!("累计错误数（#{crawl_task.error_count}）超过阈值，任务终止")
-      else
-        crawl_task.mark_complete_or_schedule_retry!
-      end
-    end
-  rescue RednoteApiClient::ApiKeyMissingError => e
-    crawl_task.log(:error, "小红书 API 密钥未配置：#{e.message}")
-    crawl_task.update!(status: :paused, error_message: e.message)
-  rescue StandardError => e
-    crawl_task.mark_failed!(e.message)
-    Rails.logger.error("RednoteCrawler CrawlTask##{crawl_task.id} 失败：#{e.message}")
-    Rails.logger.error(e.backtrace.join("\n"))
-  end
-
-  private
-
-  def self.crawl_account(account, crawl_task, max_pages)
+  # Note: Rednote's API is rate-sensitive, so notes within an account are
+  # fetched sequentially rather than using article_concurrency (kept in the
+  # signature only to conform to BaseCrawler).
+  def self.crawl_account(account, crawl_task, article_concurrency:, max_pages:)
     task_account = crawl_task.crawl_task_accounts.find_by(account: account)
     task_account&.mark_running!
 

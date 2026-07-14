@@ -19,8 +19,9 @@ module Retryable
     begin
       yield
     rescue *retry_on => e
-      # API key errors are not retryable — no point retrying with an invalid/expired key
-      if e.is_a?(WechatApiClient::ApiKeyExpiredError) || e.is_a?(RednoteApiClient::ApiKeyMissingError)
+      # API key errors are not retryable — no point retrying with an invalid/expired key.
+      # Any platform's API client can mark its key error class with `include CrawlerApiKeyError`.
+      if e.is_a?(CrawlerApiKeyError)
         crawl_task.log(:error, "#{context}: API 密钥错误，不重试：#{e.message}")
         raise e
       end

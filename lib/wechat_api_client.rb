@@ -8,6 +8,7 @@ class WechatApiClient
   end
 
   class ApiKeyExpiredError < ApiError
+    include CrawlerApiKeyError
   end
 
   class ApiRateLimitError < ApiError

@@ -2,6 +2,7 @@ class Account < ApplicationRecord
   self.inheritance_column = :type
 
   has_many :articles, dependent: :destroy
+  has_many :crawl_task_accounts, dependent: :destroy
 
   enum :status, { active: 0, inactive: 1 }
 
@@ -37,6 +38,14 @@ class Account < ApplicationRecord
   # Override in subclasses
   def platform_name
     "未知平台"
+  end
+
+  # The crawler class (< BaseCrawler) responsible for crawling accounts of
+  # this type. Override in subclasses when adding a new platform (see
+  # WechatAccount / RednoteAccount) — CrawlOrchestrator uses this to dispatch
+  # each account to the right crawler without needing to know every platform.
+  def self.crawler_class
+    raise NotImplementedError, "#{self} must implement .crawler_class"
   end
 
   def platform_badge_class

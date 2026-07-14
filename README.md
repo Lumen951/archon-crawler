@@ -84,6 +84,7 @@ Account (帐号 - STI 基类)
 ├── RednoteAccount (小红书)
 ├── has_many :articles
 ├── enum status: { active: 0, inactive: 1 }
+├── self.crawler_class (子类各自返回对应的 Crawler，供 CrawlOrchestrator 分发)
 └── scope :active, :needs_crawling, :recently_crawled
 
 Article (文章)
@@ -128,34 +129,55 @@ User (用户)
 
 ### 核心服务
 
+**CrawlOrchestrator** (`lib/crawl_orchestrator.rb`)
+- 统一的抓取调度器：一个 `Async::Semaphore` 循环内交替抓取**所有平台**的帐号（微信、小红书、未来的其他平台），而不是先抓完一个平台再抓下一个
+- 按 `account.class.crawler_class` 把每个帐号分发给对应平台的 Crawler
+- 负责暂停/恢复/错误阈值终止/自动重试调度等任务级别的通用逻辑
+- 捕获 `CrawlerApiKeyError`（见下）并将任务置为 paused，不影响其他帐号继续抓取
+
+**BaseCrawler** (`lib/base_crawler.rb`)
+- 所有平台 Crawler 的基类，只定义一个接口：`self.crawl_account(account, crawl_task, article_concurrency:, max_pages:)`
+- 平台 Crawler 只需实现「如何抓取单个帐号」，不再关心跨帐号的并发调度（由 `CrawlOrchestrator` 统一负责）
+
+**CrawlerApiKeyError** (`lib/crawler_api_key_error.rb`)
+- 各平台 API 密钥错误的通用 mixin（`include CrawlerApiKeyError`）
+- `Retryable` 和 `CrawlOrchestrator` 通过它统一识别"密钥缺失/过期"类错误并立即失败/暂停任务，无需逐个平台硬编码错误类
+
 **WechatApiClient** (`lib/wechat_api_client.rb`)
 - 封装微信文章导出 API（`down.mptext.top`）
 - 认证方式：`X-Auth-Key` header
 - 主要接口：`get_articles`、`download_content`
-- 自定义错误类：`ApiError`、`ApiKeyExpiredError`、`ApiRateLimitError`
+- 自定义错误类：`ApiError`、`ApiKeyExpiredError`（包含 `CrawlerApiKeyError`）、`ApiRateLimitError`
 
-**WechatCrawler** (`lib/wechat_crawler.rb`)
-- 异步并发抓取引擎（`Async::Semaphore`）
-- 双层并发控制：帐号并发 + 文章并发
-- 支持暂停/恢复/错误阈值终止
+**WechatCrawler** (`lib/wechat_crawler.rb`, `< BaseCrawler`)
+- 抓取单个微信公众号：分页获取文章列表 → 下载正文（Markdown/HTML）→ 保存
+- 帐号内部使用 `Async::Semaphore` 控制文章级并发
 - 使用 `Retryable` 模块处理重试
 
 **RednoteApiClient** (`lib/rednote_api_client.rb`)
 - 封装小红书 API（`api.yddm.com`）
 - 认证方式：`X-API-Key` header
 - 主要接口：`get_user_notes`、`get_note_detail`
-- 自定义错误类：`ApiError`、`ApiKeyMissingError`、`ApiRateLimitError`
+- 自定义错误类：`ApiError`、`ApiKeyMissingError`（包含 `CrawlerApiKeyError`）、`ApiRateLimitError`
 
-**RednoteCrawler** (`lib/rednote_crawler.rb`)
-- 小红书抓取引擎
-- 获取笔记列表 → 获取详情 → 保存文章
+**RednoteCrawler** (`lib/rednote_crawler.rb`, `< BaseCrawler`)
+- 抓取单个小红书帐号：获取笔记列表 → 获取详情 → 保存文章
 - 统计新增/跳过/失败数量
 
 **Retryable** (`lib/retryable.rb`)
 - 统一重试模块，支持指数退避
 - HTTP 状态码感知：5xx/429 可重试，4xx 立即失败
-- API 密钥错误（`ApiKeyExpiredError`、`ApiKeyMissingError`）不重试，立即失败
+- API 密钥错误（任何 `include CrawlerApiKeyError` 的异常）不重试，立即失败
 - 可配置重试次数、重试异常类型
+
+### 添加新的抓取平台（如 Twitter）
+
+得益于 `CrawlOrchestrator` + `BaseCrawler` 的插件式设计，新增平台无需改动调度逻辑：
+
+1. 新增 `Account` 的 STI 子类（如 `TwitterAccount`），实现 `platform_name` 和 `self.crawler_class`（返回下面的 Crawler 类）
+2. 新增 `XxxCrawler < BaseCrawler`，实现 `self.crawl_account(account, crawl_task, article_concurrency:, max_pages:)`
+3. 如该平台 API 有密钥失效的场景，将对应错误类 `include CrawlerApiKeyError`
+4. 完成 — `CrawlJob` / `CrawlOrchestrator` 会自动把该类型帐号纳入同一个并发循环，与其他平台交替抓取
 
 **Accounts::Importer** (`app/services/accounts/importer.rb`)
 - 微信帐号导入服务
@@ -165,8 +187,8 @@ User (用户)
 - 小红书帐号导入服务
 
 **CrawlJob** (`app/jobs/crawl_job.rb`)
-- Active Job，协调微信和小红书抓取
-- 自动检测帐号类型并分发到对应 Crawler
+- Active Job，负责重试时重置失败帐号、初始化帐号追踪，然后委托 `CrawlOrchestrator` 执行实际抓取
+- 不再关心帐号平台类型，也不再按平台顺序调用不同 Crawler
 
 ### 控制器
 
@@ -282,7 +304,7 @@ rails crawl:cleanup_logs
 
 - 单帐号：帐号详情页点击 "Crawl Now"
 - 全部帐号：任务列表页点击 "Crawl All"
-- 系统自动检测帐号类型并分别使用对应 Crawler
+- 所有帐号（不分平台）在同一个抓取任务中并发交替执行，而非按平台分批顺序抓取
 
 ### 4. 重试失败帐号
 
@@ -338,15 +360,16 @@ end
 
 ## 错误处理
 
-### API Key 过期
-- 运行中的任务自动暂停
-- UI 显示警告提示
-- 更新 Key 后可恢复
+### API Key 过期/缺失
+- 遇到 API 密钥错误时，**只标记该帐号失败**，不暂停整个任务
+- 任务继续运行，**其他平台的帐号不受影响**（如微信密钥失效，小红书仍可继续）
+- 同平台的其他帐号仍会尝试（虽然大概率也失败）
+- 失败帐号可在任务结束后通过自动重试或手动重试恢复（更新密钥后）
 
 ### 限流 (429)
 - `Retryable` 模块自动重试，指数退避（2s → 4s → 8s）
-- 超过重试次数后放弃
-- API 密钥错误不重试，立即失败并暂停任务
+- 超过重试次数后该帐号标记为失败，任务继续
+- API 密钥错误不重试，立即标记帐号失败（由 `CrawlerApiKeyError` mixin 统一识别）
 
 ### 错误阈值
 - 累计错误 >= 200（`ERROR_THRESHOLD`）自动终止任务
@@ -404,10 +427,13 @@ mp-crawler/
 │       ├── rss/ (index, show, accounts, active_accounts)
 │       └── sessions/ (new)
 ├── lib/
+│   ├── crawl_orchestrator.rb  (跨平台统一调度，交替抓取所有帐号)
+│   ├── base_crawler.rb        (平台 Crawler 基类/接口)
+│   ├── crawler_api_key_error.rb (API 密钥错误通用 mixin)
 │   ├── wechat_api_client.rb
-│   ├── wechat_crawler.rb
+│   ├── wechat_crawler.rb       (< BaseCrawler)
 │   ├── rednote_api_client.rb
-│   ├── rednote_crawler.rb
+│   ├── rednote_crawler.rb      (< BaseCrawler)
 │   └── retryable.rb
 ├── db/migrate/
 └── config/routes.rb
