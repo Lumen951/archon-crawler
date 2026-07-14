@@ -9,7 +9,7 @@ xml.rss version: "2.0" do
     @articles.each do |article|
       xml.item do
         xml.title "[#{article.account.nickname}] #{article.title}"
-        xml.link article.url
+        xml.link article_url(article)
         xml.description article.digest || article.content_markdown&.truncate(200) || ""
         xml.author article.author if article.author.present?
         xml.pubDate article.published_at.rfc822 if article.published_at

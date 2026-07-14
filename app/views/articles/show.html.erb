@@ -50,9 +50,12 @@
   <div class="bg-bg-card border border-border-primary rounded-2xl shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)] overflow-hidden">
     <% if @cached_content.present? %>
       <div class="p-6 sm:p-8 article-content">
+        <%= raw @cached_content %>
+        <% if false %>
         <%= sanitize @cached_content,
               tags: %w[p br h1 h2 h3 h4 h5 h6 strong em a img ul ol li blockquote pre code span div section],
               attributes: %w[href src alt class style width height] %>
+        <% end %>
       </div>
     <% elsif @article.digest.present? %>
       <div class="p-6 sm:p-8">

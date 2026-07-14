@@ -11,12 +11,16 @@ require "async/semaphore"
 # platforms without touching this file.
 class CrawlOrchestrator
   def self.crawl(crawl_task)
+    # 初始化帐号追踪（已完成的 account 不会被重置）
+    crawl_task.setup_account_tracking!
+
     accounts = crawl_task.incomplete_accounts.to_a
     account_concurrency = crawl_task.effective_account_concurrency
     article_concurrency = crawl_task.effective_article_concurrency
     max_pages = Option.max_crawl_pages
 
-    crawl_task.update!(status: :running, started_at: Time.current, error_count: 0)
+    crawl_task.crawl_task_accounts.failed.update_all(status: :pending, error_message: nil, completed_at: nil)
+    crawl_task.update!(status: :running, error_message: nil, error_count: 0, completed_at: nil, started_at: Time.current)
     crawl_task.clear_old_logs
 
     platform_summary = accounts.group_by(&:platform_name).map { |name, list| "#{name} #{list.size}" }.join("，")

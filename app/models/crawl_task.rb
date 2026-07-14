@@ -54,7 +54,7 @@ class CrawlTask < ApplicationRecord
   def resume!
     # 重置 failed, running 的 account 为 pending，以便重试
     crawl_task_accounts.failed.or(crawl_task_accounts.running).update_all(status: :pending, error_message: nil, completed_at: nil)
-    update!(status: :running, error_message: nil, error_count: 0, retry_count: 0, completed_at: nil)
+    update!(retry_count: 0)
     CrawlJob.perform_later(id)
   end
 
