@@ -1,6 +1,9 @@
 class AccountsController < ApplicationController
   include QueryPersistenceConcern
 
+  # Maximum length for flash error messages to avoid cookie overflow
+  MAX_FLASH_ERROR_LENGTH = 200
+
   persist_query_for :index
 
   def index
@@ -14,7 +17,19 @@ class AccountsController < ApplicationController
   end
 
   def import
-    # Show import form
+    # Show import landing page with links to each platform
+  end
+
+  def import_wechat_page
+    # Show WeChat import form
+  end
+
+  def import_rednote_page
+    # Show RedNote import form
+  end
+
+  def import_twitter_page
+    # Show Twitter import form
   end
 
   def import_wechat_search
@@ -22,7 +37,7 @@ class AccountsController < ApplicationController
 
     if keyword.blank?
       flash[:error] = "请输入搜索关键词"
-      redirect_to import_accounts_path and return
+      redirect_to import_wechat_page_accounts_path and return
     end
 
     @keyword = keyword
@@ -30,19 +45,19 @@ class AccountsController < ApplicationController
 
     if @search_accounts.empty?
       flash[:warning] = "未搜索到匹配的帐号"
-      redirect_to import_accounts_path and return
+      redirect_to import_wechat_page_accounts_path and return
     end
 
     render :import_preview_wechat
   rescue ArgumentError => e
-    flash[:error] = e.message
-    redirect_to import_accounts_path
+    flash[:error] = truncate_error(e.message)
+    redirect_to import_wechat_page_accounts_path
   rescue WechatApiClient::ApiError => e
-    flash[:error] = "搜索失败：#{e.message}"
-    redirect_to import_accounts_path
+    flash[:error] = truncate_error("搜索失败：#{e.message}")
+    redirect_to import_wechat_page_accounts_path
   rescue StandardError => e
-    flash[:error] = "搜索失败：#{e.message}"
-    redirect_to import_accounts_path
+    flash[:error] = truncate_error("搜索失败：#{e.message}")
+    redirect_to import_wechat_page_accounts_path
   end
 
   def import_wechat_file
@@ -52,11 +67,11 @@ class AccountsController < ApplicationController
       Accounts::Importer.import_file(params[:json_file])
     else
       flash[:error] = "请提供 JSON 数据或上传文件"
-      redirect_to import_accounts_path and return
+      redirect_to import_wechat_page_accounts_path and return
     end
 
     if result.errors.any?
-      flash[:error] = "部分帐号导入失败：#{result.errors.join('; ')}"
+      flash[:error] = truncate_error("部分帐号导入失败：#{result.errors.join('; ')}")
     elsif result.imported_count > 0
       flash[:success] = success_message_for(result)
     elsif result.invalid_count > 0
@@ -67,11 +82,11 @@ class AccountsController < ApplicationController
 
     redirect_to accounts_path
   rescue ArgumentError => e
-    flash[:error] = e.message
-    redirect_to accounts_path
+    flash[:error] = truncate_error(e.message)
+    redirect_to import_wechat_page_accounts_path
   rescue StandardError => e
-    flash[:error] = "导入失败：#{e.message}"
-    redirect_to accounts_path
+    flash[:error] = truncate_error("导入失败：#{e.message}")
+    redirect_to import_wechat_page_accounts_path
   end
 
   def import_wechat
@@ -80,7 +95,7 @@ class AccountsController < ApplicationController
 
     if selected_fakeids.empty?
       flash[:error] = "请至少选择一个帐号"
-      redirect_to import_accounts_path and return
+      redirect_to import_wechat_page_accounts_path and return
     end
 
     rows = selected_fakeids.filter_map do |fakeid|
@@ -98,7 +113,7 @@ class AccountsController < ApplicationController
     result = Accounts::Importer.import_search_rows(rows)
 
     if result.errors.any?
-      flash[:error] = "部分帐号导入失败：#{result.errors.join('; ')}"
+      flash[:error] = truncate_error("部分帐号导入失败：#{result.errors.join('; ')}")
     elsif result.imported_count > 0
       flash[:success] = success_message_for(result)
     else
@@ -107,14 +122,14 @@ class AccountsController < ApplicationController
 
     redirect_to accounts_path
   rescue ArgumentError => e
-    flash[:error] = e.message
-    redirect_to import_accounts_path
+    flash[:error] = truncate_error(e.message)
+    redirect_to import_wechat_page_accounts_path
   rescue WechatApiClient::ApiError => e
-    flash[:error] = "搜索失败：#{e.message}"
-    redirect_to import_accounts_path
+    flash[:error] = truncate_error("搜索失败：#{e.message}")
+    redirect_to import_wechat_page_accounts_path
   rescue StandardError => e
-    flash[:error] = "导入失败：#{e.message}"
-    redirect_to import_accounts_path
+    flash[:error] = truncate_error("导入失败：#{e.message}")
+    redirect_to import_wechat_page_accounts_path
   end
 
   def crawl
@@ -163,11 +178,11 @@ class AccountsController < ApplicationController
       Rednote::Importer.import_file(params[:rednote_json_file])
     else
       flash[:error] = "请提供 JSON 数据或上传文件"
-      redirect_to import_accounts_path and return
+      redirect_to import_rednote_page_accounts_path and return
     end
 
     if result.errors.any?
-      flash[:error] = "部分帐号导入失败：#{result.errors.join('; ')}"
+      flash[:error] = truncate_error("部分帐号导入失败：#{result.errors.join('; ')}")
     elsif result.imported_count > 0
       message = "成功导入 #{result.imported_count} 个小红书帐号（#{result.skipped_count} 个重复已跳过）"
       message += "，#{result.invalid_count} 行缺少必填字段已跳过" unless result.invalid_count.zero?
@@ -180,18 +195,47 @@ class AccountsController < ApplicationController
 
     redirect_to accounts_path
   rescue ArgumentError => e
-    flash[:error] = e.message
-    redirect_to accounts_path
+    flash[:error] = truncate_error(e.message)
+    redirect_to import_rednote_page_accounts_path
   rescue StandardError => e
-    flash[:error] = "导入失败：#{e.message}"
+    flash[:error] = truncate_error("导入失败：#{e.message}")
+    redirect_to import_rednote_page_accounts_path
+  end
+
+  def import_rednote_file
+    unless params[:rednote_csv_file].present?
+      flash[:error] = "请上传 CSV 文件"
+      redirect_to import_rednote_page_accounts_path and return
+    end
+
+    result = Rednote::Importer.import_file(params[:rednote_csv_file])
+
+    if result.errors.any?
+      flash[:error] = truncate_error("部分帐号导入失败：#{result.errors.join('; ')}")
+    elsif result.imported_count > 0
+      message = "成功导入 #{result.imported_count} 个小红书帐号（#{result.skipped_count} 个重复已跳过）"
+      message += "，#{result.invalid_count} 行缺少必填字段已跳过" unless result.invalid_count.zero?
+      flash[:success] = message
+    elsif result.invalid_count > 0
+      flash[:warning] = "没有新帐号需要导入（#{result.skipped_count} 个已存在，#{result.invalid_count} 行缺少必填字段）"
+    else
+      flash[:warning] = "没有新帐号需要导入（#{result.skipped_count} 个已存在）"
+    end
+
     redirect_to accounts_path
+  rescue ArgumentError => e
+    flash[:error] = truncate_error(e.message)
+    redirect_to import_rednote_page_accounts_path
+  rescue StandardError => e
+    flash[:error] = truncate_error("导入失败：#{e.message}")
+    redirect_to import_rednote_page_accounts_path
   end
 
   def import_twitter_search
     raw_input = params[:twitter_screen_names].to_s.strip
     if raw_input.blank?
       flash[:error] = "请输入 Twitter 用户名"
-      redirect_to import_accounts_path and return
+      redirect_to import_twitter_page_accounts_path and return
     end
 
     # Support comma-separated or newline-separated screen names
@@ -199,26 +243,26 @@ class AccountsController < ApplicationController
 
     if screen_names.empty?
       flash[:error] = "请输入有效的 Twitter 用户名"
-      redirect_to import_accounts_path and return
+      redirect_to import_twitter_page_accounts_path and return
     end
 
     @search_results = Twitter::Importer.search_by_names(screen_names)
 
     if @search_results.empty?
       flash[:warning] = "未找到匹配的 Twitter 帐号"
-      redirect_to import_accounts_path and return
+      redirect_to import_twitter_page_accounts_path and return
     end
 
     render :import_preview_twitter
   rescue TwitterApiClient::ApiKeyMissingError => e
     flash[:error] = "Twitter cookies 未配置，请先在设置页面配置"
-    redirect_to import_accounts_path
+    redirect_to import_twitter_page_accounts_path
   rescue TwitterApiClient::ApiError => e
-    flash[:error] = "Twitter 搜索失败：#{e.message}"
-    redirect_to import_accounts_path
+    flash[:error] = truncate_error("Twitter 搜索失败：#{e.message}")
+    redirect_to import_twitter_page_accounts_path
   rescue StandardError => e
-    flash[:error] = "搜索失败：#{e.message}"
-    redirect_to import_accounts_path
+    flash[:error] = truncate_error("搜索失败：#{e.message}")
+    redirect_to import_twitter_page_accounts_path
   end
 
   def import_twitter
@@ -227,7 +271,7 @@ class AccountsController < ApplicationController
 
     if selected_ids.empty?
       flash[:error] = "请至少选择一个帐号"
-      redirect_to import_accounts_path and return
+      redirect_to import_twitter_page_accounts_path and return
     end
 
     rows = selected_ids.filter_map do |uid|
@@ -245,7 +289,7 @@ class AccountsController < ApplicationController
     result = Twitter::Importer.import_search_rows(rows)
 
     if result.errors.any?
-      flash[:error] = "部分帐号导入失败：#{result.errors.join('; ')}"
+      flash[:error] = truncate_error("部分帐号导入失败：#{result.errors.join('; ')}")
     elsif result.imported_count > 0
       flash[:success] = "成功导入 #{result.imported_count} 个 Twitter 帐号（#{result.skipped_count} 个重复已跳过）"
     else
@@ -254,23 +298,23 @@ class AccountsController < ApplicationController
 
     redirect_to accounts_path
   rescue ArgumentError => e
-    flash[:error] = e.message
-    redirect_to import_accounts_path
+    flash[:error] = truncate_error(e.message)
+    redirect_to import_twitter_page_accounts_path
   rescue StandardError => e
-    flash[:error] = "导入失败：#{e.message}"
-    redirect_to import_accounts_path
+    flash[:error] = truncate_error("导入失败：#{e.message}")
+    redirect_to import_twitter_page_accounts_path
   end
 
   def import_twitter_file
     unless params[:csv_file].present?
       flash[:error] = "请上传 CSV 文件"
-      redirect_to import_accounts_path and return
+      redirect_to import_twitter_page_accounts_path and return
     end
 
     result = Twitter::Importer.import_file(params[:csv_file])
 
     if result.errors.any?
-      flash[:error] = "部分帐号导入失败：#{result.errors.join('; ')}"
+      flash[:error] = truncate_error("部分帐号导入失败：#{result.errors.join('; ')}")
     elsif result.imported_count > 0
       message = "成功导入 #{result.imported_count} 个 Twitter 帐号（#{result.skipped_count} 个重复已跳过）"
       message += "，#{result.invalid_count} 行缺少必填字段已跳过" unless result.invalid_count.zero?
@@ -283,11 +327,11 @@ class AccountsController < ApplicationController
 
     redirect_to accounts_path
   rescue ArgumentError => e
-    flash[:error] = e.message
-    redirect_to import_accounts_path
+    flash[:error] = truncate_error(e.message)
+    redirect_to import_twitter_page_accounts_path
   rescue StandardError => e
-    flash[:error] = "导入失败：#{e.message}"
-    redirect_to import_accounts_path
+    flash[:error] = truncate_error("导入失败：#{e.message}")
+    redirect_to import_twitter_page_accounts_path
   end
 
   private
@@ -297,6 +341,11 @@ class AccountsController < ApplicationController
     return message if result.invalid_count.zero?
 
     "#{message}，#{result.invalid_count} 行缺少必填字段已跳过"
+  end
+
+  def truncate_error(message, max_length = MAX_FLASH_ERROR_LENGTH)
+    return message if message.length <= max_length
+    "#{message[0...max_length]}..."
   end
 end
 

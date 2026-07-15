@@ -193,6 +193,65 @@ User (用户)
 3. 如该平台 API 有密钥失效的场景，将对应错误类 `include CrawlerApiKeyError`
 4. 完成 — `CrawlJob` / `CrawlOrchestrator` 会自动把该类型帐号纳入同一个并发循环，与其他平台交替抓取
 
+### 添加新的导入平台
+
+每个平台的导入功能遵循统一的模式，确保可扩展性和用户体验一致性：
+
+**架构原则**：
+- **独立页面**：每个平台有独立的导入页面（`/accounts/import/{platform}`），避免表单状态丢失
+- **错误隔离**：某个平台导入失败不影响其他平台，错误信息截断避免 cookie overflow
+- **统一模式**：所有平台遵循相同的路由、控制器和视图结构
+
+**新增平台步骤**：
+
+1. **路由**（`config/routes.rb`）：
+```ruby
+# 在 accounts collection 中添加
+get  "import/{platform}", to: "accounts#import_{platform}_page", as: :import_{platform}_page
+post :import_{platform}
+post :import_{platform}_file
+# 如支持搜索导入
+get  :import_{platform}_search
+```
+
+2. **控制器**（`app/controllers/accounts_controller.rb`）：
+```ruby
+def import_{platform}_page
+  # 渲染导入页面
+end
+
+def import_{platform}
+  # 处理导入逻辑
+  # 错误时 redirect_to import_{platform}_page_accounts_path
+  # 使用 truncate_error() 避免 cookie overflow
+end
+
+def import_{platform}_file
+  # 处理文件上传导入
+end
+```
+
+3. **视图**：
+- `app/views/accounts/import_{platform}_page.html.erb` - 导入页面
+- `app/views/accounts/import_preview_{platform}.html.erb` - 搜索结果预览（如支持搜索）
+
+4. **服务**（`app/services/{platform}/importer.rb`）：
+```ruby
+module {Platform}::Importer
+  def self.import_text(text)
+  def self.import_file(file)
+  def self.import_search_rows(rows)
+end
+```
+
+5. **更新主导入页面**（`app/views/accounts/import.html.erb`）：
+- 添加新平台的卡片链接
+
+**错误处理规范**：
+- 使用 `truncate_error(message)` 方法截断错误信息（最大 200 字符）
+- 所有错误重定向回对应平台的导入页面，而非主导入页面
+- 避免直接使用 `flash[:error] = e.message`，防止 cookie overflow
+
 **Accounts::Importer** (`app/services/accounts/importer.rb`)
 - 微信帐号导入服务
 - 支持 JSON 文本、文件上传、搜索导入
@@ -233,7 +292,29 @@ resource :session + magic_link + dev_login
 GET /magic_link/:token -> sessions#magic_link_login
 
 # 业务
-resources :accounts (index, show, destroy, import, search_preview, import_json, import_search, import_rednote_json, crawl, toggle_status)
+resources :accounts (index, show, destroy, crawl, toggle_status) do
+  collection do
+    # 导入主页
+    get :import
+
+    # 微信公众号导入
+    get  "import/wechat", to: :import_wechat_page, as: :import_wechat_page
+    get  :import_wechat_search
+    post :import_wechat
+    post :import_wechat_file
+
+    # 小红书导入
+    get  "import/rednote", to: :import_rednote_page, as: :import_rednote_page
+    post :import_rednote
+    post :import_rednote_file
+
+    # Twitter 导入
+    get  "import/twitter", to: :import_twitter_page, as: :import_twitter_page
+    get  :import_twitter_search
+    post :import_twitter
+    post :import_twitter_file
+  end
+end
 resources :crawl_tasks (index, show, crawl_all, pause, resume, fail, logs, articles)
 resource :profile (edit, update, update_password)
 

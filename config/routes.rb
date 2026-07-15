@@ -18,10 +18,17 @@ Rails.application.routes.draw do
   resources :accounts, only: [:index, :show, :destroy] do
     collection do
       get :import
+      # WeChat import routes
+      get  "import/wechat", to: "accounts#import_wechat_page", as: :import_wechat_page
       get  :import_wechat_search
       post :import_wechat
       post :import_wechat_file
+      # RedNote import routes
+      get  "import/rednote", to: "accounts#import_rednote_page", as: :import_rednote_page
       post :import_rednote
+      post :import_rednote_file
+      # Twitter import routes
+      get  "import/twitter", to: "accounts#import_twitter_page", as: :import_twitter_page
       get  :import_twitter_search
       post :import_twitter
       post :import_twitter_file

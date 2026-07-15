@@ -2,288 +2,79 @@
   <div class="flex items-center justify-between">
     <div>
       <h1 class="text-3xl font-bold text-gray-900">导入帐号</h1>
-      <p class="text-gray-600 mt-1">支持导入微信公众号、小红书和 Twitter 帐号</p>
+      <p class="text-gray-600 mt-1">选择要导入的平台类型</p>
     </div>
     <%= link_to "← 返回帐号列表", accounts_path, class: "btn btn-secondary" %>
   </div>
 
-  <!-- Platform Tabs -->
-  <div class="border-b border-gray-200">
-    <nav class="-mb-px flex space-x-8">
-      <button type="button" onclick="showPlatform('wechat')" id="platform-tab-wechat"
-              class="platform-tab border-b-2 border-primary text-primary py-3 px-1 text-base font-semibold flex items-center gap-2">
-        <span>💬</span> 微信公众号
-      </button>
-      <button type="button" onclick="showPlatform('rednote')" id="platform-tab-rednote"
-              class="platform-tab border-b-2 border-transparent text-gray-500 hover:text-gray-700 py-3 px-1 text-base font-semibold flex items-center gap-2">
-        <span>📕</span> 小红书
-      </button>
-      <button type="button" onclick="showPlatform('twitter')" id="platform-tab-twitter"
-              class="platform-tab border-b-2 border-transparent text-gray-500 hover:text-gray-700 py-3 px-1 text-base font-semibold flex items-center gap-2">
-        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-        Twitter
-      </button>
-    </nav>
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <!-- WeChat Card -->
+    <%= link_to import_wechat_page_accounts_path, class: "card hover:shadow-lg transition-shadow cursor-pointer group" do %>
+      <div class="flex items-center gap-4 mb-4">
+        <div class="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center text-2xl group-hover:bg-green-200 transition-colors">
+          💬
+        </div>
+        <div>
+          <h2 class="text-xl font-semibold text-gray-900">微信公众号</h2>
+          <p class="text-sm text-gray-500">WeChat Official Accounts</p>
+        </div>
+      </div>
+      <p class="text-gray-600 text-sm">支持搜索导入、JSON 文本和文件上传</p>
+      <div class="mt-4 flex items-center text-green-600 text-sm font-medium">
+        开始导入
+        <svg class="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+        </svg>
+      </div>
+    <% end %>
+
+    <!-- RedNote Card -->
+    <%= link_to import_rednote_page_accounts_path, class: "card hover:shadow-lg transition-shadow cursor-pointer group" do %>
+      <div class="flex items-center gap-4 mb-4">
+        <div class="w-12 h-12 bg-rose-100 rounded-xl flex items-center justify-center text-2xl group-hover:bg-rose-200 transition-colors">
+          📕
+        </div>
+        <div>
+          <h2 class="text-xl font-semibold text-gray-900">小红书</h2>
+          <p class="text-sm text-gray-500">RedNote (Xiaohongshu)</p>
+        </div>
+      </div>
+      <p class="text-gray-600 text-sm">支持 CSV 文件导入</p>
+      <div class="mt-4 flex items-center text-rose-600 text-sm font-medium">
+        开始导入
+        <svg class="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+        </svg>
+      </div>
+    <% end %>
+
+    <!-- Twitter Card -->
+    <%= link_to import_twitter_page_accounts_path, class: "card hover:shadow-lg transition-shadow cursor-pointer group" do %>
+      <div class="flex items-center gap-4 mb-4">
+        <div class="w-12 h-12 bg-sky-100 rounded-xl flex items-center justify-center text-2xl group-hover:bg-sky-200 transition-colors">
+          <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+        </div>
+        <div>
+          <h2 class="text-xl font-semibold text-gray-900">Twitter</h2>
+          <p class="text-sm text-gray-500">Twitter / X</p>
+        </div>
+      </div>
+      <p class="text-gray-600 text-sm">支持搜索导入和 CSV 文件导入</p>
+      <div class="mt-4 flex items-center text-sky-600 text-sm font-medium">
+        开始导入
+        <svg class="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+        </svg>
+      </div>
+    <% end %>
   </div>
 
-  <!-- ===== WeChat ===== -->
-  <div id="platform-wechat" class="space-y-6">
-    <div class="card">
-      <div class="border-b border-gray-200 mb-6">
-        <nav class="-mb-px flex space-x-8">
-          <button type="button" onclick="showTab('search', 'wechat')" id="wechat-tab-search" class="wechat-tab tab-button border-b-2 border-primary text-primary py-4 px-1 text-sm font-medium">搜索导入</button>
-          <button type="button" onclick="showTab('upload', 'wechat')" id="wechat-tab-upload" class="wechat-tab tab-button border-b-2 border-transparent text-gray-500 hover:text-gray-700 py-4 px-1 text-sm font-medium">上传文件</button>
-        </nav>
-      </div>
-
-      <div id="wechat-search-tab" class="wechat-tab-content">
-        <%= form_with url: import_wechat_search_accounts_path, method: :get, local: true, id: "search-form" do %>
-          <div class="space-y-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">帐号关键词</label>
-              <input type="text" id="search-keyword" name="keyword" placeholder="例如：清华大学、北大招生、复旦研究生"
-                     class="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent" required>
-              <p class="mt-2 text-sm text-gray-500">系统将调用搜索帐号 API，先展示可勾选的预览列表，再导入选中的帐号。</p>
-            </div>
-            <div class="flex justify-end">
-              <button type="submit" class="btn btn-primary">搜索并导入</button>
-            </div>
-          </div>
-        <% end %>
-      </div>
-
-      <%= form_with url: import_wechat_file_accounts_path, method: :post, multipart: true, id: "import-form" do |f| %>
-        <div id="wechat-upload-tab" class="wechat-tab-content hidden">
-          <div class="space-y-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">上传 JSON / CSV 文件</label>
-              <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-gray-400 transition-colors">
-                <div class="space-y-1 text-center">
-                  <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-                    <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                  </svg>
-                  <div class="flex text-sm text-gray-600">
-                    <label for="file-upload" class="relative cursor-pointer bg-white rounded-md font-medium text-primary hover:text-blue-700 focus-within:outline-none">
-                      <span>上传文件</span>
-                      <%= f.file_field :json_file, id: "file-upload", accept: ".json,.csv", class: "sr-only", onchange: "updateFileName(this)" %>
-                    </label>
-                    <p class="pl-1">或拖放文件至此</p>
-                  </div>
-                  <p class="text-xs text-gray-500">支持 .json 和 .csv 文件</p>
-                  <p id="file-name" class="text-sm text-gray-700 font-medium mt-2"></p>
-                </div>
-              </div>
-            </div>
-            <div class="flex justify-end">
-              <button type="submit" class="btn btn-primary">从文件导入</button>
-            </div>
-          </div>
-        </div>
-      <% end %>
-    </div>
-
-    <div class="card bg-blue-50 border-blue-200">
-      <h3 class="font-semibold text-blue-900 mb-3">💡 导入提示</h3>
-      <ul class="space-y-2 text-sm text-blue-800">
-        <li>• CSV 必填列：<code class="bg-blue-100 px-1 rounded">fakeid</code> 和 <code class="bg-blue-100 px-1 rounded">nickname</code></li>
-        <li>• 可选列：<code class="bg-blue-100 px-1 rounded">round_head_img</code>、<code class="bg-blue-100 px-1 rounded">articles</code></li>
-        <li>• 重复的帐号（相同 fakeid）将被跳过</li>
-      </ul>
-    </div>
-
-    <div class="card space-y-4">
-      <h3 class="font-semibold text-gray-900 mb-3">📄 CSV 模板</h3>
-      <pre class="bg-gray-50 border border-gray-200 rounded p-3 text-xs overflow-x-auto"><code>fakeid,nickname,round_head_img</code></pre>
-      <a href="data:text/csv;charset=utf-8,<%= CGI.escape("fakeid,nickname,round_head_img\nexample_fakeid_1,Example Account 1,http://example.com/avatar1.png\nexample_fakeid_2,Example Account 2,http://example.com/avatar2.png") %>" download="wechat_accounts_template.csv" class="btn btn-secondary inline-flex items-center">
-        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-        下载 CSV 模板
-      </a>
-    </div>
-  </div> <!-- end platform-wechat -->
-
-  <!-- ===== RedNote ===== -->
-  <div id="platform-rednote" class="hidden space-y-6">
-    <div class="card">
-      <%= form_with url: import_rednote_accounts_path, method: :post, multipart: true do |f| %>
-        <div class="space-y-4">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">上传 CSV 文件</label>
-            <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-gray-400 transition-colors" id="rednote-drop-zone">
-              <div class="space-y-1 text-center">
-                <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-                  <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
-                <div class="flex text-sm text-gray-600">
-                  <label for="rednote-file-upload" class="relative cursor-pointer bg-white rounded-md font-medium text-rose-600 hover:text-rose-700">
-                    <span>上传文件</span>
-                    <%= f.file_field :rednote_json_file, id: "rednote-file-upload", accept: ".csv", class: "sr-only", onchange: "updateFileName(this, 'rednote-file-name')" %>
-                  </label>
-                  <p class="pl-1">或拖放文件至此</p>
-                </div>
-                <p class="text-xs text-gray-500">支持 .csv 文件</p>
-                <p id="rednote-file-name" class="text-sm text-gray-700 font-medium mt-2"></p>
-              </div>
-            </div>
-          </div>
-          <div class="flex justify-end">
-            <button type="submit" class="btn btn-primary">从文件导入</button>
-          </div>
-        </div>
-      <% end %>
-    </div>
-
-    <div class="card bg-rose-50 border-rose-200">
-      <h3 class="font-semibold text-rose-900 mb-3">💡 导入提示</h3>
-      <ul class="space-y-1 text-sm text-rose-800">
-        <li>• 必填字段：<code class="bg-rose-100 px-1 rounded">user_id</code>、<code class="bg-rose-100 px-1 rounded">nickname</code></li>
-        <li>• 可选字段：<code class="bg-rose-100 px-1 rounded">avatar</code>（头像 URL）</li>
-        <li>• CSV 内重复的 user_id 自动去重</li>
-      </ul>
-    </div>
-
-    <div class="card">
-      <h3 class="font-semibold text-gray-900 mb-3">📄 CSV 模板</h3>
-      <pre class="bg-gray-50 border border-gray-200 rounded p-3 text-xs overflow-x-auto mb-3"><code>user_id,nickname,avatar
-abc123example,博主A,https://example.com/avatar1.jpg</code></pre>
-      <a href="data:text/csv;charset=utf-8,<%= CGI.escape("user_id,nickname,avatar\nabc123example,博主A,https://example.com/avatar1.jpg\ndef456example,博主B,https://example.com/avatar2.jpg") %>" download="rednote_accounts_template.csv" class="btn btn-secondary inline-flex items-center">
-        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-        下载 CSV 模板
-      </a>
-    </div>
-  </div> <!-- end platform-rednote -->
-
-  <!-- ===== Twitter ===== -->
-  <div id="platform-twitter" class="hidden space-y-6">
-    <div class="card">
-      <div class="border-b border-gray-200 mb-6">
-        <nav class="-mb-px flex space-x-8">
-          <button type="button" onclick="showTab('search', 'twitter')" id="twitter-tab-search" class="twitter-tab tab-button border-b-2 border-primary text-primary py-4 px-1 text-sm font-medium">搜索导入</button>
-          <button type="button" onclick="showTab('upload', 'twitter')" id="twitter-tab-upload" class="twitter-tab tab-button border-b-2 border-transparent text-gray-500 hover:text-gray-700 py-4 px-1 text-sm font-medium">上传文件</button>
-        </nav>
-      </div>
-
-      <div id="twitter-search-tab" class="twitter-tab-content">
-        <%= form_with url: import_twitter_search_accounts_path, method: :get, local: true do %>
-          <div class="space-y-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Twitter 用户名</label>
-              <input type="text" name="twitter_screen_names" placeholder="输入用户名，多个用逗号或空格分隔（支持 @ 前缀）"
-                     class="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent">
-              <p class="mt-2 text-sm text-gray-500">系统将查找用户信息，先展示可勾选的预览列表，再导入选中的帐号。</p>
-            </div>
-            <div class="flex justify-end">
-              <button type="submit" class="btn btn-primary">搜索并导入</button>
-            </div>
-          </div>
-        <% end %>
-      </div>
-
-      <%= form_with url: import_twitter_file_accounts_path, method: :post, local: true, multipart: true do |f| %>
-        <div id="twitter-upload-tab" class="twitter-tab-content hidden">
-          <div class="space-y-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">上传 CSV 文件</label>
-              <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-gray-400 transition-colors" id="twitter-drop-zone">
-                <div class="space-y-1 text-center">
-                  <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-                    <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                  </svg>
-                  <div class="flex text-sm text-gray-600">
-                    <label for="twitter-file-upload" class="relative cursor-pointer bg-white rounded-md font-medium text-sky-600 hover:text-sky-700">
-                      <span>上传文件</span>
-                      <input id="twitter-file-upload" name="csv_file" type="file" accept=".csv" class="sr-only" onchange="updateFileName(this, 'twitter-file-name')">
-                    </label>
-                    <p class="pl-1">或拖放文件至此</p>
-                  </div>
-                  <p class="text-xs text-gray-500">支持 .csv 文件</p>
-                  <p id="twitter-file-name" class="text-sm text-gray-700 font-medium mt-2"></p>
-                </div>
-              </div>
-            </div>
-            <div class="flex justify-end">
-              <button type="submit" class="btn btn-primary">从文件导入</button>
-            </div>
-          </div>
-        </div>
-      <% end %>
-    </div>
-
-    <div class="card bg-sky-50 border-sky-200">
-      <h3 class="font-semibold text-sky-900 mb-3">💡 导入提示</h3>
-      <ul class="space-y-1 text-sm text-sky-800">
-        <li>• 必填字段：<code class="bg-sky-100 px-1 rounded">screen_name</code>（Twitter 用户名）</li>
-        <li>• 可选字段：<code class="bg-sky-100 px-1 rounded">user_id</code>（缺失时自动查找）、<code class="bg-sky-100 px-1 rounded">name</code>、<code class="bg-sky-100 px-1 rounded">image</code></li>
-        <li>• CSV 内重复的 screen_name 自动去重</li>
-      </ul>
-    </div>
-
-    <div class="card">
-      <h3 class="font-semibold text-gray-900 mb-3">📄 CSV 模板</h3>
-      <pre class="bg-gray-50 border border-gray-200 rounded p-3 text-xs overflow-x-auto mb-3"><code>screen_name,user_id,name,image
-elonmusk,44196397,Elon Musk,https://pbs.twimg.com/profile_images/xxx.jpg
-jack,,Jack Dorsey,</code></pre>
-      <a href="data:text/csv;charset=utf-8,<%= CGI.escape("screen_name,user_id,name,image\nelonmusk,44196397,Elon Musk,https://pbs.twimg.com/profile_images/xxx.jpg\njack,,Jack Dorsey,") %>" download="twitter_accounts_template.csv" class="btn btn-secondary inline-flex items-center">
-        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-        下载 CSV 模板
-      </a>
-    </div>
-  </div> <!-- end platform-twitter -->
-
+  <div class="card bg-gray-50 border-gray-200">
+    <h3 class="font-semibold text-gray-900 mb-3">💡 导入提示</h3>
+    <ul class="space-y-2 text-sm text-gray-700">
+      <li>• 重复的帐号（相同标识符）将被自动跳过</li>
+      <li>• 导入后可在 <a href="<%= accounts_path %>" class="text-primary hover:underline">帐号列表</a> 中查看和管理</li>
+      <li>• 每个平台独立导入，某个平台导入失败不影响其他平台</li>
+    </ul>
+  </div>
 </div>
-
-<script>
-  function showPlatform(platform) {
-    ['wechat', 'rednote', 'twitter'].forEach(p => {
-      document.getElementById('platform-' + p).classList.toggle('hidden', p !== platform);
-      const tab = document.getElementById('platform-tab-' + p);
-      if (p === platform) {
-        tab.classList.add('border-primary', 'text-primary');
-        tab.classList.remove('border-transparent', 'text-gray-500');
-      } else {
-        tab.classList.remove('border-primary', 'text-primary');
-        tab.classList.add('border-transparent', 'text-gray-500');
-      }
-    });
-  }
-
-  function showTab(tab, platform) {
-    const activeColors = platform === 'rednote' ? ['border-rose-500', 'text-rose-600'] : ['border-primary', 'text-primary'];
-    document.querySelectorAll('.' + platform + '-tab-content').forEach(el => el.classList.add('hidden'));
-    document.querySelectorAll('.' + platform + '-tab.tab-button').forEach(el => {
-      el.classList.remove(...activeColors);
-      el.classList.add('border-transparent', 'text-gray-500');
-    });
-    document.getElementById(platform + '-' + tab + '-tab').classList.remove('hidden');
-    const btn = document.getElementById(platform + '-tab-' + tab);
-    btn.classList.add(...activeColors);
-    btn.classList.remove('border-transparent', 'text-gray-500');
-  }
-
-  function updateFileName(input, targetId) {
-    const el = document.getElementById(targetId || 'file-name');
-    if (el) el.textContent = input.files[0]?.name ? '📎 ' + input.files[0].name : '';
-  }
-
-  function setupDropZone(zoneId, inputId, fileNameId) {
-    const zone = document.getElementById(zoneId);
-    if (!zone) return;
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(e => zone.addEventListener(e, ev => { ev.preventDefault(); ev.stopPropagation(); }));
-    ['dragenter', 'dragover'].forEach(e => zone.addEventListener(e, () => zone.classList.add('border-primary', 'bg-blue-50')));
-    ['dragleave', 'drop'].forEach(e => zone.addEventListener(e, () => zone.classList.remove('border-primary', 'bg-blue-50')));
-    zone.addEventListener('drop', ev => {
-      const input = document.getElementById(inputId);
-      input.files = ev.dataTransfer.files;
-      updateFileName(input, fileNameId);
-    });
-  }
-  setupDropZone('rednote-drop-zone', 'rednote-file-upload', 'rednote-file-name');
-  setupDropZone('twitter-drop-zone', 'twitter-file-upload', 'twitter-file-name');
-
-  const searchKeywordInput = document.getElementById('search-keyword');
-  const searchForm = document.getElementById('search-form');
-  if (searchKeywordInput && searchForm) {
-    searchKeywordInput.addEventListener('keydown', e => {
-      if (e.key === 'Enter') { e.preventDefault(); searchForm.requestSubmit(); }
-    });
-  }
-</script>
