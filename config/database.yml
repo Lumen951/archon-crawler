@@ -87,7 +87,6 @@ test:
 production:
   primary: &primary_production
     <<: *default
-    database: mp_crawler_production
   cache:
     <<: *primary_production
     database: mp_crawler_production_cache
