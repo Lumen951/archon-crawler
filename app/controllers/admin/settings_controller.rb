@@ -10,6 +10,7 @@ class Admin::SettingsController < Admin::BaseController
     @log_retention_days = Option[:crawler_log_retention_days]
     @twitter_ct0 = Option.get('twitter_ct0')
     @twitter_auth_token = Option.get('twitter_auth_token')
+    @twitter_proxy = Option.get('twitter_proxy')
     @wechat_key_check = Rails.cache.read('api_key_check:wechat')
     @rednote_key_check = Rails.cache.read('api_key_check:rednote')
     @twitter_key_check = Rails.cache.read('api_key_check:twitter')
@@ -36,6 +37,16 @@ class Admin::SettingsController < Admin::BaseController
     if params[:twitter_auth_token].present?
       Option.set('twitter_auth_token', params[:twitter_auth_token])
       flash[:success] = "Twitter auth_token cookie 更新成功"
+    end
+
+    if params.key?(:twitter_proxy)
+      if params[:twitter_proxy].present?
+        Option.set('twitter_proxy', params[:twitter_proxy])
+        flash[:success] = "Twitter 代理更新成功"
+      else
+        Option.set('twitter_proxy', nil)
+        flash[:success] = "Twitter 代理已清除"
+      end
     end
 
     if params[:default_article_concurrency].present?
@@ -74,7 +85,7 @@ class Admin::SettingsController < Admin::BaseController
     redirect_to admin_settings_path
   rescue => e
     Rails.logger.error("WeChat API key validation error: #{e.message}")
-    flash[:error] = "验证失败：#{e.message}"
+    flash[:error] = "验证失败：#{e.message[0..200]}"
     redirect_to admin_settings_path
   end
 
@@ -86,7 +97,7 @@ class Admin::SettingsController < Admin::BaseController
     redirect_to admin_settings_path
   rescue => e
     Rails.logger.error("RedNote API key validation error: #{e.message}")
-    flash[:error] = "验证失败：#{e.message}"
+    flash[:error] = "验证失败：#{e.message[0..200]}"
     redirect_to admin_settings_path
   end
 
@@ -98,7 +109,7 @@ class Admin::SettingsController < Admin::BaseController
     redirect_to admin_settings_path
   rescue => e
     Rails.logger.error("Twitter API key validation error: #{e.message}")
-    flash[:error] = "验证失败：#{e.message}"
+    flash[:error] = "验证失败：#{e.message[0..200]}"
     redirect_to admin_settings_path
   end
 end

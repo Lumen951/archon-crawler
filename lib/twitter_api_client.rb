@@ -91,17 +91,21 @@ class TwitterApiClient
   private
 
   def self.build_env
-    ct0 = Option.get("twitter_ct0")
-    auth_token = Option.get("twitter_auth_token")
+    ct0 = Option.get("twitter_ct0") || ENV["TWITTER_CT0"]
+    auth_token = Option.get("twitter_auth_token") || ENV["TWITTER_AUTH_TOKEN"]
 
     raise ApiKeyMissingError, "未配置 Twitter cookies（twitter_ct0 / twitter_auth_token）" unless ct0.present? && auth_token.present?
 
-    {
+    proxy = Option.get("twitter_proxy") || ENV["TWITTER_PROXY"]
+
+    env = {
       "TWITTER_CT0" => ct0,
       "TWITTER_AUTH_TOKEN" => auth_token,
-      # Clear proxy env vars to avoid SOCKS proxy issues with httpx
+      # Clear system proxy env vars to avoid SOCKS proxy issues with httpx
       "HTTP_PROXY" => nil, "HTTPS_PROXY" => nil, "ALL_PROXY" => nil,
       "http_proxy" => nil, "https_proxy" => nil, "all_proxy" => nil
     }
+    env["TWITTER_PROXY"] = proxy if proxy.present?
+    env
   end
 end

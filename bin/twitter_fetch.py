@@ -22,8 +22,8 @@ import json
 import argparse
 from datetime import datetime, timezone
 
-# Clear proxy env vars — the twitter-api-client doesn't need them and
-# httpx chokes on SOCKS proxies without the socksio package.
+# Clear system proxy env vars — httpx picks these up automatically and
+# chokes on SOCKS proxies without the socksio package. Use TWITTER_PROXY instead.
 for var in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"):
     os.environ.pop(var, None)
 
@@ -164,8 +164,10 @@ def main():
 
     cookies = {"ct0": ct0, "auth_token": auth_token}
 
+    proxy = os.environ.get("TWITTER_PROXY")  # e.g. "http://user:pass@host:port"
+
     try:
-        scraper = Scraper(cookies=cookies, save=False)
+        scraper = Scraper(cookies=cookies, save=False, proxies=proxy)
 
         # Redirect stdout to stderr during scraper calls to suppress library
         # debug/progress output (tqdm, error prints, etc.)
