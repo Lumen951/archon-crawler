@@ -1,3 +1,3 @@
 [submodule "twitter-api-client"]
 	path = twitter-api-client
-	url = https://github.com/MiraclePlus/twitter-api-client.git
+	url = git@github.com:MiraclePlus/twitter-api-client.git
