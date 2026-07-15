@@ -33,7 +33,7 @@ FROM base AS build
 
 # Install packages needed to build gems and Python dependencies
 RUN apt-get update -qq && \
-    apt-get install --no-install-recommends -y build-essential git libvips libyaml-dev pkg-config python3-pip && \
+    apt-get install --no-install-recommends -y build-essential git libvips libpq-dev libyaml-dev pkg-config python3-pip && \
     rm -rf /var/lib/apt/lists /var/cache/apt/archives
 
 # Install application gems
