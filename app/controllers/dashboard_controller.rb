@@ -8,5 +8,6 @@ class DashboardController < ApplicationController
     @api_key_expires_soon = Option.api_key_expires_soon?
     @wechat_key_check = Rails.cache.read('api_key_check:wechat')
     @rednote_key_check = Rails.cache.read('api_key_check:rednote')
+    @twitter_key_check = Rails.cache.read('api_key_check:twitter')
   end
 end

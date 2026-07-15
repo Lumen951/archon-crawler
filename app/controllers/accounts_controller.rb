@@ -17,7 +17,7 @@ class AccountsController < ApplicationController
     # Show import form
   end
 
-  def search_preview
+  def import_wechat_search
     keyword = params[:keyword].to_s.strip
 
     if keyword.blank?
@@ -33,7 +33,7 @@ class AccountsController < ApplicationController
       redirect_to import_accounts_path and return
     end
 
-    render :import_preview
+    render :import_preview_wechat
   rescue ArgumentError => e
     flash[:error] = e.message
     redirect_to import_accounts_path
@@ -45,7 +45,7 @@ class AccountsController < ApplicationController
     redirect_to import_accounts_path
   end
 
-  def import_json
+  def import_wechat_file
     result = if params[:json_text].present?
       Accounts::Importer.import_text(params[:json_text])
     elsif params[:json_file].present?
@@ -74,7 +74,7 @@ class AccountsController < ApplicationController
     redirect_to accounts_path
   end
 
-  def import_search
+  def import_wechat
     selected_fakeids = Array(params[:selected_fakeids]).map(&:to_s).map(&:strip).reject(&:blank?).uniq
     accounts_data = params[:accounts_data] || {}
 
@@ -156,7 +156,7 @@ class AccountsController < ApplicationController
     redirect_back fallback_location: accounts_path
   end
 
-  def import_rednote_json
+  def import_rednote
     result = if params[:rednote_json_text].present?
       Rednote::Importer.import_text(params[:rednote_json_text])
     elsif params[:rednote_json_file].present?
@@ -185,6 +185,109 @@ class AccountsController < ApplicationController
   rescue StandardError => e
     flash[:error] = "导入失败：#{e.message}"
     redirect_to accounts_path
+  end
+
+  def import_twitter_search
+    raw_input = params[:twitter_screen_names].to_s.strip
+    if raw_input.blank?
+      flash[:error] = "请输入 Twitter 用户名"
+      redirect_to import_accounts_path and return
+    end
+
+    # Support comma-separated or newline-separated screen names
+    screen_names = raw_input.split(/[\s,]+/).map { |n| n.strip.delete_prefix("@") }.reject(&:blank?).uniq
+
+    if screen_names.empty?
+      flash[:error] = "请输入有效的 Twitter 用户名"
+      redirect_to import_accounts_path and return
+    end
+
+    @search_results = Twitter::Importer.search_by_names(screen_names)
+
+    if @search_results.empty?
+      flash[:warning] = "未找到匹配的 Twitter 帐号"
+      redirect_to import_accounts_path and return
+    end
+
+    render :import_preview_twitter
+  rescue TwitterApiClient::ApiKeyMissingError => e
+    flash[:error] = "Twitter cookies 未配置，请先在设置页面配置"
+    redirect_to import_accounts_path
+  rescue TwitterApiClient::ApiError => e
+    flash[:error] = "Twitter 搜索失败：#{e.message}"
+    redirect_to import_accounts_path
+  rescue StandardError => e
+    flash[:error] = "搜索失败：#{e.message}"
+    redirect_to import_accounts_path
+  end
+
+  def import_twitter
+    selected_ids = Array(params[:selected_user_ids]).map(&:to_s).map(&:strip).reject(&:blank?).uniq
+    accounts_data = params[:accounts_data] || {}
+
+    if selected_ids.empty?
+      flash[:error] = "请至少选择一个帐号"
+      redirect_to import_accounts_path and return
+    end
+
+    rows = selected_ids.filter_map do |uid|
+      data = accounts_data[uid] || accounts_data[uid.to_sym]
+      next unless data.respond_to?(:[])
+
+      {
+        "user_id" => uid,
+        "screen_name" => data["screen_name"] || data[:screen_name],
+        "name" => data["name"] || data[:name],
+        "image" => data["image"] || data[:image]
+      }
+    end
+
+    result = Twitter::Importer.import_search_rows(rows)
+
+    if result.errors.any?
+      flash[:error] = "部分帐号导入失败：#{result.errors.join('; ')}"
+    elsif result.imported_count > 0
+      flash[:success] = "成功导入 #{result.imported_count} 个 Twitter 帐号（#{result.skipped_count} 个重复已跳过）"
+    else
+      flash[:warning] = "没有新帐号需要导入（#{result.skipped_count} 个已存在）"
+    end
+
+    redirect_to accounts_path
+  rescue ArgumentError => e
+    flash[:error] = e.message
+    redirect_to import_accounts_path
+  rescue StandardError => e
+    flash[:error] = "导入失败：#{e.message}"
+    redirect_to import_accounts_path
+  end
+
+  def import_twitter_file
+    unless params[:csv_file].present?
+      flash[:error] = "请上传 CSV 文件"
+      redirect_to import_accounts_path and return
+    end
+
+    result = Twitter::Importer.import_file(params[:csv_file])
+
+    if result.errors.any?
+      flash[:error] = "部分帐号导入失败：#{result.errors.join('; ')}"
+    elsif result.imported_count > 0
+      message = "成功导入 #{result.imported_count} 个 Twitter 帐号（#{result.skipped_count} 个重复已跳过）"
+      message += "，#{result.invalid_count} 行缺少必填字段已跳过" unless result.invalid_count.zero?
+      flash[:success] = message
+    elsif result.invalid_count > 0
+      flash[:warning] = "没有新帐号需要导入（#{result.skipped_count} 个已存在，#{result.invalid_count} 行无效）"
+    else
+      flash[:warning] = "没有新帐号需要导入（#{result.skipped_count} 个已存在）"
+    end
+
+    redirect_to accounts_path
+  rescue ArgumentError => e
+    flash[:error] = e.message
+    redirect_to import_accounts_path
+  rescue StandardError => e
+    flash[:error] = "导入失败：#{e.message}"
+    redirect_to import_accounts_path
   end
 
   private

@@ -18,10 +18,13 @@ Rails.application.routes.draw do
   resources :accounts, only: [:index, :show, :destroy] do
     collection do
       get :import
-      get :search_preview
-      post :import_json
-      post :import_search
-      post :import_rednote_json
+      get  :import_wechat_search
+      post :import_wechat
+      post :import_wechat_file
+      post :import_rednote
+      get  :import_twitter_search
+      post :import_twitter
+      post :import_twitter_file
     end
     member do
       post :crawl
@@ -63,6 +66,7 @@ Rails.application.routes.draw do
     resource :settings, only: [:show, :update] do
       post :validate_wechat_key
       post :validate_rednote_key
+      post :validate_twitter_key
     end
   end
 

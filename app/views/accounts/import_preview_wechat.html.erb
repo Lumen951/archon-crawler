@@ -8,7 +8,7 @@
   </div>
 
   <div class="card">
-    <%= form_with url: import_search_accounts_path, method: :post, local: true, id: "search-preview-form" do %>
+    <%= form_with url: import_wechat_accounts_path, method: :post, local: true, id: "search-preview-form" do %>
       <div class="flex items-center justify-between gap-3 mb-4">
         <div class="text-sm text-gray-600">共 <span class="font-semibold text-gray-900"><%= @search_accounts.size %></span> 条结果，请勾选要导入的帐号</div>
         <label class="inline-flex items-center gap-2 text-sm text-gray-700 select-none">

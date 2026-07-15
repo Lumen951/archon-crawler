@@ -1,10 +1,10 @@
 # MP-Crawler
 
-微信公众号和小红书文章爬虫 & RSS 订阅服务
+微信公众号、小红书和 Twitter 文章爬虫 & RSS 订阅服务
 
 ## 项目简介
 
-MP-Crawler 是一个基于 Ruby on Rails 的应用，用于自动抓取微信公众号和小红书文章，并提供 RSS 订阅服务。主要面向高校帐号，支持多平台、进度保存、断点续传、并发控制等功能。
+MP-Crawler 是一个基于 Ruby on Rails 的应用，用于自动抓取微信公众号、小红书和 Twitter 文章，并提供 RSS 订阅服务。主要面向高校帐号，支持多平台、进度保存、断点续传、并发控制等功能。
 
 ## 技术栈
 
@@ -21,10 +21,10 @@ MP-Crawler 是一个基于 Ruby on Rails 的应用，用于自动抓取微信公
 ## 核心功能
 
 ### 1. 多平台帐号管理
-- 支持微信公众号（WechatAccount）和小红书（RednoteAccount）两种平台
-- 使用 STI（Single Table Inheritance）模型：`Account` 基类，`WechatAccount` / `RednoteAccount` 子类
+- 支持微信公众号（WechatAccount）、小红书（RednoteAccount）和 Twitter（TwitterAccount）三种平台
+- 使用 STI（Single Table Inheritance）模型：`Account` 基类，`WechatAccount` / `RednoteAccount` / `TwitterAccount` 子类
 - 从 JSON 文件导入帐号列表（支持粘贴或上传）
-- 从 API 搜索帐号并导入（微信公众号搜索）
+- 从 API 搜索帐号并导入（微信公众号搜索、Twitter 用户名查找）
 - 网页界面导入：支持 JSON 文本、文件上传、搜索导入
 - 命令行导入：`rails import:accounts`
 - 查看帐号详情和文章列表（支持分页和 Ransack 搜索）
@@ -34,6 +34,7 @@ MP-Crawler 是一个基于 Ruby on Rails 的应用，用于自动抓取微信公
 ### 2. 文章抓取
 - **微信公众号**：使用 WeChat Article Exporter API（`down.mptext.top`）
 - **小红书**：使用第三方 API（`api.yddm.com`）
+- **Twitter**：使用 twitter-api-client Python 库（cookie 认证）
 - 异步并发抓取（可配置帐号并发数和文章并发数）
 - 支持暂停和恢复
 - 自动保存进度，支持断点续传
@@ -82,6 +83,7 @@ MP-Crawler 是一个基于 Ruby on Rails 的应用，用于自动抓取微信公
 Account (帐号 - STI 基类)
 ├── WechatAccount (微信公众号)
 ├── RednoteAccount (小红书)
+├── TwitterAccount (Twitter)
 ├── has_many :articles
 ├── enum status: { active: 0, inactive: 1 }
 ├── self.crawler_class (子类各自返回对应的 Crawler，供 CrawlOrchestrator 分发)
@@ -117,6 +119,7 @@ CrawlLog (抓取日志)
 Option (系统配置 - key-value 存储)
 - wechat_api_key / wechat_api_key_expires_at
 - rednote_api_key
+- twitter_ct0 / twitter_auth_token (Twitter cookie 认证)
 - default_article_concurrency / default_account_concurrency
 - max_crawl_pages / crawler_verbose_mode
 
@@ -164,13 +167,24 @@ User (用户)
 - 抓取单个小红书帐号：获取笔记列表 → 获取详情 → 保存文章
 - 统计新增/跳过/失败数量
 
+**TwitterApiClient** (`lib/twitter_api_client.rb`)
+- 通过 Python 脚本 (`bin/twitter_fetch.py`) 调用 twitter-api-client 库
+- 认证方式：Cookie 认证（`twitter_ct0` + `twitter_auth_token`）
+- 主要接口：`get_user_tweets`、`lookup_user`、`validate_key`
+- 自定义错误类：`ApiError`、`ApiKeyMissingError`（包含 `CrawlerApiKeyError`）、`ApiRateLimitError`
+
+**TwitterCrawler** (`lib/twitter_crawler.rb`, `< BaseCrawler`)
+- 抓取单个 Twitter 帐号：获取推文列表 → 保存为文章
+- 解析推文文本、媒体、互动数据（点赞/转推/回复/浏览量）
+- 使用推文 URL 作为唯一标识避免重复
+
 **Retryable** (`lib/retryable.rb`)
 - 统一重试模块，支持指数退避
 - HTTP 状态码感知：5xx/429 可重试，4xx 立即失败
 - API 密钥错误（任何 `include CrawlerApiKeyError` 的异常）不重试，立即失败
 - 可配置重试次数、重试异常类型
 
-### 添加新的抓取平台（如 Twitter）
+### 添加新的抓取平台
 
 得益于 `CrawlOrchestrator` + `BaseCrawler` 的插件式设计，新增平台无需改动调度逻辑：
 
@@ -186,13 +200,17 @@ User (用户)
 **Rednote::Importer** (`app/services/rednote/importer.rb`)
 - 小红书帐号导入服务
 
+**Twitter::Importer** (`app/services/twitter/importer.rb`)
+- Twitter 帐号导入服务
+- 支持 JSON 文本导入和用户名查找导入
+
 **CrawlJob** (`app/jobs/crawl_job.rb`)
 - Active Job，负责重试时重置失败帐号、初始化帐号追踪，然后委托 `CrawlOrchestrator` 执行实际抓取
 - 不再关心帐号平台类型，也不再按平台顺序调用不同 Crawler
 
 ### 控制器
 
-- `AccountsController`：帐号 CRUD、导入（JSON/搜索/小红书）、触发抓取
+- `AccountsController`：帐号 CRUD、导入（JSON/搜索/小红书/Twitter）、触发抓取
 - `CrawlTasksController`：任务列表/详情、暂停/恢复/标记失败、查看日志和文章
 - `DashboardController`：仪表盘首页
 - `SessionsController`：登录/登出、magic link、dev_login
@@ -292,6 +310,11 @@ rails crawl:cleanup_logs
 1. `/accounts/import` → 选择小红书导入 Tab
 2. 粘贴或上传 JSON 数据
 
+**Twitter**：
+1. `/accounts/import` → 选择 Twitter 导入 Tab
+2. JSON 导入：粘贴包含 `screen_name` 和 `user_id` 的 JSON 数据
+3. 用户名查找：输入 Twitter 用户名（不含 @）→ 查找并导入
+
 **命令行**：`rails import:accounts`（读取 `wechat_accounts_import_final.json`）
 
 ### 2. 配置 API Key
@@ -299,6 +322,7 @@ rails crawl:cleanup_logs
 访问 `/admin/settings`：
 - **微信公众号 Key**：从 https://down.mptext.top/dashboard/api 获取，每 4 天过期
 - **小红书 Key**：从 API 提供商获取
+- **Twitter Cookies**：需要 `ct0` 和 `auth_token` 两个 cookie（从浏览器登录 Twitter 后的 Cookie 中获取）
 
 ### 3. 手动抓取
 
@@ -406,6 +430,7 @@ mp-crawler/
 │   │   ├── account.rb (STI base)
 │   │   ├── wechat_account.rb
 │   │   ├── rednote_account.rb
+│   │   ├── twitter_account.rb
 │   │   ├── article.rb
 │   │   ├── crawl_task.rb
 │   │   ├── crawl_task_account.rb
@@ -415,7 +440,8 @@ mp-crawler/
 │   │   └── session.rb
 │   ├── services/
 │   │   ├── accounts/importer.rb
-│   │   └── rednote/importer.rb
+│   │   ├── rednote/importer.rb
+│   │   └── twitter/importer.rb
 │   ├── jobs/
 │   │   └── crawl_job.rb
 │   ├── mailers/
@@ -435,7 +461,11 @@ mp-crawler/
 │   ├── wechat_crawler.rb       (< BaseCrawler)
 │   ├── rednote_api_client.rb
 │   ├── rednote_crawler.rb      (< BaseCrawler)
+│   ├── twitter_api_client.rb
+│   ├── twitter_crawler.rb      (< BaseCrawler)
 │   └── retryable.rb
+├── bin/
+│   └── twitter_fetch.py        (Twitter API Python CLI wrapper)
 ├── db/migrate/
 └── config/routes.rb
 ```

@@ -8,8 +8,11 @@ class Admin::SettingsController < Admin::BaseController
     @max_crawl_pages = Option.max_crawl_pages
     @verbose_mode = Option[:crawler_verbose_mode]
     @log_retention_days = Option[:crawler_log_retention_days]
+    @twitter_ct0 = Option.get('twitter_ct0')
+    @twitter_auth_token = Option.get('twitter_auth_token')
     @wechat_key_check = Rails.cache.read('api_key_check:wechat')
     @rednote_key_check = Rails.cache.read('api_key_check:rednote')
+    @twitter_key_check = Rails.cache.read('api_key_check:twitter')
   end
 
   def update
@@ -23,6 +26,16 @@ class Admin::SettingsController < Admin::BaseController
     if params[:rednote_api_key].present?
       Option.rednote_api_key = params[:rednote_api_key]
       flash[:success] = "小红书 API 密钥更新成功"
+    end
+
+    if params[:twitter_ct0].present?
+      Option.set('twitter_ct0', params[:twitter_ct0])
+      flash[:success] = "Twitter ct0 cookie 更新成功"
+    end
+
+    if params[:twitter_auth_token].present?
+      Option.set('twitter_auth_token', params[:twitter_auth_token])
+      flash[:success] = "Twitter auth_token cookie 更新成功"
     end
 
     if params[:default_article_concurrency].present?
@@ -73,6 +86,18 @@ class Admin::SettingsController < Admin::BaseController
     redirect_to admin_settings_path
   rescue => e
     Rails.logger.error("RedNote API key validation error: #{e.message}")
+    flash[:error] = "验证失败：#{e.message}"
+    redirect_to admin_settings_path
+  end
+
+  def validate_twitter_key
+    valid = TwitterApiClient.validate_key
+    result = { valid: valid, checked_at: Time.current.iso8601 }
+    Rails.cache.write('api_key_check:twitter', result, expires_in: 2.hours)
+    flash[:success] = valid ? "✓ Twitter cookies 有效" : "✗ Twitter cookies 无效或已过期"
+    redirect_to admin_settings_path
+  rescue => e
+    Rails.logger.error("Twitter API key validation error: #{e.message}")
     flash[:error] = "验证失败：#{e.message}"
     redirect_to admin_settings_path
   end

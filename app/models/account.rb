@@ -64,6 +64,10 @@ class Account < ApplicationRecord
     is_a?(RednoteAccount)
   end
 
+  def twitter?
+    is_a?(TwitterAccount)
+  end
+
   def self.ransackable_attributes(auth_object = nil)
     %w[nickname fakeid status type]
   end

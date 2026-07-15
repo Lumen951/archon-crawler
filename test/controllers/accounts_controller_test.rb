@@ -22,7 +22,7 @@ class AccountsControllerTest < ActionDispatch::IntegrationTest
       "text/csv"
     )
 
-    post import_json_accounts_path, params: { json_file: file }
+    post import_wechat_file_accounts_path, params: { json_file: file }
 
     assert_redirected_to accounts_path
     follow_redirect!
@@ -36,7 +36,7 @@ class AccountsControllerTest < ActionDispatch::IntegrationTest
       "text/plain"
     )
 
-    post import_json_accounts_path, params: { json_file: file }
+    post import_wechat_file_accounts_path, params: { json_file: file }
 
     assert_redirected_to accounts_path
     follow_redirect!
@@ -64,7 +64,7 @@ class AccountsControllerTest < ActionDispatch::IntegrationTest
     end
 
     begin
-      get search_preview_accounts_path, params: { keyword: "测试关键词" }
+      get import_wechat_search_accounts_path, params: { keyword: "测试关键词" }
     ensure
       WechatApiClient.singleton_class.alias_method :search_account, :__original_search_account_for_test
       WechatApiClient.singleton_class.remove_method :__original_search_account_for_test
@@ -76,7 +76,7 @@ class AccountsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "imports selected accounts from preview" do
-    post import_search_accounts_path, params: {
+    post import_wechat_accounts_path, params: {
       selected_fakeids: ["search_fakeid_1"],
       accounts_data: {
         "search_fakeid_1" => {
@@ -97,7 +97,7 @@ class AccountsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "rejects empty keyword for search import" do
-    get search_preview_accounts_path, params: { keyword: "   " }
+    get import_wechat_search_accounts_path, params: { keyword: "   " }
 
     assert_redirected_to import_accounts_path
     follow_redirect!
