@@ -9,7 +9,7 @@ MP-Crawler 是一个基于 Ruby on Rails 的应用，用于自动抓取微信公
 ## 技术栈
 
 - **Framework**: Ruby on Rails 8.1
-- **Database**: SQLite3 (solid_cache, solid_queue, solid_cable)
+- **Database**: PostgreSQL
 - **CSS**: TailwindCSS with CSS custom properties
 - **Concurrency**: Async gem with Semaphore (runs in Puma process)
 - **Frontend**: Stimulus.js, Turbo (Turbo Streams for real-time UI updates)
@@ -257,7 +257,7 @@ GET /up                               # health check
 
 - Ruby 3.3+
 - Rails 8.1
-- SQLite3
+- PostgreSQL
 
 ### 初始化
 
