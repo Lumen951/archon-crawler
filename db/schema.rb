@@ -11,6 +11,9 @@
 # It's strongly recommended that you check this file into your version control system.
 
 ActiveRecord::Schema[8.1].define(version: 2026_07_13_034431) do
+  # These are extensions that must be enabled in order to support this database
+  enable_extension "pg_catalog.plpgsql"
+
   create_table "accounts", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "fakeid", null: false
@@ -27,12 +30,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_13_034431) do
   end
 
   create_table "articles", force: :cascade do |t|
-    t.integer "account_id", null: false
+    t.bigint "account_id", null: false
     t.string "author"
     t.text "content_html"
     t.text "content_markdown"
     t.string "cover_url"
-    t.integer "crawl_task_id"
+    t.bigint "crawl_task_id"
     t.datetime "created_at", null: false
     t.text "digest"
     t.datetime "published_at"
@@ -48,7 +51,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_13_034431) do
 
   create_table "crawl_logs", force: :cascade do |t|
     t.text "context"
-    t.integer "crawl_task_id", null: false
+    t.bigint "crawl_task_id", null: false
     t.datetime "created_at", null: false
     t.string "level", null: false
     t.datetime "logged_at"
@@ -60,9 +63,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_13_034431) do
   end
 
   create_table "crawl_task_accounts", force: :cascade do |t|
-    t.integer "account_id", null: false
+    t.bigint "account_id", null: false
     t.datetime "completed_at"
-    t.integer "crawl_task_id", null: false
+    t.bigint "crawl_task_id", null: false
     t.datetime "created_at", null: false
     t.text "error_message"
     t.datetime "started_at"
@@ -104,7 +107,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_13_034431) do
     t.string "ip_address"
     t.datetime "updated_at", null: false
     t.string "user_agent"
-    t.integer "user_id", null: false
+    t.bigint "user_id", null: false
     t.index ["user_id"], name: "index_sessions_on_user_id"
   end
 
