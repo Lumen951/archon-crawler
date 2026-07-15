@@ -15,8 +15,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
         with:
-          submodules: true
-          token: ${{ github.token }}
+          submodules: false
+
+      - name: Checkout submodule
+        uses: actions/checkout@v6
+        with:
+          repository: MiraclePlus/twitter-api-client
+          ssh-key: ${{ secrets.SUBMODULE_SSH_PRIVATE_KEY }}
+          path: twitter-api-client
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
