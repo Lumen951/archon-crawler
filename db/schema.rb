@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_16_000842) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_16_050034) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -29,6 +29,20 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_16_000842) do
     t.index ["type"], name: "index_accounts_on_type"
   end
 
+  create_table "api_keys", force: :cascade do |t|
+    t.boolean "active", default: true
+    t.datetime "created_at", null: false
+    t.string "name", null: false
+    t.integer "rate_limit", default: 100
+    t.string "token"
+    t.string "token_digest", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["token"], name: "index_api_keys_on_token", unique: true
+    t.index ["token_digest"], name: "index_api_keys_on_token_digest", unique: true
+    t.index ["user_id"], name: "index_api_keys_on_user_id"
+  end
+
   create_table "articles", force: :cascade do |t|
     t.bigint "account_id", null: false
     t.string "author"
@@ -43,7 +57,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_16_000842) do
     t.string "title", null: false
     t.datetime "updated_at", null: false
     t.string "url", null: false
-    t.index ["account_id"], name: "index_articles_on_account_id"
+    t.index ["account_id", "published_at"], name: "index_articles_on_account_id_and_published_at", order: { published_at: :desc }
     t.index ["crawl_task_id"], name: "index_articles_on_crawl_task_id"
     t.index ["published_at"], name: "index_articles_on_published_at"
     t.index ["url"], name: "index_articles_on_url", unique: true
@@ -95,6 +109,26 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_16_000842) do
     t.index ["status"], name: "index_crawl_tasks_on_status"
   end
 
+  create_table "group_accounts", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.datetime "created_at", null: false
+    t.bigint "group_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id"], name: "index_group_accounts_on_account_id"
+    t.index ["group_id", "account_id"], name: "index_group_accounts_on_group_id_and_account_id", unique: true
+    t.index ["group_id"], name: "index_group_accounts_on_group_id"
+  end
+
+  create_table "groups", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "name"
+    t.string "ref_key", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["user_id", "ref_key"], name: "index_groups_on_user_id_and_ref_key", unique: true
+    t.index ["user_id"], name: "index_groups_on_user_id"
+  end
+
   create_table "options", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "opt_key", null: false
@@ -128,10 +162,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_16_000842) do
     t.index ["role"], name: "index_users_on_role"
   end
 
+  add_foreign_key "api_keys", "users"
   add_foreign_key "articles", "accounts"
   add_foreign_key "articles", "crawl_tasks"
   add_foreign_key "crawl_logs", "crawl_tasks"
   add_foreign_key "crawl_task_accounts", "accounts"
   add_foreign_key "crawl_task_accounts", "crawl_tasks"
+  add_foreign_key "group_accounts", "accounts"
+  add_foreign_key "group_accounts", "groups"
+  add_foreign_key "groups", "users"
   add_foreign_key "sessions", "users"
 end

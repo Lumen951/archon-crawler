@@ -38,7 +38,7 @@ class AccountsControllerTest < ActionDispatch::IntegrationTest
 
     post import_wechat_file_accounts_path, params: { json_file: file }
 
-    assert_redirected_to accounts_path
+    assert_redirected_to import_wechat_page_accounts_path
     follow_redirect!
     assert_match "仅支持 .json、.csv、.xlsx 文件", response.body
   end
@@ -99,7 +99,7 @@ class AccountsControllerTest < ActionDispatch::IntegrationTest
   test "rejects empty keyword for search import" do
     get import_wechat_search_accounts_path, params: { keyword: "   " }
 
-    assert_redirected_to import_accounts_path
+    assert_redirected_to import_wechat_page_accounts_path
     follow_redirect!
     assert_match "请输入搜索关键词", response.body
   end

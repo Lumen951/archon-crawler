@@ -25,8 +25,10 @@ Rails.application.routes.draw do
       post :import_wechat_file
       # RedNote import routes
       get  "import/rednote", to: "accounts#import_rednote_page", as: :import_rednote_page
+      get  :import_rednote_search
       post :import_rednote
       post :import_rednote_file
+      post :import_rednote_by_id
       # Twitter import routes
       get  "import/twitter", to: "accounts#import_twitter_page", as: :import_twitter_page
       get  :import_twitter_search
@@ -56,6 +58,8 @@ Rails.application.routes.draw do
   # Profile management (users can edit their own password)
   resource :profile, only: [:edit, :update] do
     patch :update_password
+    post :create_api_key
+    delete :revoke_api_key
   end
 
   # Admin-only routes
@@ -81,6 +85,14 @@ Rails.application.routes.draw do
   get "/rss/accounts", to: "rss#accounts", as: :accounts_list_rss, defaults: { format: 'rss' }
   get "/rss/accounts/active", to: "rss#active_accounts", as: :active_accounts_list_rss, defaults: { format: 'rss' }
   get "/rss/:fakeid", to: "rss#show", as: :account_rss, defaults: { format: 'rss' }
+
+  # API routes
+  namespace :api do
+    namespace :v1 do
+      resources :groups, only: [:index, :show, :create, :update, :destroy]
+      resources :articles, only: [:index]
+    end
+  end
 
   # Health check
   get "up" => "rails/health#show", as: :rails_health_check

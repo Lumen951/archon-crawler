@@ -1,0 +1,499 @@
+# MP-Crawler API 文档
+
+## 概述
+
+MP-Crawler API 允许您管理帐号分组并查询跨平台（微信、小红书、Twitter）的文章。
+
+## 认证
+
+所有 API 端点都需要通过 Authorization header 中的 Bearer token 进行认证：
+
+```
+Authorization: Bearer <your_api_key>
+```
+
+API 密钥可以通过 Web 界面或 Rails 控制台创建。
+
+## 基础 URL
+
+```
+https://your-domain.com/api/v1
+```
+
+---
+
+## API 端点
+
+### 1. POST /groups
+
+创建一个新的分组。
+
+#### 请求
+
+```json
+{
+  "ref_key": "pku",
+  "accounts": [
+    {"source": "wechat", "name": "北京大学"},
+    {"source": "rednote", "id": "6229d4850000000021021d46"},
+    {"source": "twitter", "name": "PKU1898"}
+  ]
+}
+```
+
+**参数：**
+- `ref_key`（必填）：分组的唯一标识符（字母、数字、下划线、连字符）
+- `accounts`（必填）：帐号对象数组
+  - `source`（必填）：平台名称（`wechat`、`rednote`、`twitter`）
+  - `id`：帐号 ID（小红书必填，微信/Twitter 可选）
+  - `name`：帐号名称（可选，用于搜索）
+
+#### 响应示例
+
+**成功（201 Created）- 所有帐号找到：**
+```json
+{
+  "group": {
+    "id": 1,
+    "ref_key": "pku",
+    "user_id": 1,
+    "created_at": "2026-07-16T12:00:00.000+08:00"
+  },
+  "accounts": [
+    {
+      "source": "wechat",
+      "fakeid": "fakeid_wechat_123",
+      "nickname": "北京大学",
+      "status": "found"
+    },
+    {
+      "source": "rednote",
+      "fakeid": "6229d4850000000021021d46",
+      "nickname": "北京大学",
+      "status": "created"
+    },
+    {
+      "source": "twitter",
+      "fakeid": "1234567890",
+      "nickname": "PKU1898",
+      "status": "found"
+    }
+  ],
+  "errors": []
+}
+```
+
+**部分成功（201 Created）- 部分帐号未找到：**
+```json
+{
+  "group": {
+    "id": 2,
+    "ref_key": "mixed",
+    "user_id": 1,
+    "created_at": "2026-07-16T12:00:00.000+08:00"
+  },
+  "accounts": [
+    {
+      "source": "wechat",
+      "fakeid": "fakeid_wechat_123",
+      "nickname": "北京大学",
+      "status": "found"
+    }
+  ],
+  "errors": [
+    {
+      "index": 1,
+      "source": "rednote",
+      "id": "invalid_user_id",
+      "name": null,
+      "error": "小红书帐号未找到: invalid_user_id"
+    },
+    {
+      "index": 2,
+      "source": "twitter",
+      "id": null,
+      "name": "nonexistent_user",
+      "error": "Twitter 帐号未找到: nonexistent_user"
+    }
+  ]
+}
+```
+
+**错误（422 Unprocessable Entity）- ref_key 格式无效：**
+```json
+{
+  "error": "ref_key 只能包含字母、数字、下划线和连字符"
+}
+```
+
+**错误（422 Unprocessable Entity）- ref_key 重复：**
+```json
+{
+  "error": "该用户已存在相同的 ref_key: pku"
+}
+```
+
+**错误（401 Unauthorized）- 缺少或无效的 API 密钥：**
+```json
+{
+  "error": "缺少 Authorization header"
+}
+```
+
+```json
+{
+  "error": "无效的 API key"
+}
+```
+
+---
+
+### 2. PATCH /groups/{ref_key}
+
+更新现有分组的帐号。
+
+#### 请求
+
+```json
+{
+  "accounts": [
+    {"source": "wechat", "id": "fakeid_wechat_123"},
+    {"source": "rednote", "id": "6229d4850000000021021d46"},
+    {"source": "twitter", "name": "PKU1898"}
+  ]
+}
+```
+
+**参数：**
+- `ref_key`（路径参数）：分组标识符
+- `accounts`（必填）：新的帐号对象数组（替换现有帐号）
+
+#### 响应示例
+
+**成功（200 OK）- 所有帐号找到：**
+```json
+{
+  "group": {
+    "id": 1,
+    "ref_key": "pku",
+    "user_id": 1,
+    "created_at": "2026-07-16T12:00:00.000+08:00"
+  },
+  "accounts": [
+    {
+      "source": "wechat",
+      "fakeid": "fakeid_wechat_123",
+      "nickname": "北京大学"
+    },
+    {
+      "source": "rednote",
+      "fakeid": "6229d4850000000021021d46",
+      "nickname": "北京大学"
+    },
+    {
+      "source": "twitter",
+      "fakeid": "1234567890",
+      "nickname": "PKU1898"
+    }
+  ],
+  "errors": []
+}
+```
+
+**部分成功（200 OK）- 部分帐号未找到：**
+```json
+{
+  "group": {
+    "id": 1,
+    "ref_key": "pku",
+    "user_id": 1,
+    "created_at": "2026-07-16T12:00:00.000+08:00"
+  },
+  "accounts": [
+    {
+      "source": "wechat",
+      "fakeid": "fakeid_wechat_123",
+      "nickname": "北京大学"
+    }
+  ],
+  "errors": [
+    {
+      "index": 1,
+      "source": "rednote",
+      "id": "invalid_user_id",
+      "name": null,
+      "error": "小红书帐号未找到: invalid_user_id"
+    }
+  ]
+}
+```
+
+**错误（404 Not Found）- 分组未找到：**
+```json
+{
+  "error": "分组未找到: nonexistent"
+}
+```
+
+**错误（401 Unauthorized）- 缺少或无效的 API 密钥：**
+```json
+{
+  "error": "缺少 Authorization header"
+}
+```
+
+---
+
+### 3. GET /articles
+
+查询分组中的文章，支持分页和筛选。
+
+#### 请求
+
+```
+GET /api/v1/articles?group_ref_keys[]=pku&group_ref_keys[]=tsinghua&range[]=2026-07-01&range[]=2026-07-15&source=wechat&page=1&per_page=25
+```
+
+**查询参数：**
+- `group_ref_keys[]`（必填）：要查询的分组 ref_key 数组
+- `range[]`（必填）：日期范围 [开始日期, 结束日期]，格式为 YYYY-MM-DD
+- `source`（可选）：按平台筛选（`wechat`、`rednote`、`twitter`）
+- `page`（可选）：页码（默认：1）
+- `per_page`（可选）：每页数量（默认：25，最大：100）
+
+#### 响应示例
+
+**成功（200 OK）- 有文章：**
+```json
+{
+  "articles": [
+    {
+      "id": 1,
+      "title": "北京大学2026年招生简章",
+      "url": "https://example.com/article1",
+      "content_markdown": "# 北京大学2026年招生简章\n\n...",
+      "content_html": "<h1>北京大学2026年招生简章</h1><p>...</p>",
+      "published_at": "2026-07-10T10:00:00.000+08:00",
+      "group_ref_key": "pku",
+      "account": {
+        "id": 1,
+        "fakeid": "fakeid_wechat_123",
+        "source": "wechat",
+        "nickname": "北京大学"
+      }
+    },
+    {
+      "id": 2,
+      "title": "北京大学新生入学指南",
+      "url": "https://example.com/article2",
+      "content_markdown": "# 新生入学指南\n\n...",
+      "content_html": "<h1>新生入学指南</h1><p>...</p>",
+      "published_at": "2026-07-08T15:30:00.000+08:00",
+      "group_ref_key": "pku",
+      "account": {
+        "id": 2,
+        "fakeid": "6229d4850000000021021d46",
+        "source": "rednote",
+        "nickname": "北京大学"
+      }
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "per_page": 25,
+    "total_count": 2,
+    "total_pages": 1
+  }
+}
+```
+
+**成功（200 OK）- 无文章：**
+```json
+{
+  "articles": [],
+  "pagination": {
+    "page": 1,
+    "per_page": 25,
+    "total_count": 0,
+    "total_pages": 0
+  }
+}
+```
+
+**成功（200 OK）- 使用平台筛选：**
+```json
+{
+  "articles": [
+    {
+      "id": 1,
+      "title": "北京大学2026年招生简章",
+      "url": "https://example.com/article1",
+      "content_markdown": "# 北京大学2026年招生简章\n\n...",
+      "content_html": "<h1>北京大学2026年招生简章</h1><p>...</p>",
+      "published_at": "2026-07-10T10:00:00.000+08:00",
+      "group_ref_key": "pku",
+      "account": {
+        "id": 1,
+        "fakeid": "fakeid_wechat_123",
+        "source": "wechat",
+        "nickname": "北京大学"
+      }
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "per_page": 25,
+    "total_count": 1,
+    "total_pages": 1
+  }
+}
+```
+
+**错误（400 Bad Request）- 缺少 group_ref_keys：**
+```json
+{
+  "error": "group_ref_keys 不能为空"
+}
+```
+
+**错误（400 Bad Request）- 日期范围无效：**
+```json
+{
+  "error": "range 必须包含两个日期 [start_date, end_date]"
+}
+```
+
+```json
+{
+  "error": "日期格式无效，请使用 YYYY-MM-DD 格式"
+}
+```
+
+**错误（400 Bad Request）- 平台筛选无效：**
+```json
+{
+  "error": "不支持的平台: invalid_platform"
+}
+```
+
+**错误（404 Not Found）- 未找到分组：**
+```json
+{
+  "error": "未找到指定的分组"
+}
+```
+
+**错误（401 Unauthorized）- 缺少或无效的 API 密钥：**
+```json
+{
+  "error": "缺少 Authorization header"
+}
+```
+
+---
+
+## 帐号状态值
+
+创建或更新分组时，帐号可能具有以下状态：
+
+- `found`：帐号已存在于数据库中
+- `created`：帐号已通过 API 响应创建
+- `not_found`：在平台上未找到帐号
+- `error`：解析帐号时发生错误
+
+## 平台说明
+
+### 微信（wechat）
+- 可以通过 `name` 搜索或通过 `id`（fakeid）查找
+- 搜索使用微信官方 API
+- 帐号类型为 `WechatAccount`
+
+### 小红书（rednote）
+- **必须提供 `id`**（个人资料 URL 中的 user_id）
+- 不支持按名称搜索
+- 通过 `/xhs/user_detail` API 验证用户是否存在
+- 帐号类型为 `RednoteAccount`
+
+### Twitter
+- 可以通过 `name`（screen_name）搜索或通过 `id`（rest_id）查找
+- 搜索使用 Twitter API 客户端
+- 帐号类型为 `TwitterAccount`
+
+## 速率限制
+
+API 端点根据您的 API 密钥配置进行速率限制。默认限制为每分钟 100 个请求。
+
+## 错误代码
+
+| 状态码 | 说明 |
+|--------|------|
+| 200 | 成功 |
+| 201 | 已创建（POST 请求） |
+| 400 | 错误请求 - 参数无效 |
+| 401 | 未授权 - 缺少或无效的 API 密钥 |
+| 404 | 未找到 - 资源不存在 |
+| 422 | 无法处理 - 验证错误 |
+| 500 | 服务器内部错误 |
+
+## 示例
+
+### 通过名称创建包含微信帐号的分组
+```bash
+curl -X POST "https://your-domain.com/api/v1/groups" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "ref_key": "pku",
+    "accounts": [
+      {"source": "wechat", "name": "北京大学"}
+    ]
+  }'
+```
+
+### 通过 ID 创建包含小红书帐号的分组
+```bash
+curl -X POST "https://your-domain.com/api/v1/groups" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "ref_key": "pku-rednote",
+    "accounts": [
+      {"source": "rednote", "id": "6229d4850000000021021d46"}
+    ]
+  }'
+```
+
+### 更新分组
+```bash
+curl -X PATCH "https://your-domain.com/api/v1/groups/pku" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "accounts": [
+      {"source": "wechat", "id": "fakeid_wechat_123"},
+      {"source": "twitter", "name": "PKU1898"}
+    ]
+  }'
+```
+
+### 查询多个分组的文章
+```bash
+curl -G "https://your-domain.com/api/v1/articles" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  --data-urlencode "group_ref_keys[]=pku" \
+  --data-urlencode "group_ref_keys[]=tsinghua" \
+  --data-urlencode "range[]=2026-07-01" \
+  --data-urlencode "range[]=2026-07-15" \
+  --data-urlencode "page=1" \
+  --data-urlencode "per_page=25"
+```
+
+### 使用平台筛选查询文章
+```bash
+curl -G "https://your-domain.com/api/v1/articles" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  --data-urlencode "group_ref_keys[]=pku" \
+  --data-urlencode "range[]=2026-07-01" \
+  --data-urlencode "range[]=2026-07-15" \
+  --data-urlencode "source=wechat"
+```

@@ -46,6 +46,13 @@ class RednoteApiClient
     handle_response(response)
   end
 
+  # Fetch user detail by user_id.
+  # Returns data hash with user info; raises on error.
+  def self.get_user_detail(user_id)
+    response = connection.post("/xhs/user_detail", { user_id: user_id }.to_json, headers)
+    handle_response(response)
+  end
+
   # Validate that the configured API key is accepted by the server.
   # Returns true if valid, false if unauthorized, nil on network/unknown error.
   def self.validate_key

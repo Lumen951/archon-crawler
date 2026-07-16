@@ -2,46 +2,74 @@
   <div class="flex items-center justify-between">
     <div>
       <h1 class="text-3xl font-bold text-gray-900">导入小红书帐号</h1>
-      <p class="text-gray-600 mt-1">支持 CSV 文件导入</p>
+      <p class="text-gray-600 mt-1">支持 Profile ID 查找和 CSV 文件导入</p>
     </div>
     <%= link_to "← 返回导入页", import_accounts_path, class: "btn btn-secondary" %>
   </div>
 
   <div class="card">
-    <%= form_with url: import_rednote_file_accounts_path, method: :post, multipart: true do |f| %>
-      <div class="space-y-4">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">上传 CSV 文件</label>
-          <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-gray-400 transition-colors" id="drop-zone">
-            <div class="space-y-1 text-center">
-              <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-                <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-              </svg>
-              <div class="flex text-sm text-gray-600">
-                <label for="file-upload" class="relative cursor-pointer bg-white rounded-md font-medium text-rose-600 hover:text-rose-700">
-                  <span>上传文件</span>
-                  <%= f.file_field :rednote_csv_file, id: "file-upload", accept: ".csv", class: "sr-only", onchange: "updateFileName(this)" %>
-                </label>
-                <p class="pl-1">或拖放文件至此</p>
-              </div>
-              <p class="text-xs text-gray-500">支持 .csv 文件</p>
-              <p id="file-name" class="text-sm text-gray-700 font-medium mt-2"></p>
-            </div>
+    <div class="border-b border-gray-200 mb-6">
+      <nav class="-mb-px flex space-x-8">
+        <button type="button" onclick="showTab('search')" id="tab-search" class="tab-button border-b-2 border-rose-500 text-rose-600 py-4 px-1 text-sm font-medium">Profile ID 查找</button>
+        <button type="button" onclick="showTab('upload')" id="tab-upload" class="tab-button border-b-2 border-transparent text-gray-500 hover:text-gray-700 py-4 px-1 text-sm font-medium">上传文件</button>
+      </nav>
+    </div>
+
+    <%# Profile ID search tab %>
+    <div id="search-tab" class="tab-content">
+      <%= form_with url: import_rednote_search_accounts_path, method: :get, local: true, id: "search-form" do %>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">小红书 Profile ID</label>
+            <input type="text" id="profile-id-input" name="profile_id" placeholder="例如：618bdf350000000010004769"
+                   class="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:border-transparent" required>
+            <p class="mt-2 text-sm text-gray-500">输入小红书用户的 Profile ID，系统将查找用户信息并展示供您确认后导入。</p>
+          </div>
+          <div class="flex justify-end">
+            <button type="submit" class="btn btn-primary">查找用户</button>
           </div>
         </div>
-        <div class="flex justify-end">
-          <button type="submit" class="btn btn-primary">从文件导入</button>
+      <% end %>
+    </div>
+
+    <%# File upload tab %>
+    <div id="upload-tab" class="tab-content hidden">
+      <%= form_with url: import_rednote_file_accounts_path, method: :post, multipart: true do |f| %>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">上传 CSV 文件</label>
+            <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-gray-400 transition-colors" id="drop-zone">
+              <div class="space-y-1 text-center">
+                <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                  <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                <div class="flex text-sm text-gray-600">
+                  <label for="file-upload" class="relative cursor-pointer bg-white rounded-md font-medium text-rose-600 hover:text-rose-700">
+                    <span>上传文件</span>
+                    <%= f.file_field :rednote_csv_file, id: "file-upload", accept: ".csv", class: "sr-only", onchange: "updateFileName(this)" %>
+                  </label>
+                  <p class="pl-1">或拖放文件至此</p>
+                </div>
+                <p class="text-xs text-gray-500">支持 .csv 文件</p>
+                <p id="file-name" class="text-sm text-gray-700 font-medium mt-2"></p>
+              </div>
+            </div>
+          </div>
+          <div class="flex justify-end">
+            <button type="submit" class="btn btn-primary">从文件导入</button>
+          </div>
         </div>
-      </div>
-    <% end %>
+      <% end %>
+    </div>
   </div>
 
   <div class="card bg-rose-50 border-rose-200">
     <h3 class="font-semibold text-rose-900 mb-3">💡 导入提示</h3>
     <ul class="space-y-1 text-sm text-rose-800">
-      <li>• 必填字段：<code class="bg-rose-100 px-1 rounded">user_id</code>、<code class="bg-rose-100 px-1 rounded">nickname</code></li>
+      <li>• <strong>Profile ID 查找</strong>：输入用户 ID，查找确认后导入单个帐号</li>
+      <li>• <strong>CSV 文件导入</strong>：批量导入，必填字段 <code class="bg-rose-100 px-1 rounded">user_id</code>、<code class="bg-rose-100 px-1 rounded">nickname</code></li>
       <li>• 可选字段：<code class="bg-rose-100 px-1 rounded">avatar</code>（头像 URL）</li>
-      <li>• CSV 内重复的 user_id 自动去重</li>
+      <li>• 重复的 user_id 自动跳过</li>
     </ul>
   </div>
 
@@ -57,6 +85,18 @@ abc123example,博主A,https://example.com/avatar1.jpg</code></pre>
 </div>
 
 <script>
+  function showTab(tab) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+    document.querySelectorAll('.tab-button').forEach(el => {
+      el.classList.remove('border-rose-500', 'text-rose-600');
+      el.classList.add('border-transparent', 'text-gray-500');
+    });
+    document.getElementById(tab + '-tab').classList.remove('hidden');
+    const btn = document.getElementById('tab-' + tab);
+    btn.classList.add('border-rose-500', 'text-rose-600');
+    btn.classList.remove('border-transparent', 'text-gray-500');
+  }
+
   function updateFileName(input) {
     const el = document.getElementById('file-name');
     if (el) el.textContent = input.files[0]?.name ? '📎 ' + input.files[0].name : '';
@@ -75,4 +115,12 @@ abc123example,博主A,https://example.com/avatar1.jpg</code></pre>
     });
   }
   setupDropZone();
+
+  const profileIdInput = document.getElementById('profile-id-input');
+  const searchForm = document.getElementById('search-form');
+  if (profileIdInput && searchForm) {
+    profileIdInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); searchForm.requestSubmit(); }
+    });
+  }
 </script>

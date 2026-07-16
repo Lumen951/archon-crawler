@@ -231,6 +231,75 @@ class AccountsController < ApplicationController
     redirect_to import_rednote_page_accounts_path
   end
 
+  def import_rednote_search
+    profile_id = params[:profile_id].to_s.strip
+
+    if profile_id.blank?
+      flash[:error] = "请输入小红书 Profile ID"
+      redirect_to import_rednote_page_accounts_path and return
+    end
+
+    user_data = RednoteApiClient.get_user_detail(profile_id)
+
+    unless user_data.present? && user_data["basic_info"].present?
+      flash[:warning] = "未找到该用户"
+      redirect_to import_rednote_page_accounts_path and return
+    end
+
+    basic = user_data["basic_info"]
+    @user_info = {
+      user_id:    profile_id,
+      nickname:   basic["nickname"] || "",
+      image:      basic["images"] || ""
+    }
+
+    render :import_preview_rednote
+  rescue RednoteApiClient::ApiKeyMissingError => e
+    flash[:error] = "小红书 API Key 未配置，请先在设置页面配置"
+    redirect_to import_rednote_page_accounts_path
+  rescue RednoteApiClient::ApiError => e
+    flash[:error] = truncate_error("查找失败：#{e.message}")
+    redirect_to import_rednote_page_accounts_path
+  rescue StandardError => e
+    flash[:error] = truncate_error("查找失败：#{e.message}")
+    redirect_to import_rednote_page_accounts_path
+  end
+
+  def import_rednote_by_id
+    accounts_data = params[:accounts_data]&.to_unsafe_h || {}
+
+    if accounts_data.blank?
+      flash[:error] = "请至少选择一个帐号"
+      redirect_to import_rednote_page_accounts_path and return
+    end
+
+    rows = accounts_data.map do |user_id, data|
+      {
+        "user_id"  => user_id.to_s,
+        "nickname" => data["nickname"] || data[:nickname],
+        "image"    => data["image"] || data[:image]
+      }
+    end
+
+    result = Rednote::Importer.import_search_rows(rows)
+
+    if result.errors.any?
+      flash[:error] = truncate_error("部分帐号导入失败：#{result.errors.join('; ')}")
+    elsif result.imported_count > 0
+      flash[:success] = "成功导入 #{result.imported_count} 个小红书帐号（#{result.skipped_count} 个重复已跳过）"
+    else
+      flash[:warning] = "没有新帐号需要导入（#{result.skipped_count} 个已存在）"
+    end
+
+    redirect_to accounts_path
+  rescue ArgumentError => e
+    flash[:error] = truncate_error(e.message)
+    redirect_to import_rednote_page_accounts_path
+  rescue StandardError => e
+    flash[:error] = truncate_error("导入失败：#{e.message}")
+    redirect_to import_rednote_page_accounts_path
+  end
+
   def import_twitter_search
     raw_input = params[:twitter_screen_names].to_s.strip
     if raw_input.blank?

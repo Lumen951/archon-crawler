@@ -20,6 +20,44 @@ module Rednote
       new.import_file(file)
     end
 
+    # Import from search results (profile ID lookup).
+    # rows: array of hashes with "user_id", "nickname", "image"
+    def self.import_search_rows(rows)
+      result = Result.new(imported_count: 0, skipped_count: 0, invalid_count: 0, errors: [])
+
+      rows.each do |raw_row|
+        attrs = {
+          fakeid:   raw_row["user_id"].to_s.strip.presence,
+          nickname: raw_row["nickname"].to_s.strip.presence,
+          avatar:   raw_row["image"].to_s.strip.presence
+        }
+
+        unless attrs[:fakeid].present? && attrs[:nickname].present?
+          result.invalid_count += 1
+          next
+        end
+
+        account = ::RednoteAccount.find_or_initialize_by(fakeid: attrs[:fakeid])
+
+        if account.new_record?
+          account.nickname       = attrs[:nickname]
+          account.round_head_img = attrs[:avatar]
+          account.status         = :active
+          account.total_articles = 0
+
+          if account.save
+            result.imported_count += 1
+          else
+            result.errors << "#{attrs[:nickname]}: #{account.errors.full_messages.join(', ')}"
+          end
+        else
+          result.skipped_count += 1
+        end
+      end
+
+      result
+    end
+
     def import_text(text)
       import_rows(parse_json(text))
     end

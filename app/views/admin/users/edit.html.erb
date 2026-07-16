@@ -44,6 +44,19 @@
             <%= form.password_field :password_confirmation, class: "w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200", autocomplete: "new-password" %>
           </div>
 
+          <hr class="my-6 border-slate-200">
+
+          <div class="mb-6">
+            <h4 class="text-sm font-medium text-slate-700 mb-3">通知设置</h4>
+            <label class="flex items-center gap-2">
+              <%= hidden_field_tag "user[settings][notify_api_key_expiry]", "0" %>
+              <%= check_box_tag "user[settings][notify_api_key_expiry]", "1", @user.notify_api_key_expiry?,
+                    class: "rounded border-slate-300 text-blue-600 focus:ring-blue-500" %>
+              <span class="text-sm text-slate-700">抓取平台 API Key 过期时邮件通知</span>
+            </label>
+            <p class="text-xs text-slate-500 mt-1 ml-6">开启后，当抓取平台 API Key 过期时系统将每日发送一封提醒邮件</p>
+          </div>
+
           <div class="flex gap-3">
             <%= form.submit "更新用户", class: "px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-semibold cursor-pointer" %>
             <%= link_to "取消", admin_user_path(@user), class: "px-5 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors text-sm font-semibold" %>

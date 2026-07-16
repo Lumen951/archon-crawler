@@ -136,7 +136,7 @@ class TwitterCrawler < BaseCrawler
       content_markdown: text,
       content_html:     content_html,
       published_at:     published_at,
-      raw_data:         tweet["raw"]
+      raw_data:         tweet
     )
 
     crawl_task.increment_progress!

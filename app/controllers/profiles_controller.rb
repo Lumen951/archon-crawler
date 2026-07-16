@@ -1,6 +1,7 @@
 class ProfilesController < ApplicationController
   def edit
     @user = current_user
+    @api_keys = @user.api_keys.order(created_at: :desc)
   end
 
   def update
@@ -12,6 +13,30 @@ class ProfilesController < ApplicationController
     else
       render :edit, status: :unprocessable_entity
     end
+  end
+
+  def create_api_key
+    name = params[:api_key_name].to_s.strip.presence || "Default"
+    api_key = current_user.api_keys.build(name: name)
+
+    if api_key.save
+      flash[:api_key_token] = api_key.token
+      flash[:success] = "API Key \"#{name}\" 已生成，请复制保存"
+    else
+      flash[:error] = "生成失败：#{api_key.errors.full_messages.join(', ')}"
+    end
+
+    redirect_to edit_profile_path
+  end
+
+  def revoke_api_key
+    api_key = current_user.api_keys.find(params[:api_key_id])
+    api_key.update!(active: false)
+    flash[:success] = "API Key \"#{api_key.name}\" 已撤销"
+  rescue ActiveRecord::RecordNotFound
+    flash[:error] = "未找到该 API Key"
+  ensure
+    redirect_to edit_profile_path
   end
 
   def update_password

@@ -3,6 +3,8 @@ class Account < ApplicationRecord
 
   has_many :articles, dependent: :destroy
   has_many :crawl_task_accounts, dependent: :destroy
+  has_many :group_accounts, dependent: :destroy
+  has_many :groups, through: :group_accounts
 
   enum :status, { active: 0, inactive: 1 }
 

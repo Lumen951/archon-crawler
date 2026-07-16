@@ -19,6 +19,14 @@ class ValidateApiKeysJob < ApplicationJob
       expired_keys << :rednote
       Rails.logger.warn "[ValidateApiKeysJob] Rednote API key is invalid or expired"
     end
+    
+    twitter_valid = TwitterApiClient.validate_key
+    result = { valid: twitter_valid, checked_at: Time.current.iso8601 }
+    Rails.cache.write('api_key_check:twitter', result, expires_in: 2.hours)
+    unless twitter_valid
+      expired_keys << :twitter
+      Rails.logger.warn "[ValidateApiKeysJob] Twitter API key is invalid or expired"
+    end
 
     return if expired_keys.empty?
 
