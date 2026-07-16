@@ -17,7 +17,7 @@ class WechatCrawler < BaseCrawler
 
     loop do
       break if crawl_task.reload.paused? || crawl_task.reload.failed?
-      break if crawl_task.error_threshold_exceeded?
+      break if crawl_task.error_threshold_exceeded?(account.class.name)
 
       if max_pages > 0 && pages_crawled >= max_pages
         crawl_task.log(:info, "#{account.nickname}: 已达到最大页数限制（#{max_pages} 页）")
@@ -43,7 +43,7 @@ class WechatCrawler < BaseCrawler
       crawl_task.log(:info, "#{account.nickname}: 获取了 #{articles_data.size} 篇文章（偏移 #{offset}）")
 
       articles_data.each do |article_data|
-        break if crawl_task.error_threshold_exceeded?
+        break if crawl_task.error_threshold_exceeded?(account.class.name)
 
         article_semaphore.async do
           fetch_and_save_article(article_data, account, crawl_task)
@@ -64,7 +64,7 @@ class WechatCrawler < BaseCrawler
     raise
   rescue StandardError => e
     task_account&.mark_failed!(e.message)
-    crawl_task.increment_error_count!
+    crawl_task.increment_error_count!(account.class.name)
     crawl_task.log(:error, "#{account.nickname}: 抓取出错 - #{e.message}")
     crawl_task.log(:error, "#{account.nickname}: 异常 backtrace: #{e.backtrace&.first(5)&.join(' | ')}")
     Rails.logger.error("Account #{account.fakeid} crawl error: #{e.message}")
@@ -102,7 +102,7 @@ class WechatCrawler < BaseCrawler
   rescue ActiveRecord::RecordInvalid => e
     crawl_task.log(:warn, "跳过重复文章：#{article_data['link']}")
   rescue StandardError => e
-    crawl_task.increment_error_count!
+    crawl_task.increment_error_count!(account.class.name)
     crawl_task.log(:error, "保存文章 #{article_data['link']} 失败：#{e.message}")
   end
 

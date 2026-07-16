@@ -13,7 +13,7 @@ class CrawlTask < ApplicationRecord
     terminal.where('created_at < ?', older_than).destroy_all.size
   end
 
-  ERROR_THRESHOLD = 200
+  ERROR_THRESHOLD = 50
   MAX_RETRIES = 5
 
   def resolved_accounts
@@ -32,12 +32,31 @@ class CrawlTask < ApplicationRecord
     article_concurrency || Option.default_article_concurrency
   end
 
-  def error_threshold_exceeded?
-    error_count >= ERROR_THRESHOLD
+  # When `platform_key` is given (e.g. an Account subclass name like
+  # "WechatAccount"), only that platform's error count is checked, so a
+  # struggling platform (e.g. WeChat) doesn't halt crawling for the others
+  # (e.g. Rednote, Twitter). Without a platform_key, falls back to the
+  # task-wide total.
+  def error_threshold_exceeded?(platform_key = nil)
+    if platform_key
+      platform_error_count(platform_key) >= ERROR_THRESHOLD
+    else
+      error_count >= ERROR_THRESHOLD
+    end
   end
 
-  def increment_error_count!
+  def platform_error_count(platform_key)
+    (platform_error_counts || {})[platform_key.to_s].to_i
+  end
+
+  def increment_error_count!(platform_key = nil)
     increment!(:error_count)
+
+    return if platform_key.nil?
+
+    counts = (platform_error_counts || {}).dup
+    counts[platform_key.to_s] = counts[platform_key.to_s].to_i + 1
+    update!(platform_error_counts: counts)
   end
 
   def increment_progress!

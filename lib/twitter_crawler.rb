@@ -40,7 +40,7 @@ class TwitterCrawler < BaseCrawler
 
         tweets.each_with_index do |tweet, index|
           break if crawl_task.reload.paused? || crawl_task.reload.failed?
-          break if crawl_task.error_threshold_exceeded?
+          break if crawl_task.error_threshold_exceeded?(account.class.name)
 
           tweet_id = tweet["id_str"]
           text = tweet["full_text"].to_s.truncate(50)
@@ -69,7 +69,7 @@ class TwitterCrawler < BaseCrawler
       raise
     rescue StandardError => e
       task_account&.mark_failed!(e.message)
-      crawl_task.increment_error_count!
+      crawl_task.increment_error_count!(account.class.name)
       crawl_task.log(:error, "#{account.nickname}: 抓取出错 - #{e.class}: #{e.message}")
       crawl_task.log(:error, "#{account.nickname}: 异常 backtrace: #{e.backtrace&.first(5)&.join(' | ')}")
       Rails.logger.error("TwitterAccount #{account.fakeid} crawl error: #{e.class}: #{e.message}")
@@ -146,7 +146,7 @@ class TwitterCrawler < BaseCrawler
     crawl_task.log(:debug, "跳过重复推文（数据库冲突）：#{tweet_url}")
     :skipped
   rescue StandardError => e
-    crawl_task.increment_error_count!
+    crawl_task.increment_error_count!(account.class.name)
     crawl_task.log(:error, "保存推文 #{tweet_id} 失败：#{e.message}")
     :error
   end

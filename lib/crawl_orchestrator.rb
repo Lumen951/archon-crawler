@@ -1,5 +1,6 @@
 require "async"
 require "async/semaphore"
+require "set"
 
 # Coordinates crawling across all account types (WeChat, Rednote, and any
 # future platforms) in a single interleaved loop, so accounts of different
@@ -20,7 +21,7 @@ class CrawlOrchestrator
     max_pages = Option.max_crawl_pages
 
     crawl_task.crawl_task_accounts.failed.update_all(status: :pending, error_message: nil, completed_at: nil)
-    crawl_task.update!(status: :running, error_message: nil, error_count: 0, completed_at: nil, started_at: Time.current)
+    crawl_task.update!(status: :running, error_message: nil, error_count: 0, platform_error_counts: {}, completed_at: nil, started_at: Time.current)
     crawl_task.clear_old_logs
 
     platform_summary = accounts.group_by(&:platform_name).map { |name, list| "#{name} #{list.size}" }.join("，")
@@ -29,13 +30,21 @@ class CrawlOrchestrator
     crawl_task.log(:info, "最大页数：#{max_pages == -1 ? '无限制' : max_pages}")
 
     start_time = Time.current
+    skipped_platforms = Set.new
 
     Async do |_task|
       semaphore = Async::Semaphore.new(account_concurrency)
 
       accounts.each do |account|
         break if crawl_task.reload.paused? || crawl_task.reload.failed?
-        break if crawl_task.error_threshold_exceeded?
+
+        platform_key = account.class.name
+        if crawl_task.error_threshold_exceeded?(platform_key)
+          if skipped_platforms.add?(platform_key)
+            crawl_task.log(:warn, "#{account.platform_name} 累计错误数超过阈值，跳过该平台剩余帐号，其他平台继续抓取")
+          end
+          next
+        end
 
         semaphore.async do
           crawl_one_account(account, crawl_task, article_concurrency, max_pages)
@@ -48,7 +57,7 @@ class CrawlOrchestrator
     crawl_task.log(:info, "任务全部完成，耗时 #{elapsed} 秒：完成 #{crawl_task.completed_account_count} 个帐号，失败 #{crawl_task.failed_account_count} 个帐号")
 
     if crawl_task.running?
-      crawl_task.log(:warn, "累计错误数（#{crawl_task.error_count}）超过阈值，提前终止") if crawl_task.error_threshold_exceeded?
+      crawl_task.log(:warn, "以下平台累计错误数超过阈值，已提前终止：#{skipped_platforms.to_a.join('，')}") if skipped_platforms.any?
       crawl_task.mark_complete_or_schedule_retry!
     end
   rescue StandardError => e
@@ -67,7 +76,7 @@ class CrawlOrchestrator
     # API 密钥错误时，只标记该帐号失败（不暂停整个任务），让其他平台可以继续
     task_account = crawl_task.crawl_task_accounts.find_by(account: account)
     task_account&.mark_failed!(e.message)
-    crawl_task.increment_error_count!
+    crawl_task.increment_error_count!(account.class.name)
     crawl_task.log(:error, "#{account.nickname} (#{account.platform_name}): API 密钥错误，跳过该帐号 — #{e.message}")
   end
 end

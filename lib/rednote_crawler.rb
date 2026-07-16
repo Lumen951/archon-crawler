@@ -23,7 +23,7 @@ class RednoteCrawler < BaseCrawler
 
     loop do
       break if crawl_task.reload.paused? || crawl_task.reload.failed?
-      break if crawl_task.error_threshold_exceeded?
+      break if crawl_task.error_threshold_exceeded?(account.class.name)
 
       if max_pages > 0 && page > max_pages
         crawl_task.log(:info, "#{account.nickname}: 已达到最大页数限制（#{max_pages} 页）")
@@ -56,7 +56,7 @@ class RednoteCrawler < BaseCrawler
       crawl_task.log(:info, "#{account.nickname}: 第 #{page} 页获取了 #{notes.size} 篇笔记 (共 #{total_pages} 页)")
 
       notes.each_with_index do |note_info, index|
-        break if crawl_task.error_threshold_exceeded?
+        break if crawl_task.error_threshold_exceeded?(account.class.name)
         note_id = note_info["noteId"] || note_info["id"]
         title = note_info["title"].presence || "(无标题)"
         crawl_task.log(:info, "#{account.nickname}: [#{index + 1}/#{notes.size}] 正在处理笔记 #{note_id}：#{title}")
@@ -91,7 +91,7 @@ class RednoteCrawler < BaseCrawler
     raise
   rescue StandardError => e
     task_account&.mark_failed!(e.message)
-    crawl_task.increment_error_count!
+    crawl_task.increment_error_count!(account.class.name)
     crawl_task.log(:error, "#{account.nickname}: 抓取出错 - #{e.class}: #{e.message}")
     crawl_task.log(:error, "#{account.nickname}: 异常 backtrace: #{e.backtrace&.first(5)&.join(' | ')}")
     Rails.logger.error("RednoteAccount #{account.fakeid} crawl error: #{e.class}: #{e.message}")
@@ -156,7 +156,7 @@ class RednoteCrawler < BaseCrawler
     crawl_task.log(:debug, "跳过重复笔记（数据库冲突）：#{note_url}")
     :skipped
   rescue StandardError => e
-    crawl_task.increment_error_count!
+    crawl_task.increment_error_count!(account.class.name)
     crawl_task.log(:error, "保存笔记 #{note_id} 失败：#{e.message}")
     :error
   end
