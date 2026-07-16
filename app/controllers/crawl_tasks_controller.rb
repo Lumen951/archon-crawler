@@ -7,7 +7,7 @@ class CrawlTasksController < ApplicationController
 
   def show
     @crawl_task = CrawlTask.find(params[:id])
-    @recent_logs = @crawl_task.crawl_logs.recent.limit(50)
+    @recent_logs = @crawl_task.crawl_logs.recent.where.not(level: :debug).limit(50)
   end
 
   def logs
@@ -68,7 +68,7 @@ class CrawlTasksController < ApplicationController
 
   def poll
     @crawl_task = CrawlTask.find(params[:id])
-    @recent_logs = @crawl_task.crawl_logs.recent.limit(50)
+    @recent_logs = @crawl_task.crawl_logs.recent.where.not(level: :debug).limit(50)
     # Always return the Turbo Stream so the UI gets the final state update.
     # The poller stops itself after rendering a terminal state.
   end

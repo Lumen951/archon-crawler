@@ -73,7 +73,9 @@ class WechatApiClient
     when 200
       parsed_body = JSON.parse(body)
       ret = parsed_body.dig("base_resp", "ret")
-      if ret.present? && ret != 0
+      if ret == 200013
+        raise ApiRateLimitError, "频率限制（freq control）：#{response.status} - #{body}"
+      elsif ret.present? && ret != 0
         Rails.logger.warn("WeChat API returned error: #{parsed_body}")
         raise ApiKeyExpiredError, "API 密钥已过期或无效：#{response.status} - #{body}"
       end
