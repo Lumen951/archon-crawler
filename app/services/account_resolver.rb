@@ -29,6 +29,12 @@ class AccountResolver
         Result.new(account: nil, status: "not_found", error: "微信帐号未找到: #{id}")
       end
     elsif name.present?
+      # Check DB first by nickname
+      account = WechatAccount.find_by(nickname: name)
+      if account
+        return Result.new(account: account, status: "found", error: nil)
+      end
+
       # Search by name using WechatApiClient
       begin
         response = WechatApiClient.search_account(name)
@@ -113,6 +119,12 @@ class AccountResolver
         Result.new(account: nil, status: "not_found", error: "Twitter 帐号未找到: #{id}")
       end
     elsif name.present?
+      # Check DB first by nickname (case-insensitive)
+      account = TwitterAccount.where("LOWER(nickname) = ?", name.downcase).first
+      if account
+        return Result.new(account: account, status: "found", error: nil)
+      end
+
       # Search by name using TwitterApiClient
       begin
         users = TwitterApiClient.lookup_user(name)
