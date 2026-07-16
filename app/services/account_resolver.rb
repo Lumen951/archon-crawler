@@ -119,8 +119,10 @@ class AccountResolver
         Result.new(account: nil, status: "not_found", error: "Twitter 帐号未找到: #{id}")
       end
     elsif name.present?
-      # Check DB first by nickname (case-insensitive)
-      account = TwitterAccount.where("LOWER(nickname) = ?", name.downcase).first
+      screen_name = name.strip.delete_prefix("@").downcase
+
+      # Check DB first by twitter_screen_name (fast path)
+      account = TwitterAccount.find_by(twitter_screen_name: screen_name)
       if account
         return Result.new(account: account, status: "found", error: nil)
       end
@@ -135,12 +137,15 @@ class AccountResolver
 
           if account.new_record?
             account.nickname = user["name"] || name
+            account.twitter_screen_name = screen_name
             account.round_head_img = user["profile_image_url_https"]
             account.status = :active
             account.total_articles = 0
             account.save!
             Result.new(account: account, status: "created", error: nil)
           else
+            # Update twitter_screen_name if missing
+            account.update!(twitter_screen_name: screen_name) if account.twitter_screen_name.blank?
             Result.new(account: account, status: "found", error: nil)
           end
         else

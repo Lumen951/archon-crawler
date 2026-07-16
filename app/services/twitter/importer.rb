@@ -81,8 +81,9 @@ module Twitter
         account = ::TwitterAccount.find_or_initialize_by(fakeid: attrs[:user_id])
 
         if account.new_record?
-          account.nickname       = attrs[:name].presence || attrs[:screen_name]
-          account.round_head_img = attrs[:image]
+          account.nickname            = attrs[:name].presence || attrs[:screen_name]
+          account.twitter_screen_name = attrs[:screen_name]&.downcase
+          account.round_head_img      = attrs[:image]
           account.status         = :active
           account.total_articles = 0
 
