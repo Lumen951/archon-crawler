@@ -3,9 +3,8 @@ require "async/semaphore"
 require "set"
 
 # Coordinates crawling across all account types (WeChat, Rednote, and any
-# future platforms) in a single interleaved loop, so accounts of different
-# platforms are crawled concurrently rather than fully crawling one platform
-# before moving on to the next.
+# future platforms). Each platform runs in its own concurrent task with an
+# independent semaphore, so WeChat throttling doesn't block other platforms.
 #
 # Dispatches each account to its platform's crawler via
 # `account.class.crawler_class` — see BaseCrawler for how to plug in new
@@ -15,46 +14,63 @@ class CrawlOrchestrator
     # 初始化帐号追踪（已完成的 account 不会被重置）
     crawl_task.setup_account_tracking!
 
-    accounts = crawl_task.incomplete_accounts.to_a
+    incomplete_scope = crawl_task.incomplete_accounts
     account_concurrency = crawl_task.effective_account_concurrency
     article_concurrency = crawl_task.effective_article_concurrency
     max_pages = Option.max_crawl_pages
 
     crawl_task.crawl_task_accounts.failed.update_all(status: :pending, error_message: nil, completed_at: nil)
     crawl_task.update!(status: :running, error_message: nil, error_count: 0, platform_error_counts: {}, completed_at: nil, started_at: Time.current)
-    crawl_task.clear_old_logs
 
-    platform_summary = accounts.group_by(&:platform_name).map { |name, list| "#{name} #{list.size}" }.join("，")
-    crawl_task.log(:info, "开始抓取任务，共 #{accounts.size} 个帐号（#{platform_summary}）")
-    crawl_task.log(:info, "帐号并发：#{account_concurrency}，文章并发：#{article_concurrency}")
+    platform_summary = Account.subclasses.filter_map { |klass|
+      count = klass.where(id: incomplete_scope).count
+      "#{klass.new.platform_name} #{count}" if count > 0
+    }.join("，")
+    crawl_task.log(:info, "开始抓取任务，共 #{incomplete_scope.count} 个帐号（#{platform_summary}）")
+    crawl_task.log(:info, "每平台并发：#{account_concurrency}，文章并发：#{article_concurrency}")
     crawl_task.log(:info, "最大页数：#{max_pages == -1 ? '无限制' : max_pages}")
 
     start_time = Time.current
     skipped_platforms = Set.new
 
     Async do |_task|
-      semaphore = Async::Semaphore.new(account_concurrency)
+      # Each platform runs in its own concurrent task with its own semaphore.
+      # This way WeChat throttling doesn't block Rednote/Twitter.
+      barrier = Async::Barrier.new
 
-      accounts.each do |account|
-        break if crawl_task.reload.paused? || crawl_task.reload.failed?
+      Account.subclasses.each do |platform_class|
+        platform_accounts = platform_class.where(id: incomplete_scope)
+        next if platform_accounts.empty?
 
-        platform_key = account.class.name
-        if crawl_task.error_threshold_exceeded?(platform_key)
-          if skipped_platforms.add?(platform_key)
-            crawl_task.log(:warn, "#{account.platform_name} 累计错误数超过阈值，跳过该平台剩余帐号，其他平台继续抓取")
+        platform_key = platform_class.name
+
+        barrier.async do
+          semaphore = Async::Semaphore.new(account_concurrency)
+
+          platform_accounts.find_each do |account|
+            break if crawl_task.reload.paused? || crawl_task.reload.failed?
+
+            if crawl_task.error_threshold_exceeded?(platform_key)
+              if skipped_platforms.add?(platform_key)
+                crawl_task.log(:warn, "#{account.platform_name} 累计错误数超过阈值，跳过该平台剩余帐号，其他平台继续抓取")
+              end
+              break
+            end
+
+            semaphore.async do
+              crawl_one_account(account, crawl_task, article_concurrency, max_pages)
+              if account.wechat?
+                # https://docs.mptext.top/others/%E5%BE%AE%E4%BF%A1%E6%8E%A5%E5%8F%A3%E9%A2%91%E7%8E%87%E9%99%90%E5%88%B6.html#%E5%BE%AE%E4%BF%A1%E8%8E%B7%E5%8F%96%E6%96%87%E7%AB%A0%E5%88%97%E8%A1%A8%E6%8E%A5%E5%8F%A3%E7%9A%84%E9%A2%91%E7%8E%87%E9%99%90%E5%88%B6%E7%A0%94%E7%A9%B6
+                # 20分钟请求了 1100 条数据量就触发微信限流
+                sleep 20 * account_concurrency
+              end
+            end
           end
-          next
-        end
-
-        semaphore.async do
-          crawl_one_account(account, crawl_task, article_concurrency, max_pages)
-          if account.wechat?
-             # https://docs.mptext.top/others/%E5%BE%AE%E4%BF%A1%E6%8E%A5%E5%8F%A3%E9%A2%91%E7%8E%87%E9%99%90%E5%88%B6.html#%E5%BE%AE%E4%BF%A1%E8%8E%B7%E5%8F%96%E6%96%87%E7%AB%A0%E5%88%97%E8%A1%A8%E6%8E%A5%E5%8F%A3%E7%9A%84%E9%A2%91%E7%8E%87%E9%99%90%E5%88%B6%E7%A0%94%E7%A9%B6
-             # 20分钟请求了 1100 条数据量就触发微信限流
-            sleep 20 * account_concurrency
-          end
+          crawl_task.log(:info, "#{platform_class.new.platform_name} 平台抓取完成") unless crawl_task.reload.paused? || crawl_task.reload.failed?
         end
       end
+
+      barrier.wait
     end
 
     elapsed = (Time.current - start_time).round(1)
@@ -77,11 +93,5 @@ class CrawlOrchestrator
       article_concurrency: article_concurrency,
       max_pages: max_pages
     )
-  rescue CrawlerApiKeyError => e
-    # API 密钥错误时，只标记该帐号失败（不暂停整个任务），让其他平台可以继续
-    task_account = crawl_task.crawl_task_accounts.find_by(account: account)
-    task_account&.mark_failed!(e.message)
-    crawl_task.increment_error_count!(account.class.name)
-    crawl_task.log(:error, "#{account.nickname} (#{account.platform_name}): API 密钥错误，跳过该帐号 — #{e.message}")
   end
 end

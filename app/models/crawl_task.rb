@@ -67,10 +67,6 @@ class CrawlTask < ApplicationRecord
     CrawlLog.log(self, level, message, context: context)
   end
 
-  def clear_old_logs
-    crawl_logs.delete_all
-  end
-
   def pause!
     update!(status: :paused)
   end

@@ -59,9 +59,6 @@ class WechatCrawler < BaseCrawler
     account.update!(last_crawled_at: Time.current, total_articles: account.articles.count)
     task_account&.mark_completed!
     crawl_task.log(:info, "#{account.nickname}: 抓取完成")
-  rescue WechatApiClient::ApiKeyExpiredError => e
-    task_account&.mark_failed!(e.message)
-    raise
   rescue StandardError => e
     task_account&.mark_failed!(e.message)
     crawl_task.increment_error_count!(account.class.name)
@@ -100,7 +97,7 @@ class WechatCrawler < BaseCrawler
     crawl_task.increment_progress!
     crawl_task.log(:info, "已保存文章：#{article_data['title']}")
   rescue ActiveRecord::RecordInvalid => e
-    crawl_task.log(:warn, "跳过重复文章：#{article_data['link']}")
+    crawl_task.log(:debug, "跳过重复文章：#{article_data['link']}")
   rescue StandardError => e
     crawl_task.increment_error_count!(account.class.name)
     crawl_task.log(:error, "保存文章 #{article_data['link']} 失败：#{e.message}")
