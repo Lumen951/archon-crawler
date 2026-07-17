@@ -39,12 +39,112 @@
     </div>
   </div>
 
-  <!-- Cover Image -->
-  <% if @article.cover_url.present? %>
-    <div class="mb-8">
-      <img src="<%= @article.cover_url %>" alt="" class="w-full rounded-xl shadow-lg">
+  <!-- Content Analysis Panel -->
+  <div class="mb-8 bg-bg-secondary border border-border-primary rounded-2xl overflow-hidden">
+    <div class="px-6 py-4 bg-bg-card border-b border-border-primary">
+      <h2 class="text-lg font-semibold text-text-primary flex items-center gap-2">
+        <svg class="w-5 h-5 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+        </svg>
+        内容分析 <span class="text-sm font-normal text-text-muted">(对比预览)</span>
+      </h2>
     </div>
-  <% end %>
+
+    <div class="p-6 space-y-6">
+      <!-- Metadata Row -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div class="bg-bg-card rounded-lg p-3 border border-border-primary">
+          <div class="text-xs text-text-muted mb-1">平台</div>
+          <div class="font-medium text-text-primary"><%= @article.platform&.upcase %></div>
+        </div>
+        <div class="bg-bg-card rounded-lg p-3 border border-border-primary">
+          <div class="text-xs text-text-muted mb-1">内容类型</div>
+          <div class="font-medium text-text-primary"><%= @article.content_type %></div>
+        </div>
+        <div class="bg-bg-card rounded-lg p-3 border border-border-primary">
+          <div class="text-xs text-text-muted mb-1">质量评分</div>
+          <div class="font-medium <%= @article.content_quality_score >= 70 ? 'text-green-600' : @article.content_quality_score >= 40 ? 'text-yellow-600' : 'text-red-600' %>">
+            <%= @article.content_quality_score %>/100
+          </div>
+        </div>
+        <div class="bg-bg-card rounded-lg p-3 border border-border-primary">
+          <div class="text-xs text-text-muted mb-1">媒体数量</div>
+          <div class="font-medium text-text-primary"><%= @article.media_urls.size %> 个</div>
+        </div>
+      </div>
+
+      <!-- Engagement Stats -->
+      <% stats = @article.engagement_stats %>
+      <% if stats.any? %>
+        <div class="bg-bg-card rounded-lg p-4 border border-border-primary">
+          <div class="text-sm font-medium text-text-secondary mb-3">互动数据</div>
+          <div class="flex flex-wrap gap-4">
+            <% stats.each do |key, value| %>
+              <div class="flex items-center gap-1.5">
+                <span class="text-lg font-semibold text-text-primary"><%= value %></span>
+                <span class="text-xs text-text-muted"><%= key %></span>
+              </div>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+
+      <!-- Tags -->
+      <% if @article.tags.any? %>
+        <div class="bg-bg-card rounded-lg p-4 border border-border-primary">
+          <div class="text-sm font-medium text-text-secondary mb-3">标签</div>
+          <div class="flex flex-wrap gap-2">
+            <% @article.tags.each do |tag| %>
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-brand/10 text-brand"><%= tag %></span>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+
+      <!-- Content Comparison -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <!-- Original -->
+        <div class="bg-bg-card rounded-lg border border-border-primary overflow-hidden">
+          <div class="px-4 py-2 bg-red-50 border-b border-border-primary">
+            <div class="text-sm font-medium text-red-700">原始 content_markdown</div>
+            <div class="text-xs text-red-500"><%= @article.content_markdown&.length || 0 %> 字符</div>
+          </div>
+          <div class="p-4 max-h-64 overflow-y-auto">
+            <pre class="text-xs text-text-secondary whitespace-pre-wrap break-words"><%= @article.content_markdown&.truncate(1000) || "(空)" %></pre>
+          </div>
+        </div>
+
+        <!-- Cleaned -->
+        <div class="bg-bg-card rounded-lg border border-border-primary overflow-hidden">
+          <div class="px-4 py-2 bg-green-50 border-b border-border-primary">
+            <div class="text-sm font-medium text-green-700">清洗后 clean_content_markdown</div>
+            <div class="text-xs text-green-500"><%= @article.clean_content_markdown&.length || 0 %> 字符</div>
+          </div>
+          <div class="p-4 max-h-64 overflow-y-auto">
+            <pre class="text-xs text-text-secondary whitespace-pre-wrap break-words"><%= @article.clean_content_markdown&.truncate(1000) || "(空)" %></pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- Best Digest -->
+      <div class="bg-bg-card rounded-lg p-4 border border-brand/30">
+        <div class="text-sm font-medium text-brand mb-2">推荐摘要 (best_digest)</div>
+        <p class="text-text-primary"><%= @article.best_digest %></p>
+      </div>
+
+      <!-- Media Preview -->
+      <% if @article.media_urls.any? %>
+        <div class="bg-bg-card rounded-lg p-4 border border-border-primary">
+          <div class="text-sm font-medium text-text-secondary mb-3">媒体资源 (<%= @article.media_urls.size %>)</div>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <% @article.media_urls.first(4).each do |url| %>
+              <img src="<%= url %>" alt="" class="w-full h-24 object-cover rounded-lg">
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
 
   <!-- Content -->
   <div class="bg-bg-card border border-border-primary rounded-2xl shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)] overflow-hidden">
@@ -57,9 +157,9 @@
               attributes: %w[href src alt class style width height] %>
         <% end %>
       </div>
-    <% elsif @article.digest.present? %>
+    <% elsif @article.best_digest.present? %>
       <div class="p-6 sm:p-8">
-        <p class="text-text-secondary"><%= @article.digest %></p>
+        <p class="text-text-secondary"><%= @article.best_digest %></p>
         <div class="mt-6 text-center">
           <%= link_to @article.url, target: "_blank", rel: "noopener noreferrer",
                 class: "inline-flex items-center gap-2 text-brand hover:text-brand-dark font-medium transition" do %>

@@ -271,8 +271,8 @@ GET /api/v1/articles?group_ref_keys[]=pku&group_ref_keys[]=tsinghua&range[]=2026
       "id": 1,
       "title": "北京大学2026年招生简章",
       "url": "https://example.com/article1",
-      "content_markdown": "# 北京大学2026年招生简章\n\n...",
-      "content_html": "<h1>北京大学2026年招生简章</h1><p>...</p>",
+      "digest": "北京大学2026年招生简章正式发布，本文详细介绍...",
+      "content": "# 北京大学2026年招生简章\n\n...",
       "published_at": "2026-07-10T10:00:00.000+08:00",
       "group_ref_key": "pku",
       "account": {
@@ -286,8 +286,8 @@ GET /api/v1/articles?group_ref_keys[]=pku&group_ref_keys[]=tsinghua&range[]=2026
       "id": 2,
       "title": "北京大学新生入学指南",
       "url": "https://example.com/article2",
-      "content_markdown": "# 新生入学指南\n\n...",
-      "content_html": "<h1>新生入学指南</h1><p>...</p>",
+      "digest": "新生入学指南，包含报到流程...",
+      "content": "# 新生入学指南\n\n...",
       "published_at": "2026-07-08T15:30:00.000+08:00",
       "group_ref_key": "pku",
       "account": {
@@ -328,8 +328,8 @@ GET /api/v1/articles?group_ref_keys[]=pku&group_ref_keys[]=tsinghua&range[]=2026
       "id": 1,
       "title": "北京大学2026年招生简章",
       "url": "https://example.com/article1",
-      "content_markdown": "# 北京大学2026年招生简章\n\n...",
-      "content_html": "<h1>北京大学2026年招生简章</h1><p>...</p>",
+      "digest": "北京大学2026年招生简章正式发布...",
+      "content": "# 北京大学2026年招生简章\n\n...",
       "published_at": "2026-07-10T10:00:00.000+08:00",
       "group_ref_key": "pku",
       "account": {
@@ -389,6 +389,31 @@ GET /api/v1/articles?group_ref_keys[]=pku&group_ref_keys[]=tsinghua&range[]=2026
   "error": "缺少 Authorization header"
 }
 ```
+
+---
+
+## 文章内容字段说明
+
+API 返回的文章内容经过清洗处理，提供更高质量的数据：
+
+| 字段 | 说明 | 数据来源 |
+|------|------|----------|
+| `digest` | 文章摘要（清洗后） | 优先使用 API 提供的摘要，其次使用清洗后的 markdown 内容截断 |
+| `content` | 文章正文（清洗后） | 原始 markdown 内移除 CSS/JS 污染 |
+
+### 各平台内容处理
+
+| 平台 | digest 来源 | content 清洗 |
+|------|-------------|--------------|
+| **微信** | API 返回的 `digest` 字段 | 移除开头的 CSS 样式块 |
+| **小红书** | 笔记描述 + 标签 | 使用 `note_card.desc`（去除重复标签） |
+| **Twitter** | 推文文本 + 互动数据 | 原始推文文本 |
+
+### 互动数据（engagement）
+
+各平台的互动数据包含在 digest 中（格式化为 emoji 前缀）：
+- **小红书**：❤ 点赞 | 💬 评论 | 🔗 分享 | ⭐ 收藏
+- **Twitter**：❤ 点赞 | 🔁 转推 | 💬 回复 | 👁 浏览量
 
 ---
 

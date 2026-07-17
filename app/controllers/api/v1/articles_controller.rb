@@ -43,8 +43,8 @@ module Api
                           .where(groups: { id: groups })
                           .where(published_at: range_start..range_end)
                           .select(
-                            "articles.id, articles.title, articles.url, articles.content_markdown, " \
-                            "articles.content_html, articles.published_at, articles.account_id, " \
+                            "articles.id, articles.title, articles.digest, articles.url, articles.content_markdown, " \
+                            "articles.content_html, articles.published_at, articles.account_id, articles.raw_data, " \
                             "groups.ref_key AS group_ref_key"
                           )
 
@@ -76,8 +76,9 @@ module Api
               id: article.id,
               title: article.title,
               url: article.url,
-              content_markdown: article.content_markdown,
-              content_html: article.content_html,
+              digest: article.best_digest,
+              content: article.clean_content_markdown,
+              # content_html: article.clean_content_html,
               published_at: article.published_at,
               group_ref_key: article.group_ref_key,
               account: {
