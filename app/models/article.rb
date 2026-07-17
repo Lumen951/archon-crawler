@@ -32,13 +32,14 @@ class Article < ApplicationRecord
 
     case platform
     when "wechat"
-      # Remove the CSS block at the beginning (it's one long line with escaped underscores)
+      # Remove the CSS block at the beginning and cover image
       cleaned = content_markdown
         .gsub(/\A\s*#js[^\n]*\{[^}]*\}\s*/m, '')  # Remove #js_row... block
         .gsub(/\A\s*\.[a-z_][^\n]*\{[^}]*\}\s*/m, '')  # Remove .class blocks
         .gsub(/\A\s*img\s*\{[^}]*\}\s*/m, '')  # Remove img{} block
         .gsub(/\A\s*<style[^>]*>.*?<\/style>\s*/im, '')
         .gsub(/\A\s*<script[^>]*>.*?<\/script>\s*/im, '')
+        .gsub(/\A\s*!\[cover_image\]\([^\)]+\)\s*/i, '')  # Remove cover image
         .strip
       cleaned.presence
     when "rednote"
