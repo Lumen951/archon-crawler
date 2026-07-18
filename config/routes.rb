@@ -17,6 +17,10 @@ Rails.application.routes.draw do
 
   resources :accounts, only: [:index, :show, :destroy] do
     collection do
+      post :bulk_tag
+      post :bulk_untag
+      get  :tag_suggestions
+      post :toggle_tag_follow
       get :import
       # WeChat import routes
       get  "import/wechat", to: "accounts#import_wechat_page", as: :import_wechat_page
@@ -58,6 +62,7 @@ Rails.application.routes.draw do
   # Profile management (users can edit their own password)
   resource :profile, only: [:edit, :update] do
     patch :update_password
+    patch :update_followed_tags
     post :create_api_key
     delete :revoke_api_key
   end
@@ -67,12 +72,19 @@ Rails.application.routes.draw do
     resources :users do
       member do
         post :reset_password
+        patch :update_followed_tags
       end
       collection do
         get :credentials, to: 'users#show_credentials', as: :credentials
       end
     end
     get 'users/:id/credentials', to: 'users#show_credentials', as: :user_credentials
+
+    resources :tags, only: [:index, :edit, :update, :destroy] do
+      collection do
+        post :refresh_counts
+      end
+    end
 
     resource :settings, only: [:show, :update] do
       post :validate_wechat_key
@@ -84,6 +96,8 @@ Rails.application.routes.draw do
   get "/rss", to: "rss#index", as: :all_accounts_rss, defaults: { format: 'rss' }
   get "/rss/accounts", to: "rss#accounts", as: :accounts_list_rss, defaults: { format: 'rss' }
   get "/rss/accounts/active", to: "rss#active_accounts", as: :active_accounts_list_rss, defaults: { format: 'rss' }
+  get "/rss/tag/:tag_id", to: "rss#by_tag", as: :tag_rss, defaults: { format: 'rss' }
+  get "/rss/user/:token", to: "rss#by_user", as: :user_rss, defaults: { format: 'rss' }
   get "/rss/:fakeid", to: "rss#show", as: :account_rss, defaults: { format: 'rss' }
 
   # API routes

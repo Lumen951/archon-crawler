@@ -2,7 +2,8 @@ class Admin::UsersController < Admin::BaseController
   before_action :set_user, only: [:show, :edit, :update, :destroy, :reset_password]
 
   def index
-    @users = User.order(created_at: :desc)
+    @users = User.includes(:followed_tags).order(created_at: :desc)
+    @tags = Tag.ordered
   end
 
   def show
@@ -116,6 +117,14 @@ class Admin::UsersController < Admin::BaseController
     else
       redirect_back fallback_location: admin_users_path, alert: "密码重置失败"
     end
+  end
+
+  def update_followed_tags
+    tag_ids = (params[:tag_ids] || []).map(&:to_i)
+    @user.user_tags.where.not(tag_id: tag_ids).destroy_all
+    tag_ids.each { |tid| @user.user_tags.find_or_create_by(tag_id: tid) }
+    flash[:success] = "已更新 #{@user.name || @user.email_address} 的关注标签"
+    redirect_to admin_users_path
   end
 
   private

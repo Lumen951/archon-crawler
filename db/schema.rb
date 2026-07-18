@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_16_080100) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_18_100002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -148,6 +148,39 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_16_080100) do
     t.index ["user_id"], name: "index_sessions_on_user_id"
   end
 
+  create_table "tag_accounts", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.datetime "created_at", null: false
+    t.bigint "tag_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id"], name: "index_tag_accounts_on_account_id"
+    t.index ["tag_id", "account_id"], name: "index_tag_accounts_on_tag_id_and_account_id", unique: true
+    t.index ["tag_id"], name: "index_tag_accounts_on_tag_id"
+  end
+
+  create_table "tags", force: :cascade do |t|
+    t.string "color", default: "#6366f1"
+    t.datetime "created_at", null: false
+    t.text "description"
+    t.string "name", null: false
+    t.string "name_normalized", null: false
+    t.integer "position", default: 0
+    t.integer "tag_accounts_count", default: 0
+    t.datetime "updated_at", null: false
+    t.index ["name_normalized"], name: "index_tags_on_name_normalized", unique: true
+    t.index ["position"], name: "index_tags_on_position"
+  end
+
+  create_table "user_tags", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "tag_id", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["tag_id"], name: "index_user_tags_on_tag_id"
+    t.index ["user_id", "tag_id"], name: "index_user_tags_on_user_id_and_tag_id", unique: true
+    t.index ["user_id"], name: "index_user_tags_on_user_id"
+  end
+
   create_table "users", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "email_address", null: false
@@ -174,4 +207,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_16_080100) do
   add_foreign_key "group_accounts", "groups"
   add_foreign_key "groups", "users"
   add_foreign_key "sessions", "users"
+  add_foreign_key "tag_accounts", "accounts"
+  add_foreign_key "tag_accounts", "tags"
+  add_foreign_key "user_tags", "tags"
+  add_foreign_key "user_tags", "users"
 end

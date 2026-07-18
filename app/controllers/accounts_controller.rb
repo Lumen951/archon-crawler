@@ -7,8 +7,14 @@ class AccountsController < ApplicationController
   persist_query_for :index
 
   def index
-    @q = Account.ransack(params[:q])
-    @accounts = @q.result(distinct: true).order(created_at: :desc).page(params[:page]).per(20)
+    q_params = params.fetch(:q, {})
+    q_hash = q_params.respond_to?(:to_unsafe_h) ? q_params.to_unsafe_h : q_params.to_h
+    @q = Account.ransack(q_hash)
+    @accounts = @q.result(distinct: true).includes(:tags).order(created_at: :desc).page(params[:page]).per(20)
+    @tags = Tag.ordered
+    @active_tag_id = params.dig(:q, :with_tag_id).to_s.presence
+    @active_tag = @active_tag_id.present? && @active_tag_id != "none" ? Tag.find_by(id: @active_tag_id) : nil
+    @total_filtered_count = @accounts.total_count
   end
 
   def show
@@ -169,6 +175,66 @@ class AccountsController < ApplicationController
   rescue StandardError => e
     flash[:error] = "删除失败：#{e.message}"
     redirect_back fallback_location: accounts_path
+  end
+
+  def bulk_tag
+    tag_names = params[:tag_names].to_a.map(&:strip).reject(&:blank?)
+    account_ids = resolve_bulk_account_ids
+
+    if tag_names.blank? || account_ids.blank?
+      flash[:error] = "请选择帐号并输入标签"
+      redirect_back fallback_location: accounts_path and return
+    end
+
+    tags = tag_names.map { |name| Tag.find_or_create_by_name(name) }.compact
+    added = 0
+    account_ids.each do |aid|
+      tags.each do |tag|
+        TagAccount.find_or_create_by(tag: tag, account_id: aid)
+        added += 1
+      end
+    end
+    flash[:success] = "已为 #{account_ids.size} 个帐号添加 #{tags.size} 个标签"
+    redirect_back fallback_location: accounts_path
+  rescue StandardError => e
+    flash[:error] = "操作失败：#{e.message}"
+    redirect_back fallback_location: accounts_path
+  end
+
+  def bulk_untag
+    tag_ids = params[:tag_ids].to_a
+    account_ids = resolve_bulk_account_ids
+
+    if tag_ids.blank? || account_ids.blank?
+      flash[:error] = "请选择帐号和标签"
+      redirect_back fallback_location: accounts_path and return
+    end
+
+    removed = TagAccount.where(tag_id: tag_ids, account_id: account_ids).destroy_all.count
+    flash[:success] = "已移除 #{removed} 个标签关联"
+    redirect_back fallback_location: accounts_path
+  rescue StandardError => e
+    flash[:error] = "操作失败：#{e.message}"
+    redirect_back fallback_location: accounts_path
+  end
+
+  def tag_suggestions
+    query = params[:q].to_s.strip
+    tags = query.blank? ? Tag.ordered.limit(20) : Tag.search(query).ordered.limit(10)
+    render json: tags.map { |t| { id: t.id, name: t.name, color: t.color, count: t.tag_accounts_count } }
+  end
+
+  def toggle_tag_follow
+    tag = Tag.find(params[:tag_id])
+    if current_user.followed_tags.exists?(tag.id)
+      current_user.user_tags.find_by(tag: tag)&.destroy
+      render json: { followed: false }
+    else
+      current_user.user_tags.create!(tag: tag)
+      render json: { followed: true }
+    end
+  rescue StandardError => e
+    render json: { error: e.message }, status: :unprocessable_entity
   end
 
   def import_rednote
@@ -415,6 +481,21 @@ class AccountsController < ApplicationController
   def truncate_error(message, max_length = MAX_FLASH_ERROR_LENGTH)
     return message if message.length <= max_length
     "#{message[0...max_length]}..."
+  end
+
+  def resolve_bulk_account_ids
+    if params[:select_all] == "true"
+      if params[:q].present?
+        q_params = params[:q]
+        q_hash = q_params.respond_to?(:to_unsafe_h) ? q_params.to_unsafe_h : q_params.to_h
+        scope = Account.ransack(q_hash).result
+      else
+        scope = Account.all
+      end
+      scope.pluck(:id)
+    else
+      Array(params[:account_ids]).map(&:to_i).reject(&:zero?)
+    end
   end
 end
 

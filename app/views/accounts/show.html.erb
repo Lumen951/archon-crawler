@@ -43,6 +43,62 @@
             删除帐号
           <% end %>
         </div>
+
+        <!-- Tags -->
+        <div class="mt-4" data-controller="dropdown">
+          <div class="flex flex-wrap items-center gap-2">
+            <% @account.tags.each do |tag| %>
+              <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-sm font-medium" style="background-color: <%= tag.color %>20; color: <%= tag.color %>">
+                <span class="w-2.5 h-2.5 rounded-full" style="background-color: <%= tag.color %>"></span>
+                <%= tag.name %>
+              </span>
+            <% end %>
+            <button data-action="click->dropdown#toggle" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-sm font-medium bg-bg-secondary text-text-secondary hover:bg-brand hover:text-white transition">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+              管理标签
+            </button>
+          </div>
+          <div data-dropdown-target="panel" class="hidden mt-2 p-4 bg-bg-card border border-border-primary rounded-xl shadow-lg max-w-md">
+            <!-- Current tags with remove -->
+            <% if @account.tags.any? %>
+              <div class="mb-3">
+                <p class="text-xs text-text-secondary mb-2">当前标签：</p>
+                <div class="flex flex-wrap gap-1">
+                  <% @account.tags.each do |tag| %>
+                    <%= form_with url: bulk_untag_accounts_path, method: :post, class: "inline-flex" do |f| %>
+                      <%= hidden_field_tag "account_ids[]", @account.id %>
+                      <%= hidden_field_tag "tag_ids[]", tag.id %>
+                      <button type="submit" class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium hover:opacity-70 transition" style="background-color: <%= tag.color %>20; color: <%= tag.color %>" title="点击移除">
+                        <span class="w-2 h-2 rounded-full" style="background-color: <%= tag.color %>"></span>
+                        <%= tag.name %>
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                      </button>
+                    <% end %>
+                  <% end %>
+                </div>
+              </div>
+            <% end %>
+            <!-- Add tag form -->
+            <%= form_with url: bulk_tag_accounts_path, method: :post, data: { controller: "tag-input" } do |f| %>
+              <%= hidden_field_tag "account_ids[]", @account.id %>
+              <div class="flex gap-2">
+                <div class="flex-1 relative">
+                  <input type="text" data-tag-input-target="input" data-action="input->tag-input#onInput keydown->tag-input#onKeydown"
+                    placeholder="输入标签名称..."
+                    class="w-full h-9 px-3 rounded-lg border border-border-primary bg-bg-secondary text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand/30">
+                  <div data-tag-input-target="dropdown"
+                       class="hidden absolute top-full left-0 right-0 mt-1 bg-bg-card border border-border-primary rounded-xl shadow-lg max-h-48 overflow-y-auto z-50">
+                  </div>
+                  <div data-tag-input-target="chips" class="hidden"></div>
+                  <div data-tag-input-target="hiddenFields"></div>
+                </div>
+                <button type="submit" class="h-9 px-4 rounded-lg bg-brand text-white hover:bg-brand-dark text-sm font-semibold transition">
+                  添加
+                </button>
+              </div>
+            <% end %>
+          </div>
+        </div>
       </div>
     </div>
   </div>

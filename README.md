@@ -55,13 +55,25 @@ MP-Crawler 是一个基于 Ruby on Rails 的应用，用于自动抓取微信公
 - 仅在 `verbose_mode` 开启时写入日志
 - 支持日志清理（按保留天数配置）
 
-### 5. RSS 订阅
+### 5. 标签系统
+- `Tag`：标签模型，支持名称、颜色、描述、排序位置
+- `TagAccount`：帐号与标签的多对多关联（counter_cache 自动计数）
+- `UserTag`：用户关注标签（followed tags）
+- 帐号批量打标签/移除标签（Bulk Actions）
+- 标签自动补全（tag_suggestions API）
+- 按标签筛选帐号列表（Ransack scope: `with_tag_id`）
+- 仪表盘按用户关注标签过滤最新文章
+- 用户 Profile 页面管理关注的标签
+- Admin 标签管理：编辑名称/颜色/描述/排序、删除标签、刷新计数
+- 按标签和用户生成 RSS feed（`/rss/tag/:tag_id`、`/rss/user/:token`）
+
+### 6. RSS 订阅
 - 全局 RSS feed：`/rss`（支持按时间段过滤：today/yesterday/7days/1month）
 - 单帐号 RSS feed：`/rss/{fakeid}`
 - 帐号列表 RSS：`/rss/accounts`、`/rss/accounts/active`
 - 自动包含最近 50 篇文章
 
-### 6. 用户认证与权限
+### 7. 用户认证与权限
 - 基于 `has_secure_password` 的密码认证
 - **MiraclePlus OAuth 登录**（推荐）
 - Magic Link 邮箱登录（免密码）
@@ -70,7 +82,7 @@ MP-Crawler 是一个基于 Ruby on Rails 的应用，用于自动抓取微信公
 - 邮箱验证机制
 - `AdminMailer`：邀请邮件、登录链接邮件、新用户凭据邮件
 
-### 7. API Key 管理
+### 8. API Key 管理
 - **微信公众号**：`wechat_api_key`，有效期 4 天，支持过期检测和即将过期警告
 - **小红书**：`rednote_api_key`，无过期机制
 - 在 `/admin/settings` 页面统一管理
@@ -123,9 +135,29 @@ Option (系统配置 - key-value 存储)
 - default_article_concurrency / default_account_concurrency
 - max_crawl_pages / crawler_verbose_mode
 
+Tag (标签)
+├── has_many :tag_accounts (counter_cache: tag_accounts_count)
+├── has_many :accounts, through: :tag_accounts
+├── has_many :user_tags
+├── has_many :followers, through: :user_tags, source: :user
+├── validates :name_normalized, uniqueness: true
+└── scope :ordered (position ASC, name ASC)
+
+TagAccount (帐号-标签关联)
+├── belongs_to :tag
+├── belongs_to :account
+└── validates :account_id, uniqueness: { scope: :tag_id }
+
+UserTag (用户关注标签)
+├── belongs_to :user
+├── belongs_to :tag
+└── validates :tag_id, uniqueness: { scope: :user_id }
+
 User (用户)
 ├── enum role: { user: 0, admin: 1 }
 ├── has_many :sessions
+├── has_many :user_tags
+├── has_many :followed_tags, through: :user_tags, source: :tag
 ├── has_secure_password
 └── magic link / email confirmation / password reset tokens
 ```
@@ -275,7 +307,8 @@ end
 - `SessionsController`：登录/登出、magic link、dev_login
 - `ProfilesController`：用户密码管理
 - `RssController`：RSS feed 输出
-- `Admin::UsersController`：用户管理（admin only）
+- `Admin::UsersController`：用户管理（admin only）、管理用户关注标签
+- `Admin::TagsController`：标签管理（admin only）、编辑/删除/刷新计数
 - `Admin::SettingsController`：系统设置（admin only）
 
 ### 关注点分离（Concerns）
@@ -294,6 +327,12 @@ GET /magic_link/:token -> sessions#magic_link_login
 # 业务
 resources :accounts (index, show, destroy, crawl, toggle_status) do
   collection do
+    # 标签操作
+    post :bulk_tag
+    post :bulk_untag
+    get  :tag_suggestions
+    post :toggle_tag_follow
+
     # 导入主页
     get :import
 
@@ -316,10 +355,14 @@ resources :accounts (index, show, destroy, crawl, toggle_status) do
   end
 end
 resources :crawl_tasks (index, show, crawl_all, pause, resume, fail, logs, articles)
-resource :profile (edit, update, update_password)
+resource :profile (edit, update, update_password, update_followed_tags)
 
 # Admin
-namespace :admin { resources :users (reset_password, credentials); resource :settings }
+namespace :admin {
+  resources :users (reset_password, update_followed_tags, credentials)
+  resources :tags (edit, update, destroy, refresh_counts)
+  resource :settings
+}
 
 # RSS
 GET /rss                              # 全局（支持 ?period=today|yesterday|7days|1month）
@@ -430,6 +473,8 @@ https://your-domain.com/rss?period=yesterday          # 昨天
 https://your-domain.com/rss?period=7days              # 最近7天
 https://your-domain.com/rss?period=1month             # 最近1个月
 https://your-domain.com/rss/{fakeid}                  # 单帐号
+https://your-domain.com/rss/tag/{tag_id}              # 按标签过滤
+https://your-domain.com/rss/user/{token}              # 按用户关注标签过滤
 https://your-domain.com/rss/accounts                  # 帐号列表
 https://your-domain.com/rss/accounts/active           # 活跃帐号列表
 ```
@@ -513,6 +558,9 @@ mp-crawler/
 │   │   ├── rednote_account.rb
 │   │   ├── twitter_account.rb
 │   │   ├── article.rb
+│   │   ├── tag.rb
+│   │   ├── tag_account.rb
+│   │   ├── user_tag.rb
 │   │   ├── crawl_task.rb
 │   │   ├── crawl_task_account.rb
 │   │   ├── crawl_log.rb
@@ -531,7 +579,7 @@ mp-crawler/
 │   └── views/
 │       ├── accounts/ (index, show, import, import_preview)
 │       ├── crawl_tasks/ (index, show, logs, articles, partials)
-│       ├── admin/ (settings, users)
+│       ├── admin/ (settings, users, tags)
 │       ├── rss/ (index, show, accounts, active_accounts)
 │       └── sessions/ (new)
 ├── lib/

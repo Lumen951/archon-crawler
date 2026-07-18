@@ -39,6 +39,14 @@ class ProfilesController < ApplicationController
     redirect_to edit_profile_path
   end
 
+  def update_followed_tags
+    tag_ids = (params[:tag_ids] || []).map(&:to_i)
+    current_user.user_tags.where.not(tag_id: tag_ids).destroy_all
+    tag_ids.each { |tid| current_user.user_tags.find_or_create_by(tag_id: tid) }
+    flash[:success] = "关注标签已更新"
+    redirect_to edit_profile_path(anchor: "followed-tags")
+  end
+
   def update_password
     @user = current_user
 

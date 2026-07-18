@@ -5,6 +5,8 @@ class Account < ApplicationRecord
   has_many :crawl_task_accounts, dependent: :destroy
   has_many :group_accounts, dependent: :destroy
   has_many :groups, through: :group_accounts
+  has_many :tag_accounts, dependent: :destroy
+  has_many :tags, through: :tag_accounts
 
   enum :status, { active: 0, inactive: 1 }
 
@@ -14,6 +16,9 @@ class Account < ApplicationRecord
   scope :active, -> { where(status: :active) }
   scope :recently_crawled, -> { where.not(last_crawled_at: nil).order(last_crawled_at: :desc) }
   scope :needs_crawling, -> { active.where(last_crawled_at: nil).or(active.where("last_crawled_at < ?", 1.day.ago)) }
+  scope :with_tag, ->(tag_id) { joins(:tag_accounts).where(tag_accounts: { tag_id: tag_id }) }
+  scope :with_any_tag, ->(tag_ids) { joins(:tag_accounts).where(tag_accounts: { tag_id: tag_ids }).distinct }
+  scope :without_tag, -> { where.not(id: TagAccount.select(:account_id)) }
 
   def crawl!(concurrency: nil)
     task = CrawlTask.create!(
@@ -77,4 +82,22 @@ class Account < ApplicationRecord
   def self.ransackable_associations(auth_object = nil)
     %w[articles]
   end
+
+  def self.ransackable_scopes(auth_object = nil)
+    %w[with_tag_id]
+  end
+
+  def self.ransackable_scopes_skip_sanitize_args
+    %w[with_tag_id]
+  end
+
+  scope :with_tag_id, ->(tag_id) {
+    if tag_id.blank? || tag_id == "all"
+      all
+    elsif tag_id == "none"
+      without_tag
+    else
+      with_tag(tag_id)
+    end
+  }
 end
