@@ -79,7 +79,10 @@
             {},
             class: "h-10 px-4 rounded-lg border border-border-primary bg-bg-secondary text-text-primary text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition" %>
         <%= f.select :type_eq,
-            options_for_select([["全部平台", ""], ["微信公众号", "WechatAccount"], ["小红书", "RednoteAccount"]], params.dig(:q, :type_eq)),
+            options_for_select(
+              [["全部平台", ""]] + Account.descendants.sort_by(&:name).map { |klass| [klass.new.platform_name, klass.name] },
+              params.dig(:q, :type_eq)
+            ),
             {},
             class: "h-10 px-4 rounded-lg border border-border-primary bg-bg-secondary text-text-primary text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition" %>
         <%= f.submit "搜索", class: "h-10 px-5 rounded-lg bg-brand text-white hover:bg-brand-dark font-semibold text-sm transition cursor-pointer" %>
