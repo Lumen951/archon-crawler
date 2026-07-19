@@ -43,7 +43,17 @@
       </div>
       <div>
         <p class="text-sm text-gray-600">累计错误</p>
-        <p class="text-2xl font-bold <%= crawl_task.error_count > 0 ? 'text-red-600' : 'text-gray-900' %>"><%= crawl_task.error_count %></p>
+        <% if crawl_task.platform_error_counts.present? && crawl_task.platform_error_counts.any? %>
+          <p class="text-2xl font-bold <%= crawl_task.error_count > 0 ? 'text-red-600' : 'text-gray-900' %>"><%= crawl_task.error_count %></p>
+          <div class="mt-1 space-x-2">
+            <% crawl_task.platform_error_counts.each do |platform, count| %>
+              <% next if count.to_i.zero? %>
+              <span class="inline-block text-xs px-1.5 py-0.5 rounded bg-red-50 text-red-700"><%= platform.sub('Account', '') %>: <%= count %></span>
+            <% end %>
+          </div>
+        <% else %>
+          <p class="text-2xl font-bold <%= crawl_task.error_count > 0 ? 'text-red-600' : 'text-gray-900' %>"><%= crawl_task.error_count %></p>
+        <% end %>
       </div>
       <div>
         <p class="text-sm text-gray-600">开始时间</p>
@@ -58,8 +68,10 @@
         <p class="text-lg font-semibold text-gray-900">
           <% if crawl_task.completed_at && crawl_task.started_at %>
             <%= distance_of_time_in_words(crawl_task.started_at, crawl_task.completed_at) %>
-          <% elsif crawl_task.running? %>
-            运行中...
+          <% elsif crawl_task.running? && crawl_task.started_at %>
+            <span class="text-green-600" data-controller="elapsed-time" data-elapsed-time-start-value="<%= crawl_task.started_at.to_i %>">
+              <span data-elapsed-time-target="display">--:--:--</span>
+            </span>
           <% else %>
             -
           <% end %>
@@ -75,6 +87,12 @@
       <div>
         <p class="text-sm text-gray-600">文章并发</p>
         <p class="text-lg font-semibold text-gray-900"><%= crawl_task.effective_article_concurrency %></p>
+      </div>
+      <div>
+        <p class="text-sm text-gray-600">重试次数</p>
+        <p class="text-lg font-semibold <%= crawl_task.retry_count > 0 ? 'text-orange-600' : 'text-gray-900' %>">
+          <%= crawl_task.retry_count %> / <%= CrawlTask::MAX_RETRIES %>
+        </p>
       </div>
     </div>
 

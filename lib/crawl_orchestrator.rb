@@ -19,7 +19,7 @@ class CrawlOrchestrator
     article_concurrency = crawl_task.effective_article_concurrency
     max_pages = Option.max_crawl_pages
 
-    crawl_task.crawl_task_accounts.failed.update_all(status: :pending, error_message: nil, completed_at: nil)
+    crawl_task.crawl_task_accounts.failed.or(crawl_task.crawl_task_accounts.running).update_all(status: :pending, error_message: nil, completed_at: nil)
     crawl_task.update!(status: :running, error_message: nil, error_count: 0, platform_error_counts: {}, completed_at: nil, started_at: Time.current)
 
     platform_summary = Account.subclasses.filter_map { |klass|
