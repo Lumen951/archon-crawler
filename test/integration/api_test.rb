@@ -310,13 +310,12 @@ class ApiTest < ActionDispatch::IntegrationTest
     assert article["id"].present?
     assert article["title"].present?
     assert article["url"].present?
-    assert article["content_markdown"].present?
-    assert article["content_html"].present?
+    assert article["content"].present?
     assert article["published_at"].present?
     assert article["group_ref_key"].present?
     assert article["account"]["id"].present?
     assert article["account"]["source"].present?
-    assert article["account"]["nickname"].present?
+    assert article["account"]["name"].present?
   end
 
   test "GET /articles - success with no articles" do

@@ -76,8 +76,8 @@ module Api
           accounts: resolved_accounts.map { |r|
             {
               source: r[:source],
-              fakeid: r[:account].fakeid,
-              nickname: r[:account].nickname,
+              id: r[:account].fakeid,
+              name: r[:account].nickname,
               status: r[:status]
             }
           },
@@ -103,8 +103,8 @@ module Api
           accounts: group.accounts.map { |a|
             {
               source: a.type.sub("Account", "").downcase,
-              fakeid: a.fakeid,
-              nickname: a.nickname
+              id: a.fakeid,
+              name: a.nickname
             }
           }
         }
@@ -179,8 +179,8 @@ module Api
           accounts: resolved_accounts.map { |a|
             {
               source: a.type.sub("Account", "").downcase,
-              fakeid: a.fakeid,
-              nickname: a.nickname
+              id: a.fakeid,
+              name: a.nickname
             }
           },
           errors: errors

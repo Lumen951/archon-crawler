@@ -2,7 +2,7 @@
 
 ## 概述
 
-MP-Crawler API 允许您管理帐号分组并查询跨平台（微信、小红书、Twitter）的文章。
+MP-Crawler API 允许您查询帐号信息、管理帐号分组并查询跨平台（微信、小红书、Twitter）的文章。
 
 ## 认证
 
@@ -24,7 +24,84 @@ https://your-domain.com/api/v1
 
 ## API 端点
 
-### 1. POST /groups
+### 1. GET /accounts
+
+查询帐号信息。支持按名称或 ID 查找，如果数据库中不存在，会尝试通过外部 API 查找并创建。
+
+#### 请求
+
+```
+GET /api/v1/accounts?source=wechat&name=北京大学
+GET /api/v1/accounts?source=twitter&name=PKU1898
+GET /api/v1/accounts?source=rednote&id=6229d4850000000021021d46
+```
+
+**查询参数：**
+- `source`（必填）：平台名称（`wechat`、`rednote`、`twitter`）
+- `id`（可选）：帐号 ID（fakeid）
+- `name`（可选）：帐号名称（至少需要 `id` 或 `name` 之一）
+
+#### 响应示例
+
+**成功（200 OK）- 帐号已存在：**
+```json
+{
+  "source": "wechat",
+  "id": "fakeid_wechat_123",
+  "name": "北京大学",
+  "round_head_img": "https://example.com/avatar.jpg",
+  "status": "found"
+}
+```
+
+**成功（200 OK）- 帐号通过 API 创建：**
+```json
+{
+  "source": "twitter",
+  "id": "1234567890",
+  "name": "PKU1898",
+  "round_head_img": "https://example.com/avatar.jpg",
+  "status": "created"
+}
+```
+
+**错误（404 Not Found）- 帐号未找到：**
+```json
+{
+  "source": "wechat",
+  "name": "不存在的帐号",
+  "status": "not_found",
+  "error": "微信帐号未找到: 不存在的帐号"
+}
+```
+
+**错误（400 Bad Request）- 缺少参数：**
+```json
+{
+  "error": "source 不能为空（wechat/rednote/twitter）"
+}
+```
+
+```json
+{
+  "error": "至少需要提供 id 或 name 参数"
+}
+```
+
+**状态值说明：**
+- `found`：帐号已存在于数据库中
+- `created`：帐号已通过外部 API 查找并创建
+- `not_found`：在平台上未找到帐号
+- `error`：查找帐号时发生错误
+
+**平台说明：**
+- **微信**：支持按 `name` 搜索或按 `id` 查找
+- **小红书**：仅支持按 `id` 查找（不支持按名称搜索）
+- **Twitter**：支持按 `name`（screen_name）搜索或按 `id` 查找
+
+---
+
+### 2. POST /groups
 
 创建一个新的分组。
 
@@ -62,20 +139,20 @@ https://your-domain.com/api/v1
   "accounts": [
     {
       "source": "wechat",
-      "fakeid": "fakeid_wechat_123",
-      "nickname": "北京大学",
+      "id": "fakeid_wechat_123",
+      "name": "北京大学",
       "status": "found"
     },
     {
       "source": "rednote",
-      "fakeid": "6229d4850000000021021d46",
-      "nickname": "北京大学",
+      "id": "6229d4850000000021021d46",
+      "name": "北京大学",
       "status": "created"
     },
     {
       "source": "twitter",
-      "fakeid": "1234567890",
-      "nickname": "PKU1898",
+      "id": "1234567890",
+      "name": "PKU1898",
       "status": "found"
     }
   ],
@@ -95,8 +172,8 @@ https://your-domain.com/api/v1
   "accounts": [
     {
       "source": "wechat",
-      "fakeid": "fakeid_wechat_123",
-      "nickname": "北京大学",
+      "id": "fakeid_wechat_123",
+      "name": "北京大学",
       "status": "found"
     }
   ],
@@ -148,7 +225,7 @@ https://your-domain.com/api/v1
 
 ---
 
-### 2. PATCH /groups/{ref_key}
+### 3. PATCH /groups/{ref_key}
 
 更新现有分组的帐号。
 
@@ -182,18 +259,18 @@ https://your-domain.com/api/v1
   "accounts": [
     {
       "source": "wechat",
-      "fakeid": "fakeid_wechat_123",
-      "nickname": "北京大学"
+      "id": "fakeid_wechat_123",
+      "name": "北京大学"
     },
     {
       "source": "rednote",
-      "fakeid": "6229d4850000000021021d46",
-      "nickname": "北京大学"
+      "id": "6229d4850000000021021d46",
+      "name": "北京大学"
     },
     {
       "source": "twitter",
-      "fakeid": "1234567890",
-      "nickname": "PKU1898"
+      "id": "1234567890",
+      "name": "PKU1898"
     }
   ],
   "errors": []
@@ -212,8 +289,8 @@ https://your-domain.com/api/v1
   "accounts": [
     {
       "source": "wechat",
-      "fakeid": "fakeid_wechat_123",
-      "nickname": "北京大学"
+      "id": "fakeid_wechat_123",
+      "name": "北京大学"
     }
   ],
   "errors": [
@@ -244,7 +321,7 @@ https://your-domain.com/api/v1
 
 ---
 
-### 3. GET /articles
+### 4. GET /articles
 
 查询分组中的文章，支持分页和筛选。
 
@@ -277,9 +354,9 @@ GET /api/v1/articles?group_ref_keys[]=pku&group_ref_keys[]=tsinghua&range[]=2026
       "group_ref_key": "pku",
       "account": {
         "id": 1,
-        "fakeid": "fakeid_wechat_123",
+        "id": "fakeid_wechat_123",
         "source": "wechat",
-        "nickname": "北京大学"
+        "name": "北京大学"
       }
     },
     {
@@ -292,9 +369,9 @@ GET /api/v1/articles?group_ref_keys[]=pku&group_ref_keys[]=tsinghua&range[]=2026
       "group_ref_key": "pku",
       "account": {
         "id": 2,
-        "fakeid": "6229d4850000000021021d46",
+        "id": "6229d4850000000021021d46",
         "source": "rednote",
-        "nickname": "北京大学"
+        "name": "北京大学"
       }
     }
   ],
@@ -334,9 +411,9 @@ GET /api/v1/articles?group_ref_keys[]=pku&group_ref_keys[]=tsinghua&range[]=2026
       "group_ref_key": "pku",
       "account": {
         "id": 1,
-        "fakeid": "fakeid_wechat_123",
+        "id": "fakeid_wechat_123",
         "source": "wechat",
-        "nickname": "北京大学"
+        "name": "北京大学"
       }
     }
   ],
@@ -461,6 +538,18 @@ API 端点根据您的 API 密钥配置进行速率限制。默认限制为每�
 | 500 | 服务器内部错误 |
 
 ## 示例
+
+### 查询帐号（按名称）
+```bash
+curl "https://your-domain.com/api/v1/accounts?source=wechat&name=北京大学" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+### 查询帐号（按 ID）
+```bash
+curl "https://your-domain.com/api/v1/accounts?source=rednote&id=6229d4850000000021021d46" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
 
 ### 通过名称创建包含微信帐号的分组
 ```bash

@@ -82,10 +82,9 @@ module Api
               published_at: article.published_at,
               group_ref_key: article.group_ref_key,
               account: {
-                id: article.account.id,
-                fakeid: article.account.fakeid,
+                id: article.account.fakeid,
                 source: article.account.type.sub("Account", "").downcase,
-                nickname: article.account.nickname
+                name: article.account.nickname
               }
             }
           },

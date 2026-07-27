@@ -105,6 +105,7 @@ Rails.application.routes.draw do
     namespace :v1 do
       resources :groups, only: [:index, :show, :create, :update, :destroy]
       resources :articles, only: [:index]
+      resources :accounts, only: [:index]
     end
   end
 
