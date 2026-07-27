@@ -59,11 +59,6 @@ class CrawlOrchestrator
 
             semaphore.async do
               crawl_one_account(account, crawl_task, article_concurrency, max_pages)
-              if account.wechat?
-                # https://docs.mptext.top/others/%E5%BE%AE%E4%BF%A1%E6%8E%A5%E5%8F%A3%E9%A2%91%E7%8E%87%E9%99%90%E5%88%B6.html#%E5%BE%AE%E4%BF%A1%E8%8E%B7%E5%8F%96%E6%96%87%E7%AB%A0%E5%88%97%E8%A1%A8%E6%8E%A5%E5%8F%A3%E7%9A%84%E9%A2%91%E7%8E%87%E9%99%90%E5%88%B6%E7%A0%94%E7%A9%B6
-                # 20分钟请求了 1100 条数据量就触发微信限流
-                sleep 20 * account_concurrency
-              end
             end
           end
           crawl_task.log(:info, "#{platform_class.new.platform_name} 平台抓取完成") unless crawl_task.reload.paused? || crawl_task.reload.failed?

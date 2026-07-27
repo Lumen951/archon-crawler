@@ -1,17 +1,21 @@
 module Retryable
-  # HTTP status codes that are safe to retry (transient errors).
-  RETRYABLE_STATUS_CODES = (500..599).to_a + [429, 0].freeze # 0 = no status (network error)
+  # Application-level errors worth retrying with crawl task tracking.
+  # Transport-level retries (timeout, connection failure, HTTP 5xx) are handled
+  # by Faraday retry middleware on each API client's connection. This module
+  # focuses on application-level errors (rate limits from response body) and
+  # provides crawl task logging/error tracking that Faraday cannot.
+  RETRYABLE_STATUS_CODES = (500..599).to_a + [0].freeze # 0 = no status (network error)
 
   # Execute a block with exponential backoff retry.
   #
   # For HTTP errors (exceptions responding to #status_code), only retries on
-  # retryable status codes (5xx, 429). Client errors (4xx) are raised immediately.
+  # retryable status codes (5xx, 0). Client errors (4xx) are raised immediately.
   #
   # @param crawl_task [CrawlTask] for logging retry attempts
   # @param context [String] label for log messages (e.g. account nickname, note ID)
   # @param max_retries [Integer] maximum number of retries (default 3)
   # @param retry_on [Array<Class>] exception classes to retry on
-  # @param retryable_codes [Array<Integer>] HTTP status codes to retry (default: 5xx + 429)
+  # @param retryable_codes [Array<Integer>] HTTP status codes to retry (default: 5xx + 0)
   # @yield the block to execute
   # @return [Object] block return value, or nil if all retries exhausted
   def self.with_retry(crawl_task:, context:, max_retries: 3, retry_on: [StandardError], retryable_codes: RETRYABLE_STATUS_CODES)

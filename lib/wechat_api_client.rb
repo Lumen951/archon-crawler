@@ -1,5 +1,7 @@
 require 'faraday'
 require 'faraday/retry'
+require 'rate_limiter'
+require 'rate_limiter_middleware'
 
 class WechatApiClient
   BASE_URL = "https://down.mptext.top"
@@ -14,9 +16,26 @@ class WechatApiClient
   class ApiRateLimitError < ApiError
   end
 
+  RATE_LIMITER = RateLimiter.new(5, 60) # 20 requests per minute
+
+  # Rate limiter for /api/public/v1/download — 1 requests per minute.
+  # Shared across all instances; thread-safe and Async-fiber-safe.
+  DOWNLOAD_RATE_LIMITER = RateLimiter.new(1, 60)
+
   def self.connection
     @connection ||= Faraday.new(url: BASE_URL) do |f|
       f.request :url_encoded
+      f.request :rate_limiter, RATE_LIMITER
+      f.request :retry, max: 3, interval: 1, backoff_factor: 2, exceptions: [Faraday::TimeoutError, Faraday::ConnectionFailed]
+      f.adapter Faraday.default_adapter
+    end
+  end
+
+  # Separate connection for download endpoint — includes rate limiter middleware.
+  def self.download_connection
+    @download_connection ||= Faraday.new(url: BASE_URL) do |f|
+      f.request :url_encoded
+      f.request :rate_limiter, DOWNLOAD_RATE_LIMITER
       f.request :retry, max: 3, interval: 1, backoff_factor: 2, exceptions: [Faraday::TimeoutError, Faraday::ConnectionFailed]
       f.adapter Faraday.default_adapter
     end
@@ -48,7 +67,7 @@ class WechatApiClient
   end
 
   def self.download_content(url, format: 'markdown')
-    response = connection.get('/api/public/v1/download', {
+    response = download_connection.get('/api/public/v1/download', {
       url: url,
       format: format
     }, headers)
@@ -69,6 +88,10 @@ class WechatApiClient
 
   def self.handle_response(response)
     body = response.body
+    if body.encoding == Encoding::ASCII_8BIT
+      body = body.dup.force_encoding(Encoding::UTF_8)
+    end
+
     case response.status
     when 200
       parsed_body = JSON.parse(body)
@@ -76,7 +99,6 @@ class WechatApiClient
       if ret == 200013
         raise ApiRateLimitError, "频率限制（freq control）：#{response.status} - #{body}"
       elsif ret.present? && ret != 0
-        Rails.logger.warn("WeChat API returned error: #{parsed_body}")
         raise ApiKeyExpiredError, "API 密钥已过期或无效：#{response.status} - #{body}"
       end
       parsed_body
@@ -88,11 +110,15 @@ class WechatApiClient
       raise ApiError, "API 错误：#{response.status} - #{body}"
     end
   rescue JSON::ParserError => e
-    raise ApiError, "无效的 JSON 响应：#{e.message}"
+    raise ApiError, "无效的 JSON 响应：#{e.message} - #{body}"
   end
 
   def self.handle_download_response(response)
     body = response.body
+    if body.encoding == Encoding::ASCII_8BIT
+      body = body.dup.force_encoding(Encoding::UTF_8)
+    end
+
     case response.status
     when 200
       body

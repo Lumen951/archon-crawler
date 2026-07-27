@@ -169,6 +169,7 @@ User (用户)
 - 按 `account.class.crawler_class` 把每个帐号分发给对应平台的 Crawler
 - 负责暂停/恢复/错误阈值终止/自动重试调度等任务级别的通用逻辑
 - 捕获 `CrawlerApiKeyError`（见下）并将任务置为 paused，不影响其他帐号继续抓取
+- API 速率限制由各平台 API Client 的 Faraday 中间件处理（如 `WechatApiClient` 的 `RateLimiterMiddleware`），调度层无需平台特定的 sleep
 
 **BaseCrawler** (`lib/base_crawler.rb`)
 - 所有平台 Crawler 的基类，只定义一个接口：`self.crawl_account(account, crawl_task, article_concurrency:, max_pages:)`
@@ -182,6 +183,7 @@ User (用户)
 - 封装微信文章导出 API（`down.mptext.top`）
 - 认证方式：`X-Auth-Key` header
 - 主要接口：`get_articles`、`download_content`
+- 双连接架构：`connection`（搜索/文章列表，无限流）+ `download_connection`（下载端点，带 `RateLimiterMiddleware` 限流 60 次/分钟）
 - 自定义错误类：`ApiError`、`ApiKeyExpiredError`（包含 `CrawlerApiKeyError`）、`ApiRateLimitError`
 
 **WechatCrawler** (`lib/wechat_crawler.rb`, `< BaseCrawler`)
@@ -210,11 +212,22 @@ User (用户)
 - 解析推文文本、媒体、互动数据（点赞/转推/回复/浏览量）
 - 使用推文 URL 作为唯一标识避免重复
 
+**RateLimiter** (`lib/rate_limiter.rb`)
+- 通用滑动窗口速率限制器
+- 线程安全（Mutex）+ 协程安全（Async 兼容 — sleep 会让出 reactor）
+- 按实例隔离，不同端点可设不同限制
+- 主要用于限制微信下载 API（60 次/分钟）
+
+**RateLimiterMiddleware** (`lib/rate_limiter_middleware.rb`)
+- Faraday 中间件，在每次 HTTP 请求前调用 `rate_limiter.wait`
+- 注册为 `:rate_limiter`，可与 retry 等中间件组合使用
+- 仅应用于需要限流的连接（如 `WechatApiClient.download_connection`）
+
 **Retryable** (`lib/retryable.rb`)
-- 统一重试模块，支持指数退避
-- HTTP 状态码感知：5xx/429 可重试，4xx 立即失败
-- API 密钥错误（任何 `include CrawlerApiKeyError` 的异常）不重试，立即失败
-- 可配置重试次数、重试异常类型
+- 应用层重试模块，专注于 API 语义级错误处理
+- 传输层重试（超时、连接失败、HTTP 5xx）由 Faraday retry 中间件处理
+- `Retryable` 负责：应用层错误重试（如响应体中的频率限制）、API 密钥错误短路（`CrawlerApiKeyError` 立即失败）、抓取任务错误追踪和日志记录（`crawl_task.log`）
+- 指数退避（2s → 4s → 8s）
 
 ### 添加新的抓取平台
 
@@ -223,7 +236,8 @@ User (用户)
 1. 新增 `Account` 的 STI 子类（如 `TwitterAccount`），实现 `platform_name` 和 `self.crawler_class`（返回下面的 Crawler 类）
 2. 新增 `XxxCrawler < BaseCrawler`，实现 `self.crawl_account(account, crawl_task, article_concurrency:, max_pages:)`
 3. 如该平台 API 有密钥失效的场景，将对应错误类 `include CrawlerApiKeyError`
-4. 完成 — `CrawlJob` / `CrawlOrchestrator` 会自动把该类型帐号纳入同一个并发循环，与其他平台交替抓取
+4. 如该平台 API 有频率限制，在 API Client 中使用 `RateLimiter` + `RateLimiterMiddleware`（参考 `WechatApiClient`）
+5. 完成 — `CrawlJob` / `CrawlOrchestrator` 会自动把该类型帐号纳入同一个并发循环，与其他平台交替抓取
 
 ### 添加新的导入平台
 
@@ -517,7 +531,8 @@ end
 - 失败帐号可在任务结束后通过自动重试或手动重试恢复（更新密钥后）
 
 ### 限流 (429)
-- `Retryable` 模块自动重试，指数退避（2s → 4s → 8s）
+- **预防**：`RateLimiter` + `RateLimiterMiddleware` 在 HTTP 层主动限流（如微信下载 60 次/分钟），避免触发 429
+- **兜底**：若仍收到应用层频率限制（如响应体 `ret: 200013`），`Retryable` 模块自动重试，指数退避（2s → 4s → 8s）
 - 超过重试次数后该帐号标记为失败，任务继续
 - API 密钥错误不重试，立即标记帐号失败（由 `CrawlerApiKeyError` mixin 统一识别）
 
@@ -586,13 +601,15 @@ mp-crawler/
 │   ├── crawl_orchestrator.rb  (跨平台统一调度，交替抓取所有帐号)
 │   ├── base_crawler.rb        (平台 Crawler 基类/接口)
 │   ├── crawler_api_key_error.rb (API 密钥错误通用 mixin)
+│   ├── rate_limiter.rb          (通用滑动窗口速率限制器)
+│   ├── rate_limiter_middleware.rb (Faraday 速率限制中间件)
 │   ├── wechat_api_client.rb
 │   ├── wechat_crawler.rb       (< BaseCrawler)
 │   ├── rednote_api_client.rb
 │   ├── rednote_crawler.rb      (< BaseCrawler)
 │   ├── twitter_api_client.rb
 │   ├── twitter_crawler.rb      (< BaseCrawler)
-│   └── retryable.rb
+│   └── retryable.rb            (应用层重试 + 抓取任务错误追踪)
 ├── bin/
 │   └── twitter_fetch.py        (Twitter API Python CLI wrapper)
 ├── db/migrate/
@@ -603,8 +620,9 @@ mp-crawler/
 
 ### API 限制
 - 微信：每请求最多 20 篇文章，需翻页
+- 微信下载 API：60 次/分钟，由 `RateLimiterMiddleware` 主动限流
 - 小红书：分页获取，每页间隔 1 秒
-- 两个 API 均可能有频率限制
+- 两个 API 均可能有频率限制，超出时自动重试
 
 ### API Key 管理
 - 微信 Key 每 4 天过期，需人工登录更新

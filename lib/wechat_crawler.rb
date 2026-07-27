@@ -27,7 +27,7 @@ class WechatCrawler < BaseCrawler
       response = Retryable.with_retry(
         crawl_task: crawl_task,
         context: "#{account.nickname}: 文章列表获取 (offset: #{offset})",
-        retry_on: [WechatApiClient::ApiRateLimitError, StandardError]
+        retry_on: [StandardError]
       ) do
         WechatApiClient.get_articles(account.fakeid, begin_offset: offset, size: 20)
       end
@@ -77,8 +77,10 @@ class WechatCrawler < BaseCrawler
 
     crawl_task.log(:debug, "正在下载内容：#{article_data['title']}")
 
-    markdown_content = download_with_retry(article_data['link'], 'markdown', crawl_task)
     html_content = download_with_retry(article_data['link'], 'html', crawl_task)
+    # markdown 格式仅限会员（请在请求头携带有效 X-Api-Token），游客仅支持 html 格式
+    # markdown_content = download_with_retry(article_data['link'], 'markdown', crawl_task)
+    markdown_content = Html2Text.convert(html_content)
 
     Article.create!(
       account: account,
