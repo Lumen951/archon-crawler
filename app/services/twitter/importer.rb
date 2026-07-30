@@ -17,28 +17,6 @@ module Twitter
       new.import_search_rows(rows)
     end
 
-    def self.search_by_names(screen_names)
-      new.search_by_names(screen_names)
-    end
-
-    # Look up multiple screen names via the Twitter API.
-    # Returns array of { rest_id:, screen_name:, name:, profile_image_url_https:, ... }
-    def search_by_names(screen_names)
-      results = []
-      screen_names.each do |name|
-        name = name.to_s.strip.delete_prefix("@")
-        next if name.blank?
-
-        begin
-          users = TwitterApiClient.lookup_user(name)
-          results.concat(users) if users.is_a?(Array)
-        rescue TwitterApiClient::ApiError => e
-          Rails.logger.warn("Twitter lookup failed for @#{name}: #{e.message}")
-        end
-      end
-      results
-    end
-
     def import_file(file)
       extension = File.extname(original_filename_for(file)).downcase
       raise ArgumentError, "仅支持 .csv 文件" unless extension == ".csv"

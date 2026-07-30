@@ -2,8 +2,10 @@ module Api
   module V1
     class AccountsController < Api::BaseController
       # GET /api/v1/accounts?source=wechat&id=xxx
+      # GET /api/v1/accounts?source=wechat&name=xxx
       # GET /api/v1/accounts?source=twitter&name=xxx
       # GET /api/v1/accounts?source=rednote&id=xxx
+      # GET /api/v1/accounts?source=rednote&name=xxx
       def index
         source = params[:source].to_s.strip.presence
         id = params[:id].to_s.strip.presence
@@ -26,13 +28,16 @@ module Api
 
         result = AccountResolver.resolve(source: source, id: id, name: name)
 
-        if result.account
-          account = result.account
+        if result.accounts.any?
           render json: {
             source: source.downcase,
-            id: account.fakeid,
-            name: account.nickname,
-            round_head_img: account.round_head_img,
+            accounts: result.accounts.map { |a|
+              {
+                id: a.fakeid,
+                name: a.nickname,
+                round_head_img: a.round_head_img
+              }
+            },
             status: result.status
           }
         else
@@ -40,6 +45,7 @@ module Api
             source: source.downcase,
             id: id,
             name: name,
+            accounts: [],
             status: result.status,
             error: result.error
           }, status: :not_found

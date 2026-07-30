@@ -29,6 +29,11 @@ module Retryable
         crawl_task.log(:error, "#{context}: API 密钥错误，不重试：#{e.message}")
         raise e
       end
+      
+      if e.is_a?(WechatApiClient::ApiRateLimitError)
+        crawl_task.log(:error, "#{context}: 触发速率限制，不重试：#{e.message}")
+        raise e
+      end
 
       # For HTTP errors, check status code before retrying
       if e.respond_to?(:status_code) && e.status_code.present?

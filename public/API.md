@@ -28,12 +28,15 @@ https://your-domain.com/api/v1
 
 查询帐号信息。支持按名称或 ID 查找，如果数据库中不存在，会尝试通过外部 API 查找并创建。
 
+当按名称搜索时，可能返回多个匹配结果。
+
 #### 请求
 
 ```
 GET /api/v1/accounts?source=wechat&name=北京大学
 GET /api/v1/accounts?source=twitter&name=PKU1898
 GET /api/v1/accounts?source=rednote&id=6229d4850000000021021d46
+GET /api/v1/accounts?source=rednote&name=蔚来
 ```
 
 **查询参数：**
@@ -43,25 +46,43 @@ GET /api/v1/accounts?source=rednote&id=6229d4850000000021021d46
 
 #### 响应示例
 
-**成功（200 OK）- 帐号已存在：**
+**成功（200 OK）- 按 ID 查找（返回单个帐号）：**
 ```json
 {
-  "source": "wechat",
-  "id": "fakeid_wechat_123",
-  "name": "北京大学",
-  "round_head_img": "https://example.com/avatar.jpg",
+  "source": "rednote",
+  "accounts": [
+    {
+      "id": "6229d4850000000021021d46",
+      "name": "北京大学",
+      "round_head_img": "https://example.com/avatar.jpg"
+    }
+  ],
   "status": "found"
 }
 ```
 
-**成功（200 OK）- 帐号通过 API 创建：**
+**成功（200 OK）- 按名称搜索（返回多个帐号）：**
 ```json
 {
-  "source": "twitter",
-  "id": "1234567890",
-  "name": "PKU1898",
-  "round_head_img": "https://example.com/avatar.jpg",
-  "status": "created"
+  "source": "rednote",
+  "accounts": [
+    {
+      "id": "5663dbb17c5bb8369230f1b9",
+      "name": "蔚来",
+      "round_head_img": "https://sns-avatar-qc.xhscdn.com/avatar/..."
+    },
+    {
+      "id": "657ff6960000000020031e74",
+      "name": "NIO蔚来 童话",
+      "round_head_img": "https://sns-avatar-qc.xhscdn.com/avatar/..."
+    },
+    {
+      "id": "646f2972000000002a034f67",
+      "name": "蔚来",
+      "round_head_img": "https://sns-avatar-qc.xhscdn.com/avatar/..."
+    }
+  ],
+  "status": "found"
 }
 ```
 
@@ -70,6 +91,7 @@ GET /api/v1/accounts?source=rednote&id=6229d4850000000021021d46
 {
   "source": "wechat",
   "name": "不存在的帐号",
+  "accounts": [],
   "status": "not_found",
   "error": "微信帐号未找到: 不存在的帐号"
 }
@@ -96,7 +118,7 @@ GET /api/v1/accounts?source=rednote&id=6229d4850000000021021d46
 
 **平台说明：**
 - **微信**：支持按 `name` 搜索或按 `id` 查找
-- **小红书**：仅支持按 `id` 查找（不支持按名称搜索）
+- **小红书**：支持按 `name` 搜索（通过 TikHub API）或按 `id` 查找
 - **Twitter**：支持按 `name`（screen_name）搜索或按 `id` 查找
 
 ---
@@ -112,7 +134,7 @@ GET /api/v1/accounts?source=rednote&id=6229d4850000000021021d46
   "ref_key": "pku",
   "accounts": [
     {"source": "wechat", "name": "北京大学"},
-    {"source": "rednote", "id": "6229d4850000000021021d46"},
+    {"source": "rednote", "name": "蔚来"},
     {"source": "twitter", "name": "PKU1898"}
   ]
 }
@@ -122,8 +144,10 @@ GET /api/v1/accounts?source=rednote&id=6229d4850000000021021d46
 - `ref_key`（必填）：分组的唯一标识符（字母、数字、下划线、连字符）
 - `accounts`（必填）：帐号对象数组
   - `source`（必填）：平台名称（`wechat`、`rednote`、`twitter`）
-  - `id`：帐号 ID（小红书必填，微信/Twitter 可选）
-  - `name`：帐号名称（可选，用于搜索）
+  - `id`：帐号 ID（可选，精确匹配）
+  - `name`：帐号名称（可选，用于搜索，可能返回多个匹配，使用第一个）
+
+**说明：** 当按 `name` 搜索返回多个匹配时，系统自动使用第一个结果。响应中会包含 `multiple_matches` 字段提示匹配数量。
 
 #### 响应示例
 
@@ -145,9 +169,11 @@ GET /api/v1/accounts?source=rednote&id=6229d4850000000021021d46
     },
     {
       "source": "rednote",
-      "id": "6229d4850000000021021d46",
-      "name": "北京大学",
-      "status": "created"
+      "id": "5663dbb17c5bb8369230f1b9",
+      "name": "蔚来",
+      "status": "found",
+      "multiple_matches": 3,
+      "hint": "找到 3 个匹配帐号，已使用第一个。可通过 id 精确指定。"
     },
     {
       "source": "twitter",
@@ -235,7 +261,7 @@ GET /api/v1/accounts?source=rednote&id=6229d4850000000021021d46
 {
   "accounts": [
     {"source": "wechat", "id": "fakeid_wechat_123"},
-    {"source": "rednote", "id": "6229d4850000000021021d46"},
+    {"source": "rednote", "name": "蔚来"},
     {"source": "twitter", "name": "PKU1898"}
   ]
 }
@@ -511,9 +537,9 @@ API 返回的文章内容经过清洗处理，提供更高质量的数据：
 - 帐号类型为 `WechatAccount`
 
 ### 小红书（rednote）
-- **必须提供 `id`**（个人资料 URL 中的 user_id）
-- 不支持按名称搜索
-- 通过 `/xhs/user_detail` API 验证用户是否存在
+- 可以通过 `name` 搜索（通过 TikHub API）或通过 `id` 查找
+- 按 `id` 查找时使用 `/xhs/user_detail` API 验证用户是否存在
+- 按 `name` 搜索时使用 TikHub 搜索用户 API，可能返回多个结果
 - 帐号类型为 `RednoteAccount`
 
 ### Twitter
@@ -539,19 +565,19 @@ API 端点根据您的 API 密钥配置进行速率限制。默认限制为每�
 
 ## 示例
 
-### 查询帐号（按名称）
+### 查询帐号（按名称 - 返回多个结果）
 ```bash
-curl "https://your-domain.com/api/v1/accounts?source=wechat&name=北京大学" \
+curl "https://your-domain.com/api/v1/accounts?source=rednote&name=蔚来" \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
-### 查询帐号（按 ID）
+### 查询帐号（按 ID - 返回单个结果）
 ```bash
 curl "https://your-domain.com/api/v1/accounts?source=rednote&id=6229d4850000000021021d46" \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
-### 通过名称创建包含微信帐号的分组
+### 通过名称创建分组（包含多个平台）
 ```bash
 curl -X POST "https://your-domain.com/api/v1/groups" \
   -H "Authorization: Bearer YOUR_API_KEY" \
@@ -559,18 +585,20 @@ curl -X POST "https://your-domain.com/api/v1/groups" \
   -d '{
     "ref_key": "pku",
     "accounts": [
-      {"source": "wechat", "name": "北京大学"}
+      {"source": "wechat", "name": "北京大学"},
+      {"source": "rednote", "name": "蔚来"},
+      {"source": "twitter", "name": "PKU1898"}
     ]
   }'
 ```
 
-### 通过 ID 创建包含小红书帐号的分组
+### 通过 ID 创建分组（精确匹配）
 ```bash
 curl -X POST "https://your-domain.com/api/v1/groups" \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "ref_key": "pku-rednote",
+    "ref_key": "pku-exact",
     "accounts": [
       {"source": "rednote", "id": "6229d4850000000021021d46"}
     ]
@@ -585,6 +613,7 @@ curl -X PATCH "https://your-domain.com/api/v1/groups/pku" \
   -d '{
     "accounts": [
       {"source": "wechat", "id": "fakeid_wechat_123"},
+      {"source": "rednote", "name": "蔚来"},
       {"source": "twitter", "name": "PKU1898"}
     ]
   }'

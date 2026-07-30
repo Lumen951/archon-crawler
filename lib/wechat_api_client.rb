@@ -2,6 +2,7 @@ require 'faraday'
 require 'faraday/retry'
 require 'rate_limiter'
 require 'rate_limiter_middleware'
+require 'response_cache_middleware'
 
 class WechatApiClient
   BASE_URL = "https://down.mptext.top"
@@ -24,6 +25,7 @@ class WechatApiClient
 
   def self.connection
     @connection ||= Faraday.new(url: BASE_URL) do |f|
+      f.request :response_cache
       f.request :url_encoded
       f.request :rate_limiter, RATE_LIMITER
       f.request :retry, max: 3, interval: 1, backoff_factor: 2, exceptions: [Faraday::TimeoutError, Faraday::ConnectionFailed]

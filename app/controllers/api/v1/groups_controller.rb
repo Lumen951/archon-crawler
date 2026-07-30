@@ -39,11 +39,17 @@ module Api
           result = AccountResolver.resolve(source: source, id: id, name: name)
 
           if result.account
-            resolved_accounts << {
+            entry = {
               account: result.account,
               source: source,
               status: result.status
             }
+            # Warn when multiple matches found and only first is used
+            if result.accounts.size > 1
+              entry[:multiple_matches] = result.accounts.size
+              entry[:hint] = "找到 #{result.accounts.size} 个匹配帐号，已使用第一个。可通过 id 精确指定。"
+            end
+            resolved_accounts << entry
           else
             errors << {
               index: index,
@@ -74,12 +80,15 @@ module Api
             created_at: group.created_at
           },
           accounts: resolved_accounts.map { |r|
-            {
+            entry = {
               source: r[:source],
               id: r[:account].fakeid,
               name: r[:account].nickname,
               status: r[:status]
             }
+            entry[:multiple_matches] = r[:multiple_matches] if r[:multiple_matches]
+            entry[:hint] = r[:hint] if r[:hint]
+            entry
           },
           errors: errors
         }, status: :created
@@ -134,6 +143,7 @@ module Api
 
         # Resolve new accounts
         resolved_accounts = []
+        multiple_warnings = []
         errors = []
 
         accounts_params.each_with_index do |account_param, index|
@@ -150,6 +160,15 @@ module Api
 
           if result.account
             resolved_accounts << result.account
+            if result.accounts.size > 1
+              multiple_warnings << {
+                index: index,
+                source: source,
+                name: name,
+                matches: result.accounts.size,
+                hint: "找到 #{result.accounts.size} 个匹配帐号，已使用第一个。可通过 id 精确指定。"
+              }
+            end
           else
             errors << {
               index: index,
@@ -183,6 +202,7 @@ module Api
               name: a.nickname
             }
           },
+          multiple_matches: multiple_warnings,
           errors: errors
         }
 

@@ -26,8 +26,7 @@ class WechatCrawler < BaseCrawler
 
       response = Retryable.with_retry(
         crawl_task: crawl_task,
-        context: "#{account.nickname}: 文章列表获取 (offset: #{offset})",
-        retry_on: [StandardError]
+        context: "#{account.nickname}: 文章列表获取 (offset: #{offset})"
       ) do
         WechatApiClient.get_articles(account.fakeid, begin_offset: offset, size: 20)
       end
@@ -105,11 +104,10 @@ class WechatCrawler < BaseCrawler
     crawl_task.log(:error, "保存文章 #{article_data['link']} 失败：#{e.message}")
   end
 
-  def self.download_with_retry(url, format, crawl_task, max_retries: 3)
+  def self.download_with_retry(url, format, crawl_task)
     Retryable.with_retry(
       crawl_task: crawl_task,
-      context: "下载 #{url} (#{format})",
-      max_retries: max_retries
+      context: "下载 #{url} (#{format})"
     ) do
       WechatApiClient.download_content(url, format: format)
     end

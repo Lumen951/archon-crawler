@@ -47,7 +47,7 @@ class AccountsController < ApplicationController
     end
 
     @keyword = keyword
-    @search_accounts = Accounts::Importer.search(keyword)
+    @search_accounts = AccountResolver.search_wechat(keyword)
 
     if @search_accounts.empty?
       flash[:warning] = "未搜索到匹配的帐号"
@@ -298,32 +298,38 @@ class AccountsController < ApplicationController
   end
 
   def import_rednote_search
-    profile_id = params[:profile_id].to_s.strip
+    query = params[:profile_id].to_s.strip
 
-    if profile_id.blank?
-      flash[:error] = "请输入小红书 Profile ID"
+    if query.blank?
+      flash[:error] = "请输入用户 ID 或名称"
       redirect_to import_rednote_page_accounts_path and return
     end
 
-    user_data = RednoteApiClient.get_user_detail(profile_id)
+    # If input looks like a user ID (24-char hex), search by ID; otherwise search by name
+    if query.match?(/\A[0-9a-f]{24}\z/i)
+      @user_info = AccountResolver.search_rednote_by_id(query)
 
-    unless user_data.present? && user_data["basic_info"].present?
-      flash[:warning] = "未找到该用户"
-      redirect_to import_rednote_page_accounts_path and return
+      unless @user_info.present?
+        flash[:warning] = "未找到该用户"
+        redirect_to import_rednote_page_accounts_path and return
+      end
+
+      render :import_preview_rednote
+    else
+      @keyword = query
+      @search_results = AccountResolver.search_rednote(query)
+
+      if @search_results.empty?
+        flash[:warning] = "未搜索到匹配的帐号"
+        redirect_to import_rednote_page_accounts_path and return
+      end
+
+      render :import_preview_rednote_search
     end
-
-    basic = user_data["basic_info"]
-    @user_info = {
-      user_id:    profile_id,
-      nickname:   basic["nickname"] || "",
-      image:      basic["images"] || ""
-    }
-
-    render :import_preview_rednote
-  rescue RednoteApiClient::ApiKeyMissingError => e
-    flash[:error] = "小红书 API Key 未配置，请先在设置页面配置"
+  rescue RednoteApiClient::ApiKeyMissingError, TikHubApiClient::ApiKeyMissingError => e
+    flash[:error] = "API Key 未配置，请先在设置页面配置"
     redirect_to import_rednote_page_accounts_path
-  rescue RednoteApiClient::ApiError => e
+  rescue RednoteApiClient::ApiError, TikHubApiClient::ApiError => e
     flash[:error] = truncate_error("查找失败：#{e.message}")
     redirect_to import_rednote_page_accounts_path
   rescue StandardError => e
@@ -334,12 +340,15 @@ class AccountsController < ApplicationController
   def import_rednote_by_id
     accounts_data = params[:accounts_data]&.to_unsafe_h || {}
 
-    if accounts_data.blank?
+    # Filter to only selected accounts
+    selected = accounts_data.select { |_, data| data["selected"] == "1" || data[:selected] == "1" }
+
+    if selected.blank?
       flash[:error] = "请至少选择一个帐号"
       redirect_to import_rednote_page_accounts_path and return
     end
 
-    rows = accounts_data.map do |user_id, data|
+    rows = selected.map do |user_id, data|
       {
         "user_id"  => user_id.to_s,
         "nickname" => data["nickname"] || data[:nickname],
@@ -381,7 +390,13 @@ class AccountsController < ApplicationController
       redirect_to import_twitter_page_accounts_path and return
     end
 
-    @search_results = Twitter::Importer.search_by_names(screen_names)
+    @search_results = []
+    screen_names.each do |name|
+      users = AccountResolver.search_twitter(name)
+      @search_results.concat(users) if users.any?
+    rescue TwitterApiClient::ApiError => e
+      Rails.logger.warn("Twitter lookup failed for @#{name}: #{e.message}")
+    end
 
     if @search_results.empty?
       flash[:warning] = "未找到匹配的 Twitter 帐号"
@@ -391,9 +406,6 @@ class AccountsController < ApplicationController
     render :import_preview_twitter
   rescue TwitterApiClient::ApiKeyMissingError => e
     flash[:error] = "Twitter cookies 未配置，请先在设置页面配置"
-    redirect_to import_twitter_page_accounts_path
-  rescue TwitterApiClient::ApiError => e
-    flash[:error] = truncate_error("Twitter 搜索失败：#{e.message}")
     redirect_to import_twitter_page_accounts_path
   rescue StandardError => e
     flash[:error] = truncate_error("搜索失败：#{e.message}")

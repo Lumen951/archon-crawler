@@ -183,6 +183,59 @@
     <% end %>
   </div>
 
+  <!-- TikHub API Key -->
+  <div class="card">
+    <h2 class="text-xl font-bold text-gray-900 mb-4">TikHub API 密钥</h2>
+    <p class="text-sm text-gray-600 mb-4">用于小红书用户搜索功能（按名称搜索帐号）</p>
+
+    <% if @tikhub_api_key.present? %>
+      <div class="mb-4 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-purple-900">当前 API 密钥</p>
+            <p class="text-sm text-purple-700 mt-1 font-mono"><%= mask_api_key(@tikhub_api_key) %></p>
+            <% if @tikhub_key_check %>
+              <p class="text-sm mt-1">
+                上次验证：
+                <% if @tikhub_key_check[:valid] == true %>
+                  <span class="text-green-700 font-semibold">✓ 有效</span>
+                <% elsif @tikhub_key_check[:valid] == false %>
+                  <span class="text-red-700 font-semibold">✗ 无效</span>
+                <% else %>
+                  <span class="text-yellow-700 font-semibold">? 验证失败</span>
+                <% end %>
+                <span class="text-gray-500 text-xs ml-1">(<%= Time.parse(@tikhub_key_check[:checked_at]).strftime('%Y-%m-%d %H:%M') %>)</span>
+              </p>
+            <% end %>
+          </div>
+          <%= button_to "验证接口", validate_tikhub_key_admin_settings_path, method: :post,
+              class: "text-sm px-3 py-1.5 rounded bg-purple-600 text-white hover:bg-purple-700 transition self-start" %>
+        </div>
+      </div>
+    <% else %>
+      <div class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+        <p class="text-sm text-yellow-800">未配置 TikHub API 密钥。小红书按名称搜索功能将不可用。</p>
+        <p class="text-xs text-yellow-700 mt-1">从 <a href="https://tikhub.io" target="_blank" class="text-primary hover:underline">tikhub.io</a> 获取 API Token</p>
+      </div>
+    <% end %>
+
+    <%= form_with url: admin_settings_path, method: :patch, class: "space-y-4" do |f| %>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">API Token</label>
+        <%= text_field_tag :tikhub_api_key, nil,
+            class: "w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent",
+            placeholder: "输入 TikHub API Token" %>
+        <p class="mt-1 text-sm text-gray-500">
+          从 <a href="https://tikhub.io" target="_blank" class="text-primary hover:underline">tikhub.io</a> 用户中心获取 API Token
+        </p>
+      </div>
+
+      <div class="flex items-center justify-end">
+        <button type="submit" class="btn btn-primary">保存 TikHub 密钥</button>
+      </div>
+    <% end %>
+  </div>
+
   <!-- Crawl Settings -->
   <div class="card">
     <h2 class="text-xl font-bold text-gray-900 mb-4">抓取设置</h2>

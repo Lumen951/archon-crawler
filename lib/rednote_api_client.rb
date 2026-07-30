@@ -1,5 +1,6 @@
 require "faraday"
 require "faraday/retry"
+require "response_cache_middleware"
 
 class RednoteApiClient
   BASE_URL = "https://api.yddm.com"
@@ -16,6 +17,7 @@ class RednoteApiClient
 
   def self.connection
     @connection ||= Faraday.new(url: BASE_URL) do |f|
+      f.request :response_cache
       f.request :json
       f.request :retry, max: 3, interval: 1, backoff_factor: 2,
                          exceptions: [ Faraday::TimeoutError, Faraday::ConnectionFailed ]

@@ -11,9 +11,11 @@ class Admin::SettingsController < Admin::BaseController
     @twitter_ct0 = Option.get('twitter_ct0')
     @twitter_auth_token = Option.get('twitter_auth_token')
     @twitter_proxy = Option.get('twitter_proxy')
+    @tikhub_api_key = Option.tikhub_api_key
     @wechat_key_check = Rails.cache.read('api_key_check:wechat')
     @rednote_key_check = Rails.cache.read('api_key_check:rednote')
     @twitter_key_check = Rails.cache.read('api_key_check:twitter')
+    @tikhub_key_check = Rails.cache.read('api_key_check:tikhub')
   end
 
   def update
@@ -27,6 +29,11 @@ class Admin::SettingsController < Admin::BaseController
     if params[:rednote_api_key].present?
       Option.rednote_api_key = params[:rednote_api_key]
       flash[:success] = "小红书 API 密钥更新成功"
+    end
+
+    if params[:tikhub_api_key].present?
+      Option.tikhub_api_key = params[:tikhub_api_key]
+      flash[:success] = "TikHub API 密钥更新成功"
     end
 
     if params[:twitter_ct0].present?
@@ -109,6 +116,18 @@ class Admin::SettingsController < Admin::BaseController
     redirect_to admin_settings_path
   rescue => e
     Rails.logger.error("Twitter API key validation error: #{e.message}")
+    flash[:error] = "验证失败：#{e.message[0..200]}"
+    redirect_to admin_settings_path
+  end
+
+  def validate_tikhub_key
+    valid = TikHubApiClient.validate_key
+    result = { valid: valid, checked_at: Time.current.iso8601 }
+    Rails.cache.write('api_key_check:tikhub', result, expires_in: 2.hours)
+    flash[:success] = valid ? "✓ TikHub API 密钥有效" : "✗ TikHub API 密钥无效"
+    redirect_to admin_settings_path
+  rescue => e
+    Rails.logger.error("TikHub API key validation error: #{e.message}")
     flash[:error] = "验证失败：#{e.message[0..200]}"
     redirect_to admin_settings_path
   end

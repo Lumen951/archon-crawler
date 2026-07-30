@@ -20,14 +20,6 @@ module Accounts
       new.import_file(file)
     end
 
-    def self.import_search(keyword)
-      new.import_search(keyword)
-    end
-
-    def self.search(keyword)
-      new.search(keyword)
-    end
-
     def self.import_search_rows(rows)
       new.import_search_rows(rows)
     end
@@ -53,19 +45,6 @@ module Accounts
       end
 
       import_rows(rows)
-    end
-
-    def import_search(keyword)
-      import_rows(search(keyword))
-    end
-
-    def search(keyword)
-      response = WechatApiClient.search_account(keyword)
-      rows = extract_accounts_from_search_response(response)
-
-      raise ArgumentError, "未搜索到匹配的帐号" if rows.empty?
-
-      rows
     end
 
     def import_search_rows(rows)
@@ -118,42 +97,6 @@ module Accounts
       json.fetch("accounts")
     rescue JSON::ParserError => e
       raise ArgumentError, "无效的 JSON 格式：#{e.message}"
-    end
-
-    def extract_accounts_from_search_response(response)
-      if response.is_a?(Hash) && response["code"].to_i != 0
-        message = response["message"].presence || response["msg"].presence || response["err_msg"].presence || "搜索帐号接口返回错误"
-        raise ArgumentError, message
-      end
-
-      rows = search_result_rows(response)
-      rows.filter_map do |row|
-        next unless row.is_a?(Hash)
-
-        {
-          fakeid: normalize_value(row["fakeid"] || row[:fakeid]),
-          nickname: normalize_value(row["nickname"] || row[:nickname] || row["name"] || row[:name]),
-          round_head_img: normalize_value(row["round_head_img"] || row[:round_head_img] || row["avatar"] || row[:avatar]),
-          total_articles: parse_integer(row["articles"] || row[:articles] || row["total_articles"] || row[:total_articles])
-        }
-      end
-    end
-
-    def search_result_rows(response)
-      return response if response.is_a?(Array)
-      return [] unless response.is_a?(Hash)
-
-      candidates = [
-        response["accounts"],
-        response["list"],
-        response["data"],
-        response.dig("data", "accounts"),
-        response.dig("data", "list"),
-        response.dig("result", "accounts"),
-        response.dig("result", "list")
-      ]
-
-      candidates.find { |candidate| candidate.is_a?(Array) } || []
     end
 
     def parse_csv(content)

@@ -87,5 +87,18 @@ class Option < ApplicationRecord
     def rednote_api_key_valid?
       rednote_api_key.present?
     end
+
+    # TikHub API key helpers (for Rednote user search)
+    def tikhub_api_key
+      get('tikhub_api_key')
+    end
+
+    def tikhub_api_key=(val)
+      set('tikhub_api_key', val)
+    end
+
+    def tikhub_api_key_valid?
+      tikhub_api_key.present?
+    end
   end
 end

@@ -2,7 +2,7 @@
   <div class="flex items-center justify-between">
     <div>
       <h1 class="text-3xl font-bold text-gray-900">导入小红书帐号</h1>
-      <p class="text-gray-600 mt-1">支持 Profile ID 查找和 CSV 文件导入</p>
+      <p class="text-gray-600 mt-1">支持用户 ID、名称搜索和 CSV 文件导入</p>
     </div>
     <%= link_to "← 返回导入页", import_accounts_path, class: "btn btn-secondary" %>
   </div>
@@ -10,20 +10,20 @@
   <div class="card">
     <div class="border-b border-gray-200 mb-6">
       <nav class="-mb-px flex space-x-8">
-        <button type="button" onclick="showTab('search')" id="tab-search" class="tab-button border-b-2 border-rose-500 text-rose-600 py-4 px-1 text-sm font-medium">Profile ID 查找</button>
+        <button type="button" onclick="showTab('search')" id="tab-search" class="tab-button border-b-2 border-rose-500 text-rose-600 py-4 px-1 text-sm font-medium">用户查找</button>
         <button type="button" onclick="showTab('upload')" id="tab-upload" class="tab-button border-b-2 border-transparent text-gray-500 hover:text-gray-700 py-4 px-1 text-sm font-medium">上传文件</button>
       </nav>
     </div>
 
-    <%# Profile ID search tab %>
+    <%# Search tab %>
     <div id="search-tab" class="tab-content">
       <%= form_with url: import_rednote_search_accounts_path, method: :get, local: true, id: "search-form" do %>
         <div class="space-y-4">
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">小红书 Profile ID</label>
-            <input type="text" id="profile-id-input" name="profile_id" placeholder="例如：618bdf350000000010004769"
+            <label class="block text-sm font-medium text-gray-700 mb-2">用户 ID 或名称</label>
+            <input type="text" id="search-input" name="profile_id" placeholder="输入 Profile ID（24位）或用户名称关键词"
                    class="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:border-transparent" required>
-            <p class="mt-2 text-sm text-gray-500">输入小红书用户的 Profile ID，系统将查找用户信息并展示供您确认后导入。</p>
+            <p class="mt-2 text-sm text-gray-500">输入用户 ID 精确查找，或输入名称关键词搜索多个匹配帐号。</p>
           </div>
           <div class="flex justify-end">
             <button type="submit" class="btn btn-primary">查找用户</button>
@@ -66,7 +66,8 @@
   <div class="card bg-rose-50 border-rose-200">
     <h3 class="font-semibold text-rose-900 mb-3">💡 导入提示</h3>
     <ul class="space-y-1 text-sm text-rose-800">
-      <li>• <strong>Profile ID 查找</strong>：输入用户 ID，查找确认后导入单个帐号</li>
+      <li>• <strong>用户 ID 查找</strong>：输入 24 位 Profile ID，精确查找单个帐号</li>
+      <li>• <strong>名称搜索</strong>：输入关键词，搜索多个匹配帐号（需要 TikHub API Key）</li>
       <li>• <strong>CSV 文件导入</strong>：批量导入，必填字段 <code class="bg-rose-100 px-1 rounded">user_id</code>、<code class="bg-rose-100 px-1 rounded">nickname</code></li>
       <li>• 可选字段：<code class="bg-rose-100 px-1 rounded">avatar</code>（头像 URL）</li>
       <li>• 重复的 user_id 自动跳过</li>
@@ -116,10 +117,10 @@ abc123example,博主A,https://example.com/avatar1.jpg</code></pre>
   }
   setupDropZone();
 
-  const profileIdInput = document.getElementById('profile-id-input');
+  const searchInput = document.getElementById('search-input');
   const searchForm = document.getElementById('search-form');
-  if (profileIdInput && searchForm) {
-    profileIdInput.addEventListener('keydown', e => {
+  if (searchInput && searchForm) {
+    searchInput.addEventListener('keydown', e => {
       if (e.key === 'Enter') { e.preventDefault(); searchForm.requestSubmit(); }
     });
   }
