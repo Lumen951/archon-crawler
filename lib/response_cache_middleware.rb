@@ -44,6 +44,7 @@ class ResponseCacheMiddleware < Faraday::Middleware
   private
 
   def skip_cache?(env)
+    return true if Rails.env.development?
     env.request.context&.dig(:nocache) == true
   end
 
