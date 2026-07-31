@@ -4,7 +4,15 @@ require 'async/semaphore'
 # Crawls WeChat public accounts. Orchestration across accounts (concurrency,
 # pausing, retry scheduling) is handled by CrawlOrchestrator; this class only
 # knows how to crawl a single WeChat account's articles.
+#
+# Uses the API provider configured in Option.wechat_api_provider:
+#   "mptext"  (default) — WechatApiClient (down.mptext.top)
+#   "dajiala"           — DajialaApiClient (dajiala.com)
 class WechatCrawler < BaseCrawler
+  # Returns the active API client class based on the provider setting.
+  def self.api_client
+    Option.wechat_api_provider == "dajiala" ? DajialaApiClient : WechatApiClient
+  end
   def self.crawl_account(account, crawl_task, article_concurrency:, max_pages:)
     task_account = crawl_task.crawl_task_accounts.find_by(account: account)
     task_account&.mark_running!
@@ -12,7 +20,29 @@ class WechatCrawler < BaseCrawler
     crawl_task.log(:info, "开始抓取帐号：#{account.nickname}")
     article_semaphore = Async::Semaphore.new(article_concurrency)
 
-    offset = 0
+    dajiala = Option.wechat_api_provider == "dajiala"
+
+    # Dajiala requires `alias` (ghid) instead of `fakeid`.
+    # Search via mptext API to get account details and cache in metadata.
+    # if dajiala
+    #   if account.metadata&.dig('alias').blank?
+    #     crawl_task.log(:info, "#{account.nickname}: 正在搜索公众号信息...")
+    #     search_result = WechatApiClient.search_account(account.nickname)
+    #     match = (search_result['list'] || []).find { |a| a['nickname'] == account.nickname }
+    #     match ||= (search_result['list'] || []).first
+    #     if match.blank?
+    #       raise DajialaApiClient::ApiError, "无法找到帐号 #{account.nickname}，请检查帐号名称是否正确"
+    #     end
+    #     account.metadata = (account.metadata || {}).merge(match)
+    #     account.save!
+    #     crawl_task.log(:info, "#{account.nickname}: 已获取帐号信息，alias = #{match['alias']}")
+    #   end
+    # end
+
+    # Dajiala uses alias (ghid), mptext uses fakeid
+    # identifier = dajiala ? (account.metadata&.dig('alias').presence || account.fakeid) : account.fakeid
+    identifier = dajiala ? account.nickname : account.fakeid
+    offset = dajiala ? "" : 0
     pages_crawled = 0
 
     loop do
@@ -28,7 +58,8 @@ class WechatCrawler < BaseCrawler
         crawl_task: crawl_task,
         context: "#{account.nickname}: 文章列表获取 (offset: #{offset})"
       ) do
-        WechatApiClient.get_articles(account.fakeid, begin_offset: offset, size: 20)
+        # mptext uses fakeid, Dajiala uses biz (stored in metadata)
+        api_client.get_articles(identifier, begin_offset: offset, size: 20)
       end
       break unless response
 
@@ -39,7 +70,7 @@ class WechatCrawler < BaseCrawler
         break
       end
 
-      crawl_task.log(:info, "#{account.nickname}: 获取了 #{articles_data.size} 篇文章（偏移 #{offset}）")
+      crawl_task.log(:info, "#{account.nickname}: 获取了 #{articles_data.size} 篇文章（第 #{pages_crawled + 1} 页）")
 
       articles_data.each do |article_data|
         break if crawl_task.error_threshold_exceeded?(account.class.name)
@@ -49,9 +80,16 @@ class WechatCrawler < BaseCrawler
         end
       end
 
-      offset += 20
-      pages_crawled += 1
+      # Advance pagination
+      if dajiala
+        break if response["dajiala_end"]
+        offset = response["dajiala_offset"] || ""
+        break if offset.blank?
+      else
+        offset += 20
+      end
 
+      pages_crawled += 1
       sleep 0.5
     end
 
@@ -109,7 +147,7 @@ class WechatCrawler < BaseCrawler
       crawl_task: crawl_task,
       context: "下载 #{url} (#{format})"
     ) do
-      WechatApiClient.download_content(url, format: format)
+      api_client.download_content(url, format: format)
     end
   end
 end

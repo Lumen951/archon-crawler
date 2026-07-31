@@ -2,6 +2,8 @@ class Admin::SettingsController < Admin::BaseController
   def show
     @api_key_value = Option.api_key
     @api_key_expires_at = Option.get('wechat_api_key_expires_at')
+    @wechat_api_provider = Option.wechat_api_provider
+    @dajiala_api_key = Option.dajiala_api_key
     @rednote_api_key = Option.rednote_api_key
     @default_article_concurrency = Option.default_article_concurrency
     @default_account_concurrency = Option.default_account_concurrency
@@ -13,12 +15,23 @@ class Admin::SettingsController < Admin::BaseController
     @twitter_proxy = Option.get('twitter_proxy')
     @tikhub_api_key = Option.tikhub_api_key
     @wechat_key_check = Rails.cache.read('api_key_check:wechat')
+    @dajiala_key_check = Rails.cache.read('api_key_check:dajiala')
     @rednote_key_check = Rails.cache.read('api_key_check:rednote')
     @twitter_key_check = Rails.cache.read('api_key_check:twitter')
     @tikhub_key_check = Rails.cache.read('api_key_check:tikhub')
   end
 
   def update
+    if params[:wechat_api_provider].present?
+      Option.wechat_api_provider = params[:wechat_api_provider]
+      flash[:success] = "微信 API 提供商已切换为 #{params[:wechat_api_provider]}"
+    end
+
+    if params[:dajiala_api_key].present?
+      Option.dajiala_api_key = params[:dajiala_api_key]
+      flash[:success] = "Dajiala API 密钥更新成功"
+    end
+
     if params[:api_key].present?
       expires_at = params[:expires_days].to_i.days.from_now
       Option.api_key = params[:api_key]
@@ -92,6 +105,18 @@ class Admin::SettingsController < Admin::BaseController
     redirect_to admin_settings_path
   rescue => e
     Rails.logger.error("WeChat API key validation error: #{e.message}")
+    flash[:error] = "验证失败：#{e.message[0..200]}"
+    redirect_to admin_settings_path
+  end
+
+  def validate_dajiala_key
+    valid = DajialaApiClient.validate_key
+    result = { valid: valid, checked_at: Time.current.iso8601 }
+    Rails.cache.write('api_key_check:dajiala', result, expires_in: 2.hours)
+    flash[:success] = valid ? "✓ Dajiala API 密钥有效" : "✗ Dajiala API 密钥无效"
+    redirect_to admin_settings_path
+  rescue => e
+    Rails.logger.error("Dajiala API key validation error: #{e.message}")
     flash[:error] = "验证失败：#{e.message[0..200]}"
     redirect_to admin_settings_path
   end

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_18_100002) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_31_053711) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -18,6 +18,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_18_100002) do
     t.datetime "created_at", null: false
     t.string "fakeid", null: false
     t.datetime "last_crawled_at"
+    t.jsonb "metadata", default: {}
     t.string "nickname", null: false
     t.string "round_head_img"
     t.integer "status", default: 0
@@ -26,6 +27,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_18_100002) do
     t.string "type", null: false
     t.datetime "updated_at", null: false
     t.index ["fakeid"], name: "index_accounts_on_fakeid", unique: true
+    t.index ["metadata"], name: "index_accounts_on_metadata", using: :gin
     t.index ["status"], name: "index_accounts_on_status"
     t.index ["twitter_screen_name"], name: "index_accounts_on_twitter_screen_name"
     t.index ["type"], name: "index_accounts_on_type"

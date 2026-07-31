@@ -73,6 +73,19 @@ class CrawlTasksController < ApplicationController
     # The poller stops itself after rendering a terminal state.
   end
 
+  def destroy
+    @crawl_task = CrawlTask.find(params[:id])
+
+    unless @crawl_task.completed? || @crawl_task.failed?
+      flash[:error] = "只能删除已完成或已失败的任务"
+      redirect_to crawl_task_path(@crawl_task) and return
+    end
+
+    @crawl_task.destroy
+    flash[:success] = "抓取任务已删除"
+    redirect_to crawl_tasks_path
+  end
+
   def crawl_all
     # has_wechat  = WechatAccount.active.exists?
     # has_rednote = RednoteAccount.active.exists?

@@ -25,6 +25,9 @@
         <% elsif crawl_task.paused? || crawl_task.failed? %>
           <%= button_to "重试抓取未完成的帐号", resume_crawl_task_path(crawl_task), method: :post, class: "btn btn-primary" %>
         <% end %>
+        <% if crawl_task.completed? || crawl_task.failed? %>
+          <%= button_to "删除任务", crawl_task_path(crawl_task), method: :delete, data: { turbo_confirm: "确定要删除此抓取任务吗？关联的日志和帐号追踪记录将被删除，文章不会被删除。" }, class: "btn btn-danger" %>
+        <% end %>
       </div>
     </div>
 

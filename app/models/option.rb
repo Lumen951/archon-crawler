@@ -100,5 +100,28 @@ class Option < ApplicationRecord
     def tikhub_api_key_valid?
       tikhub_api_key.present?
     end
+
+    # WeChat API provider helpers
+    # Returns "mptext" (default) or "dajiala"
+    def wechat_api_provider
+      get('wechat_api_provider') || 'mptext'
+    end
+
+    def wechat_api_provider=(val)
+      set('wechat_api_provider', val)
+    end
+
+    # Dajiala API key helpers
+    def dajiala_api_key
+      get('dajiala_api_key')
+    end
+
+    def dajiala_api_key=(val)
+      set('dajiala_api_key', val)
+    end
+
+    def dajiala_api_key_valid?
+      dajiala_api_key.present?
+    end
   end
 end

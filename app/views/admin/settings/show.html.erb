@@ -4,69 +4,139 @@
     <p class="text-gray-600 mt-1">配置您的 API 密钥和系统设置</p>
   </div>
 
-  <!-- API Key Section -->
+  <!-- WeChat API Provider Section -->
   <div class="card">
-    <h2 class="text-xl font-bold text-gray-900 mb-4">微信 API 密钥</h2>
+    <h2 class="text-xl font-bold text-gray-900 mb-4">微信 API 设置</h2>
 
-    <% if @api_key_value.present? %>
-      <div class="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-sm font-medium text-blue-900">当前 API 密钥</p>
-            <p class="text-sm text-blue-700 mt-1 font-mono"><%= mask_api_key(@api_key_value) %></p>
-            <p class="text-sm text-blue-700 mt-1">
-              过期时间：<%= @api_key_expires_at ? Time.parse(@api_key_expires_at).strftime('%Y-%m-%d %H:%M') : '永不过期' %>
-              <% if @api_key_expires_at && Time.parse(@api_key_expires_at) < 24.hours.from_now %>
-                <span class="ml-2 text-red-600 font-semibold">⚠️ 即将过期！</span>
-              <% end %>
-            </p>
-            <% if @wechat_key_check %>
-              <p class="text-sm mt-1">
-                上次验证：
-                <% if @wechat_key_check[:valid] == true %>
-                  <span class="text-green-700 font-semibold">✓ 有效</span>
-                <% elsif @wechat_key_check[:valid] == false %>
-                  <span class="text-red-700 font-semibold">✗ 无效</span>
-                <% else %>
-                  <span class="text-yellow-700 font-semibold">? 验证失败</span>
+    <!-- Provider Selector -->
+    <div class="mb-6">
+      <label class="block text-sm font-medium text-gray-700 mb-2">API 提供商</label>
+      <%= form_with url: admin_settings_path, method: :patch, class: "flex items-center gap-3" do |f| %>
+        <select name="wechat_api_provider" id="wechat_provider_select"
+                class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                onchange="this.form.requestSubmit()">
+          <option value="mptext" <%= 'selected' if @wechat_api_provider == 'mptext' %>>MPText (down.mptext.top)</option>
+          <option value="dajiala" <%= 'selected' if @wechat_api_provider == 'dajiala' %>>Dajiala (dajiala.com)</option>
+        </select>
+        <noscript><button type="submit" class="btn btn-primary text-sm">切换</button></noscript>
+      <% end %>
+      <p class="mt-1 text-sm text-gray-500">选择用于抓取微信公众号文章的 API 服务</p>
+    </div>
+
+    <!-- MPText Section -->
+    <div id="mptext_section" style="display: <%= @wechat_api_provider == 'mptext' ? 'block' : 'none' %>">
+      <h3 class="text-lg font-semibold text-gray-800 mb-3">MPText API</h3>
+
+      <% if @api_key_value.present? %>
+        <div class="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm font-medium text-blue-900">当前 API 密钥</p>
+              <p class="text-sm text-blue-700 mt-1 font-mono"><%= mask_api_key(@api_key_value) %></p>
+              <p class="text-sm text-blue-700 mt-1">
+                过期时间：<%= @api_key_expires_at ? Time.parse(@api_key_expires_at).strftime('%Y-%m-%d %H:%M') : '永不过期' %>
+                <% if @api_key_expires_at && Time.parse(@api_key_expires_at) < 24.hours.from_now %>
+                  <span class="ml-2 text-red-600 font-semibold">⚠️ 即将过期！</span>
                 <% end %>
-                <span class="text-gray-500 text-xs ml-1">(<%= Time.parse(@wechat_key_check[:checked_at]).strftime('%Y-%m-%d %H:%M') %>)</span>
               </p>
-            <% end %>
-          </div>
-          <div class="flex flex-col items-end gap-2">
-            <%= button_to "验证接口", validate_wechat_key_admin_settings_path, method: :post,
-                class: "text-sm px-3 py-1.5 rounded bg-blue-600 text-white hover:bg-blue-700 transition" %>
+              <% if @wechat_key_check %>
+                <p class="text-sm mt-1">
+                  上次验证：
+                  <% if @wechat_key_check[:valid] == true %>
+                    <span class="text-green-700 font-semibold">✓ 有效</span>
+                  <% elsif @wechat_key_check[:valid] == false %>
+                    <span class="text-red-700 font-semibold">✗ 无效</span>
+                  <% else %>
+                    <span class="text-yellow-700 font-semibold">? 验证失败</span>
+                  <% end %>
+                  <span class="text-gray-500 text-xs ml-1">(<%= Time.parse(@wechat_key_check[:checked_at]).strftime('%Y-%m-%d %H:%M') %>)</span>
+                </p>
+              <% end %>
+            </div>
+            <div class="flex flex-col items-end gap-2">
+              <%= button_to "验证接口", validate_wechat_key_admin_settings_path, method: :post,
+                  class: "text-sm px-3 py-1.5 rounded bg-blue-600 text-white hover:bg-blue-700 transition" %>
+            </div>
           </div>
         </div>
-      </div>
-    <% else %>
-      <div class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-        <p class="text-sm text-yellow-800">未配置 API 密钥。请在下方添加。</p>
-      </div>
-    <% end %>
+      <% else %>
+        <div class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <p class="text-sm text-yellow-800">未配置 API 密钥。请在下方添加。</p>
+        </div>
+      <% end %>
 
-    <%= form_with url: admin_settings_path, method: :patch, class: "space-y-4" do |f| %>
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">API 密钥</label>
-        <input type="text" name="api_key" placeholder="输入您从 down.mptext.top 获取的 API 密钥"
-               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
-        <p class="mt-1 text-sm text-gray-500">
-          从 <a href="https://down.mptext.top/dashboard/api" target="_blank" class="text-primary hover:underline">https://down.mptext.top/dashboard/api</a> 获取您的 API 密钥
-        </p>
-      </div>
+      <%= form_with url: admin_settings_path, method: :patch, class: "space-y-4" do |f| %>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">API 密钥</label>
+          <input type="text" name="api_key" placeholder="输入您从 down.mptext.top 获取的 API 密钥"
+                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+          <p class="mt-1 text-sm text-gray-500">
+            从 <a href="https://down.mptext.top/dashboard/api" target="_blank" class="text-primary hover:underline">https://down.mptext.top/dashboard/api</a> 获取您的 API 密钥
+          </p>
+        </div>
 
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">过期时间（天）</label>
-        <select name="expires_days" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
-          <option value="4" selected>4 天（推荐）</option>
-          <option value="3">3 天</option>
-          <option value="5">5 天</option>
-        </select>
-      </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">过期时间（天）</label>
+          <select name="expires_days" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+            <option value="4" selected>4 天（推荐）</option>
+            <option value="3">3 天</option>
+            <option value="5">5 天</option>
+          </select>
+        </div>
 
-      <button type="submit" class="btn btn-primary">更新 API 密钥</button>
-    <% end %>
+        <button type="submit" class="btn btn-primary">更新 API 密钥</button>
+      <% end %>
+    </div>
+
+    <!-- Dajiala Section -->
+    <div id="dajiala_section" style="display: <%= @wechat_api_provider == 'dajiala' ? 'block' : 'none' %>">
+      <h3 class="text-lg font-semibold text-gray-800 mb-3">Dajiala API</h3>
+
+      <% if @dajiala_api_key.present? %>
+        <div class="mb-4 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm font-medium text-indigo-900">当前 API 密钥</p>
+              <p class="text-sm text-indigo-700 mt-1 font-mono"><%= mask_api_key(@dajiala_api_key) %></p>
+              <% if @dajiala_key_check %>
+                <p class="text-sm mt-1">
+                  上次验证：
+                  <% if @dajiala_key_check[:valid] == true %>
+                    <span class="text-green-700 font-semibold">✓ 有效</span>
+                  <% elsif @dajiala_key_check[:valid] == false %>
+                    <span class="text-red-700 font-semibold">✗ 无效</span>
+                  <% else %>
+                    <span class="text-yellow-700 font-semibold">? 验证失败</span>
+                  <% end %>
+                  <span class="text-gray-500 text-xs ml-1">(<%= Time.parse(@dajiala_key_check[:checked_at]).strftime('%Y-%m-%d %H:%M') %>)</span>
+                </p>
+              <% end %>
+            </div>
+            <div class="flex flex-col items-end gap-2">
+              <%= button_to "验证接口", validate_dajiala_key_admin_settings_path, method: :post,
+                  class: "text-sm px-3 py-1.5 rounded bg-indigo-600 text-white hover:bg-indigo-700 transition" %>
+            </div>
+          </div>
+        </div>
+      <% else %>
+        <div class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <p class="text-sm text-yellow-800">未配置 Dajiala API 密钥。请在下方添加。</p>
+        </div>
+      <% end %>
+
+      <%= form_with url: admin_settings_path, method: :patch, class: "space-y-4" do |f| %>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">API 密钥</label>
+          <input type="text" name="dajiala_api_key" placeholder="输入您的 Dajiala API 密钥"
+                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+          <p class="mt-1 text-sm text-gray-500">
+            从 <a href="https://www.dajiala.com" target="_blank" class="text-primary hover:underline">dajiala.com</a> 获取您的 API 密钥
+          </p>
+        </div>
+
+        <button type="submit" class="btn btn-primary">保存 Dajiala 密钥</button>
+      <% end %>
+    </div>
   </div>
 
   <!-- RedNote API Key -->
@@ -306,9 +376,9 @@
   <div class="card bg-gray-50">
     <h3 class="font-semibold text-gray-900 mb-2">重要说明</h3>
     <ul class="space-y-2 text-sm text-gray-600">
-      <li>• API 密钥每 4 天过期一次，必须手动更新</li>
-      <li>• 当密钥过期时，所有正在运行的抓取任务将自动暂停</li>
-      <li>• 您需要登录 <a href="https://down.mptext.top" target="_blank" class="text-primary hover:underline">down.mptext.top</a> 使用您的微信公众号来获取新密钥</li>
+      <li>• <strong>MPText</strong>：API 密钥每 4 天过期一次，必须手动更新；当密钥过期时，抓取任务将自动暂停</li>
+      <li>• <strong>Dajiala</strong>：使用公众号名称抓取文章，无需 fakeid；如遇频率限制可切换回 MPText</li>
+      <li>• 两个提供商的搜索导入功能均使用 MPText API</li>
       <li>• 更高的并发数 = 更快的抓取速度，但可能触发速率限制</li>
     </ul>
   </div>

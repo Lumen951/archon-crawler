@@ -45,7 +45,7 @@ Rails.application.routes.draw do
     end
   end
 
-  resources :crawl_tasks, only: [:index, :show] do
+  resources :crawl_tasks, only: [:index, :show, :destroy] do
     collection do
       post :crawl_all
     end
@@ -88,6 +88,7 @@ Rails.application.routes.draw do
 
     resource :settings, only: [:show, :update] do
       post :validate_wechat_key
+      post :validate_dajiala_key
       post :validate_rednote_key
       post :validate_twitter_key
       post :validate_tikhub_key
