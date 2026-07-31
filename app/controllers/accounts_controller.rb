@@ -218,6 +218,81 @@ class AccountsController < ApplicationController
     redirect_back fallback_location: accounts_path
   end
 
+  def bulk_enable
+    account_ids = resolve_bulk_account_ids
+    if account_ids.blank?
+      flash[:error] = "请选择帐号"
+      redirect_back fallback_location: accounts_path and return
+    end
+
+    count = Account.where(id: account_ids).update_all(status: :active)
+    flash[:success] = "已启用 #{count} 个帐号"
+    redirect_back fallback_location: accounts_path
+  rescue StandardError => e
+    flash[:error] = "操作失败：#{e.message}"
+    redirect_back fallback_location: accounts_path
+  end
+
+  def bulk_disable
+    account_ids = resolve_bulk_account_ids
+    if account_ids.blank?
+      flash[:error] = "请选择帐号"
+      redirect_back fallback_location: accounts_path and return
+    end
+
+    count = Account.where(id: account_ids).update_all(status: :inactive)
+    flash[:success] = "已停用 #{count} 个帐号"
+    redirect_back fallback_location: accounts_path
+  rescue StandardError => e
+    flash[:error] = "操作失败：#{e.message}"
+    redirect_back fallback_location: accounts_path
+  end
+
+  def bulk_destroy
+    account_ids = resolve_bulk_account_ids
+    if account_ids.blank?
+      flash[:error] = "请选择帐号"
+      redirect_back fallback_location: accounts_path and return
+    end
+
+    count = Account.where(id: account_ids).destroy_all.count
+    flash[:success] = "已删除 #{count} 个帐号"
+    redirect_to accounts_path
+  rescue StandardError => e
+    flash[:error] = "删除失败：#{e.message}"
+    redirect_back fallback_location: accounts_path
+  end
+
+  def bulk_crawl
+    account_ids = resolve_bulk_account_ids
+    if account_ids.blank?
+      flash[:error] = "请选择帐号"
+      redirect_back fallback_location: accounts_path and return
+    end
+
+    if CrawlTask.active.exists?
+      flash[:error] = "已有活跃的抓取任务，请先完成或暂停"
+      redirect_back fallback_location: accounts_path and return
+    end
+
+    accounts = Account.where(id: account_ids).active
+    if accounts.empty?
+      flash[:error] = "选中的帐号中没有活跃帐号"
+      redirect_back fallback_location: accounts_path and return
+    end
+
+    crawl_task = CrawlTask.create!(status: :pending)
+    accounts.each do |account|
+      crawl_task.crawl_task_accounts.create!(account: account, status: :pending)
+    end
+    CrawlJob.perform_later(crawl_task.id)
+    flash[:success] = "已为 #{accounts.size} 个帐号启动抓取"
+    redirect_to crawl_task_path(crawl_task)
+  rescue StandardError => e
+    flash[:error] = "启动抓取失败：#{e.message}"
+    redirect_back fallback_location: accounts_path
+  end
+
   def tag_suggestions
     query = params[:q].to_s.strip
     tags = query.blank? ? Tag.ordered.limit(20) : Tag.search(query).ordered.limit(10)

@@ -293,7 +293,7 @@
 
   <!-- Bulk Action Bar (sticky bottom) -->
   <div data-bulk-selector-target="actionBar"
-       class="hidden fixed bottom-0 left-0 right-0 z-40 bg-bg-card border-t border-border-primary shadow-[0_-4px_20px_rgba(15,23,42,.1)]">
+       class="hidden fixed bottom-16 md:bottom-0 left-0 right-0 z-40 bg-bg-card border-t border-border-primary shadow-[0_-4px_20px_rgba(15,23,42,.1)]">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
       <!-- Select All Matching Banner -->
       <div data-select-all-banner class="hidden mb-3 p-2 bg-brand-soft rounded-lg flex items-center justify-between">
@@ -416,6 +416,77 @@
                     </button>
                   </div>
                 </form>
+              </div>
+            </div>
+          </div>
+
+          <!-- More Actions Dropdown -->
+          <div data-controller="modal">
+            <div class="relative" data-controller="dropdown">
+              <button data-action="click->dropdown#toggle"
+                      class="h-9 px-4 rounded-lg border border-border-primary bg-bg-card hover:border-brand hover:text-brand text-sm font-semibold transition whitespace-nowrap inline-flex items-center gap-1.5">
+                更多操作
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+              </button>
+              <div data-dropdown-target="panel"
+                   class="hidden absolute bottom-full md:bottom-auto md:top-full left-0 mb-1 md:mb-0 md:mt-1 w-48 bg-bg-card border border-border-primary rounded-xl shadow-lg py-1 z-50">
+                <form data-action="submit->bulk-selector#submitAndClose" action="<%= bulk_crawl_accounts_path %>" method="post">
+                  <%= hidden_field_tag :authenticity_token, form_authenticity_token %>
+                  <button type="submit" class="w-full px-4 py-2 text-left text-sm text-text-primary hover:bg-bg-secondary transition inline-flex items-center gap-2">
+                    <svg class="w-4 h-4 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    批量抓取
+                  </button>
+                </form>
+                <form data-action="submit->bulk-selector#submitAndClose" action="<%= bulk_enable_accounts_path %>" method="post">
+                  <%= hidden_field_tag :authenticity_token, form_authenticity_token %>
+                  <button type="submit" class="w-full px-4 py-2 text-left text-sm text-text-primary hover:bg-bg-secondary transition inline-flex items-center gap-2">
+                    <svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    批量启用
+                  </button>
+                </form>
+                <form data-action="submit->bulk-selector#submitAndClose" action="<%= bulk_disable_accounts_path %>" method="post">
+                  <%= hidden_field_tag :authenticity_token, form_authenticity_token %>
+                  <button type="submit" class="w-full px-4 py-2 text-left text-sm text-text-primary hover:bg-bg-secondary transition inline-flex items-center gap-2">
+                    <svg class="w-4 h-4 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    批量停用
+                  </button>
+                </form>
+                <div class="border-t border-border-primary my-1"></div>
+                <button data-action="click->dropdown#toggle click->modal#open"
+                        class="w-full px-4 py-2 text-left text-sm text-red-500 hover:bg-red-50 transition inline-flex items-center gap-2">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                  批量删除
+                </button>
+              </div>
+            </div>
+            <!-- Delete Confirmation Modal -->
+            <div data-modal-target="dialog"
+                 class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 transition-opacity duration-200 opacity-0">
+              <div data-modal-target="backdrop" data-modal-backdrop
+                   class="absolute inset-0 bg-black/50 transition-opacity duration-200 opacity-0"></div>
+              <div class="relative bg-bg-card rounded-2xl shadow-xl max-w-md w-full overflow-hidden border border-border-primary">
+                <div class="px-5 py-4 border-b border-border-primary">
+                  <h3 class="text-lg font-semibold text-text-primary">确认删除</h3>
+                </div>
+                <div class="p-5">
+                  <p class="text-sm text-text-secondary mb-2">确定要删除选中的帐号吗？</p>
+                  <p class="text-sm text-red-500 font-medium">此操作不可撤销，将同时删除帐号的所有文章数据。</p>
+                </div>
+                <div class="flex items-center justify-end gap-3 px-5 py-4 border-t border-border-primary">
+                  <button type="button" data-action="click->modal#close"
+                          class="h-9 px-4 rounded-lg border border-border-primary bg-bg-card hover:bg-bg-secondary text-sm font-semibold transition">
+                    取消
+                  </button>
+                  <form data-action="submit->bulk-selector#prepareSubmit"
+                        action="<%= bulk_destroy_accounts_path %>" method="post" class="inline-flex">
+                    <%= hidden_field_tag :authenticity_token, form_authenticity_token %>
+                    <button type="submit" class="h-9 px-4 rounded-lg bg-red-500 text-white hover:bg-red-600 text-sm font-semibold transition">
+                      确认删除
+                    </button>
+                  </form>
+                </div>
               </div>
             </div>
           </div>

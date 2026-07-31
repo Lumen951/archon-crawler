@@ -67,6 +67,17 @@ export default class extends Controller {
     this._updateUI()
   }
 
+  // Before form submit: populate hidden fields and close dropdown
+  submitAndClose(e) {
+    this.prepareSubmit(e)
+    // Close parent dropdown
+    const dropdown = e.target.closest('[data-controller="dropdown"]')
+    if (dropdown) {
+      const panel = dropdown.querySelector('[data-dropdown-target="panel"]')
+      if (panel) panel.classList.add('hidden')
+    }
+  }
+
   // Before form submit: populate hidden fields
   prepareSubmit(e) {
     const form = e.target

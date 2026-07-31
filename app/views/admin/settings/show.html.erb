@@ -11,7 +11,7 @@
     <!-- Provider Selector -->
     <div class="mb-6">
       <label class="block text-sm font-medium text-gray-700 mb-2">API 提供商</label>
-      <%= form_with url: admin_settings_path, method: :patch, class: "flex items-center gap-3" do |f| %>
+      <%= form_with url: admin_settings_path, method: :patch, class: "flex items-center gap-3", data: { turbo: false } do |f| %>
         <select name="wechat_api_provider" id="wechat_provider_select"
                 class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                 onchange="this.form.requestSubmit()">

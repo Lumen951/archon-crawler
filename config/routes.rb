@@ -19,6 +19,10 @@ Rails.application.routes.draw do
     collection do
       post :bulk_tag
       post :bulk_untag
+      post :bulk_enable
+      post :bulk_disable
+      post :bulk_destroy
+      post :bulk_crawl
       get  :tag_suggestions
       post :toggle_tag_follow
       get :import
