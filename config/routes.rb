@@ -15,7 +15,7 @@ Rails.application.routes.draw do
 
   resources :articles, only: [:show]
 
-  resources :accounts, only: [:index, :show, :destroy] do
+  resources :accounts, only: [:index, :show, :update, :destroy] do
     collection do
       post :bulk_tag
       post :bulk_untag

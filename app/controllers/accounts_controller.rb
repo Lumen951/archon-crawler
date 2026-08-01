@@ -22,6 +22,29 @@ class AccountsController < ApplicationController
     @articles = @account.articles.recent.page(params[:page]).per(25)
   end
 
+  def update
+    @account = Account.find(params[:id])
+
+    if @account.update(account_params)
+      respond_to do |format|
+        format.turbo_stream
+        format.html { redirect_to account_path(@account), flash: { success: "帐号名称已更新" } }
+        format.json { render json: { success: true, nickname: @account.nickname } }
+      end
+    else
+      respond_to do |format|
+        format.turbo_stream { render turbo_stream: helpers.toast_stream("更新失败：#{@account.errors.full_messages.join(', ')}", type: :error) }
+        format.html { redirect_to account_path(@account), flash: { error: "更新失败：#{@account.errors.full_messages.join(', ')}" } }
+        format.json { render json: { errors: @account.errors.full_messages }, status: :unprocessable_entity }
+      end
+    end
+  rescue ActiveRecord::RecordNotFound
+    respond_to do |format|
+      format.html { redirect_to accounts_path, flash: { error: "帐号不存在" } }
+      format.json { render json: { error: "帐号不存在" }, status: :not_found }
+    end
+  end
+
   def import
     # Show import landing page with links to each platform
   end
@@ -557,6 +580,10 @@ class AccountsController < ApplicationController
   end
 
   private
+
+  def account_params
+    params.require(:account).permit(:nickname)
+  end
 
   def success_message_for(result)
     message = "成功导入 #{result.imported_count} 个帐号（#{result.skipped_count} 个重复已跳过）"

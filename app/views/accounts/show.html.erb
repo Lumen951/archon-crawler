@@ -16,7 +16,22 @@
 
       <div class="flex-1 min-w-0">
         <div class="flex flex-wrap items-center gap-3 mb-3">
-          <h1 class="text-2xl sm:text-3xl font-bold text-text-primary"><%= @account.nickname %></h1>
+          <div id="<%= dom_id(@account, :name) %>"
+               data-controller="inline-edit"
+               data-inline-edit-url-value="<%= account_path(@account, format: :json) %>"
+               class="flex items-center gap-2 group">
+            <h1 data-inline-edit-target="display"
+                data-action="click->inline-edit#edit"
+                class="text-2xl sm:text-3xl font-bold text-text-primary cursor-pointer hover:opacity-80 transition-opacity">
+              <%= @account.nickname %>
+            </h1>
+            <span data-edit-icon class="text-text-secondary opacity-0 group-hover:opacity-100 transition-opacity">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+              </svg>
+            </span>
+            <div data-inline-edit-target="input" class="hidden"></div>
+          </div>
           <%= render 'shared/status_badge', status: @account.status %>
         </div>
         <div class="space-y-2">
