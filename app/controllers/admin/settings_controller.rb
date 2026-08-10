@@ -19,6 +19,9 @@ class Admin::SettingsController < Admin::BaseController
     @rednote_key_check = Rails.cache.read('api_key_check:rednote')
     @twitter_key_check = Rails.cache.read('api_key_check:twitter')
     @tikhub_key_check = Rails.cache.read('api_key_check:tikhub')
+    @crawl_wechat_enabled = Option.crawl_wechat_enabled?
+    @crawl_rednote_enabled = Option.crawl_rednote_enabled?
+    @crawl_twitter_enabled = Option.crawl_twitter_enabled?
   end
 
   def update
@@ -94,6 +97,18 @@ class Admin::SettingsController < Admin::BaseController
     if params[:log_retention_days].present?
       Option[:crawler_log_retention_days] = params[:log_retention_days]
       message = "日志保留天数更新成功"
+    end
+
+    if params.key?(:crawl_wechat_enabled)
+      Option.set("crawl_wechat_enabled", params[:crawl_wechat_enabled] == "1")
+    end
+
+    if params.key?(:crawl_rednote_enabled)
+      Option.set("crawl_rednote_enabled", params[:crawl_rednote_enabled] == "1")
+    end
+
+    if params.key?(:crawl_twitter_enabled)
+      Option.set("crawl_twitter_enabled", params[:crawl_twitter_enabled] == "1")
     end
 
     respond_to do |format|

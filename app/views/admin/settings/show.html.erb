@@ -372,6 +372,52 @@
     <% end %>
   </div>
 
+  <!-- Platform Crawl Toggle Section -->
+  <div class="card">
+    <h2 class="text-xl font-bold text-gray-900 mb-4">平台抓取开关</h2>
+    <p class="text-sm text-gray-500 mb-4">启用或禁用特定平台的帐号抓取。禁用的平台将在抓取任务中被跳过。</p>
+
+    <%= form_with url: admin_settings_path, method: :patch, class: "space-y-3" do |f| %>
+      <div>
+        <label class="flex items-center space-x-3 cursor-pointer">
+          <input type="hidden" name="crawl_wechat_enabled" value="0">
+          <input type="checkbox" name="crawl_wechat_enabled" value="1" <%= 'checked' if @crawl_wechat_enabled %>
+                 class="w-5 h-5 text-green-600 border-gray-300 rounded focus:ring-2 focus:ring-green-500">
+          <div>
+            <span class="text-sm font-medium text-gray-700">微信公众号</span>
+            <p class="text-xs text-gray-500">启用微信公众号文章抓取</p>
+          </div>
+        </label>
+      </div>
+
+      <div>
+        <label class="flex items-center space-x-3 cursor-pointer">
+          <input type="hidden" name="crawl_rednote_enabled" value="0">
+          <input type="checkbox" name="crawl_rednote_enabled" value="1" <%= 'checked' if @crawl_rednote_enabled %>
+                 class="w-5 h-5 text-rose-500 border-gray-300 rounded focus:ring-2 focus:ring-rose-500">
+          <div>
+            <span class="text-sm font-medium text-gray-700">小红书</span>
+            <p class="text-xs text-gray-500">启用小红书笔记抓取</p>
+          </div>
+        </label>
+      </div>
+
+      <div>
+        <label class="flex items-center space-x-3 cursor-pointer">
+          <input type="hidden" name="crawl_twitter_enabled" value="0">
+          <input type="checkbox" name="crawl_twitter_enabled" value="1" <%= 'checked' if @crawl_twitter_enabled %>
+                 class="w-5 h-5 text-sky-500 border-gray-300 rounded focus:ring-2 focus:ring-sky-500">
+          <div>
+            <span class="text-sm font-medium text-gray-700">Twitter</span>
+            <p class="text-xs text-gray-500">启用 Twitter 推文抓取</p>
+          </div>
+        </label>
+      </div>
+
+      <button type="submit" class="btn btn-primary">更新平台开关</button>
+    <% end %>
+  </div>
+
   <!-- Info Section -->
   <div class="card bg-gray-50">
     <h3 class="font-semibold text-gray-900 mb-2">重要说明</h3>

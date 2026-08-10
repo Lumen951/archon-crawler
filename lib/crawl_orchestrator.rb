@@ -23,9 +23,12 @@ class CrawlOrchestrator
     crawl_task.update!(status: :running, error_message: nil, error_count: 0, platform_error_counts: {}, completed_at: nil, started_at: Time.current)
 
     platform_summary = Account.subclasses.filter_map { |klass|
+      next if !klass.crawl_enabled?
       count = klass.where(id: incomplete_scope).count
       "#{klass.new.platform_name} #{count}" if count > 0
     }.join("，")
+    disabled_platforms = Account.subclasses.reject(&:crawl_enabled?).map { |k| k.new.platform_name }
+    crawl_task.log(:info, "已禁用的平台：#{disabled_platforms.join('，')}") if disabled_platforms.any?
     crawl_task.log(:info, "开始抓取任务，共 #{incomplete_scope.count} 个帐号（#{platform_summary}）")
     crawl_task.log(:info, "每平台并发：#{account_concurrency}，文章并发：#{article_concurrency}")
     crawl_task.log(:info, "最大页数：#{max_pages == -1 ? '无限制' : max_pages}")
@@ -39,6 +42,11 @@ class CrawlOrchestrator
       barrier = Async::Barrier.new
 
       Account.subclasses.each do |platform_class|
+        unless platform_class.crawl_enabled?
+          crawl_task.log(:info, "#{platform_class.new.platform_name} 平台抓取已禁用，跳过")
+          next
+        end
+
         platform_accounts = platform_class.where(id: incomplete_scope)
         next if platform_accounts.empty?
 

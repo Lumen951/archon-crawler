@@ -123,5 +123,18 @@ class Option < ApplicationRecord
     def dajiala_api_key_valid?
       dajiala_api_key.present?
     end
+
+    # Per-platform crawl toggle helpers
+    def crawl_wechat_enabled?
+      get("crawl_wechat_enabled") != "false"
+    end
+
+    def crawl_rednote_enabled?
+      get("crawl_rednote_enabled") != "false"
+    end
+
+    def crawl_twitter_enabled?
+      get("crawl_twitter_enabled") != "false"
+    end
   end
 end

@@ -91,6 +91,14 @@ class Account < ApplicationRecord
     %w[with_tag_id]
   end
 
+  # Whether crawling is enabled for this platform.
+  # Checks the "crawl_<platform>_enabled" option (default true).
+  def self.crawl_enabled?
+    return true if self == Account
+    platform_key = name.sub("Account", "").underscore
+    Option.get("crawl_#{platform_key}_enabled") != "false"
+  end
+
   scope :with_tag_id, ->(tag_id) {
     if tag_id.blank? || tag_id == "all"
       all
