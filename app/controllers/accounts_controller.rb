@@ -10,7 +10,7 @@ class AccountsController < ApplicationController
     q_params = params.fetch(:q, {})
     q_hash = q_params.respond_to?(:to_unsafe_h) ? q_params.to_unsafe_h : q_params.to_h
     @q = Account.ransack(q_hash)
-    @accounts = @q.result(distinct: true).includes(:tags).order(created_at: :desc).page(params[:page]).per(20)
+    @accounts = @q.result(distinct: true).includes(:tags).order(activity_score: :desc, last_published_at: :desc).page(params[:page]).per(20)
     @tags = Tag.ordered
     @active_tag_id = params.dig(:q, :with_tag_id).to_s.presence
     @active_tag = @active_tag_id.present? && @active_tag_id != "none" ? Tag.find_by(id: @active_tag_id) : nil

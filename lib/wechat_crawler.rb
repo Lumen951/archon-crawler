@@ -11,7 +11,11 @@ require 'async/semaphore'
 class WechatCrawler < BaseCrawler
   # Returns the active API client class based on the provider setting.
   def self.api_client
-    Option.wechat_api_provider == "dajiala" ? DajialaApiClient : WechatApiClient
+    case Option.wechat_api_provider
+    when "dajiala" then DajialaApiClient
+    when "profile_ext" then ProfileExtApiClient
+    else WechatApiClient
+    end
   end
   def self.crawl_account(account, crawl_task, article_concurrency:, max_pages:)
     task_account = crawl_task.crawl_task_accounts.find_by(account: account)
@@ -59,7 +63,7 @@ class WechatCrawler < BaseCrawler
         context: "#{account.nickname}: 文章列表获取 (offset: #{offset})"
       ) do
         # mptext uses fakeid, Dajiala uses biz (stored in metadata)
-        api_client.get_articles(identifier, begin_offset: offset, size: 20)
+        api_client.get_articles(identifier, begin_offset: offset, size: 20, crawl_task: crawl_task)
       end
       break unless response
 
@@ -93,7 +97,8 @@ class WechatCrawler < BaseCrawler
       sleep 0.5
     end
 
-    account.update!(last_crawled_at: Time.current, total_articles: account.articles.count)
+    account.refresh_activity_counters!
+    account.update_column(:last_crawled_at, Time.current)
     task_account&.mark_completed!
     crawl_task.log(:info, "#{account.nickname}: 抓取完成")
   rescue StandardError => e
@@ -147,7 +152,7 @@ class WechatCrawler < BaseCrawler
       crawl_task: crawl_task,
       context: "下载 #{url} (#{format})"
     ) do
-      api_client.download_content(url, format: format)
+      api_client.download_content(url, format: format, crawl_task: crawl_task)
     end
   end
 end

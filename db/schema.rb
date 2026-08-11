@@ -10,14 +10,19 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_31_053711) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_11_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
   create_table "accounts", force: :cascade do |t|
+    t.integer "activity_score", default: 0, null: false
+    t.integer "articles_count", default: 0, null: false
+    t.integer "articles_last_30_days", default: 0, null: false
+    t.integer "articles_last_7_days", default: 0, null: false
     t.datetime "created_at", null: false
     t.string "fakeid", null: false
     t.datetime "last_crawled_at"
+    t.datetime "last_published_at"
     t.jsonb "metadata", default: {}
     t.string "nickname", null: false
     t.string "round_head_img"
@@ -28,6 +33,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_31_053711) do
     t.datetime "updated_at", null: false
     t.index ["fakeid"], name: "index_accounts_on_fakeid", unique: true
     t.index ["metadata"], name: "index_accounts_on_metadata", using: :gin
+    t.index ["status", "last_published_at"], name: "index_accounts_on_status_and_last_published_at"
     t.index ["status"], name: "index_accounts_on_status"
     t.index ["twitter_screen_name"], name: "index_accounts_on_twitter_screen_name"
     t.index ["type"], name: "index_accounts_on_type"

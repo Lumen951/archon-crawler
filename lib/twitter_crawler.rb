@@ -59,7 +59,8 @@ class TwitterCrawler < BaseCrawler
       end
 
       elapsed = (Time.current - start_time).round(1)
-      account.update!(last_crawled_at: Time.current, total_articles: account.articles.count)
+      account.refresh_activity_counters!
+      account.update_column(:last_crawled_at, Time.current)
       task_account&.mark_completed!
       crawl_task.log(:info, "#{account.nickname}: Twitter 抓取完成，耗时 #{elapsed} 秒 — 新增 #{new_count} 篇，跳过 #{skip_count} 篇，失败 #{error_count} 篇")
 

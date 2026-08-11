@@ -26,7 +26,7 @@
   <body class="min-h-screen flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased">
     <%= render 'shared/header' %>
 
-    <main class="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 <%= 'pb-20 md:pb-8' if current_user %>">
+    <main class="flex-1 w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8 <%= 'pb-20 md:pb-8' if current_user %>">
       <%# Toast container — Turbo Streams append here; initial flashes are converted by Stimulus %>
       <%
         flash_messages = {}

@@ -96,6 +96,11 @@ Rails.application.routes.draw do
       post :validate_rednote_key
       post :validate_twitter_key
       post :validate_tikhub_key
+      post :validate_profile_ext_key
+    end
+
+    resource :analytics, only: [:show] do
+      post :bulk_disable_dormant
     end
   end
 

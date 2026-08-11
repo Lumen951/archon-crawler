@@ -4,6 +4,9 @@ class Article < ApplicationRecord
 
   validates :url, presence: true, uniqueness: true
 
+  after_create :refresh_account_counters
+  after_destroy :refresh_account_counters
+
   scope :recent, -> { order(published_at: :desc) }
   scope :today, -> { where("published_at >= ?", Time.current.beginning_of_day) }
   scope :yesterday, -> { where(published_at: Time.current.beginning_of_day - 1.day...Time.current.beginning_of_day) }
@@ -186,6 +189,10 @@ class Article < ApplicationRecord
   end
 
   private
+
+  def refresh_account_counters
+    account.refresh_activity_counters!
+  end
 
   def wechat_metadata
     {
