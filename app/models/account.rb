@@ -113,7 +113,7 @@ class Account < ApplicationRecord
       total_articles: articles_scope.count,
       articles_last_7_days: articles_scope.where("published_at >= ?", 7.days.ago).count,
       articles_last_30_days: articles_scope.where("published_at >= ?", 30.days.ago).count,
-      last_published_at: articles_scope.order(published_at: :desc).first&.published_at,
+      last_published_at: articles_scope.order(Arel.sql("published_at DESC NULLS LAST")).first&.published_at,
     }
     attrs[:activity_score] = self.class.compute_activity_score(attrs)
     update_columns(attrs)
