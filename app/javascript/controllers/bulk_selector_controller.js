@@ -84,6 +84,7 @@ export default class extends Controller {
     // Remove old hidden fields
     form.querySelectorAll('input[name="account_ids[]"]').forEach(el => el.remove())
     form.querySelectorAll('input[name="select_all"]').forEach(el => el.remove())
+    form.querySelectorAll('input[name^="q["]').forEach(el => el.remove())
 
     if (this._isSelectAllMode()) {
       const input = document.createElement('input')
@@ -91,6 +92,19 @@ export default class extends Controller {
       input.name = 'select_all'
       input.value = 'true'
       form.appendChild(input)
+
+      // Include current filter/query params from URL so the server
+      // resolves the filtered scope instead of operating on all records
+      const urlParams = new URLSearchParams(window.location.search)
+      urlParams.forEach((value, key) => {
+        if (key.startsWith('q[')) {
+          const qInput = document.createElement('input')
+          qInput.type = 'hidden'
+          qInput.name = key
+          qInput.value = value
+          form.appendChild(qInput)
+        }
+      })
     } else {
       this.selected.forEach(id => {
         const input = document.createElement('input')
