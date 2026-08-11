@@ -57,6 +57,10 @@ module QueryPersistenceConcern
     query_hash = params[:q]&.permit!&.to_h
     return if query_hash.blank?
 
+    # Exclude blank values to keep persisted filters clean
+    query_hash = query_hash.reject { |_, v| v.blank? }
+    return if query_hash.blank?
+
     Rails.cache.write(
       query_persistence_cache_key,
       query_hash,
