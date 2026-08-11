@@ -21,17 +21,19 @@ class Account < ApplicationRecord
   scope :without_tag, -> { where.not(id: TagAccount.select(:account_id)) }
 
   # Activity-based scopes
-  scope :never_published, -> { where(total_articles: 0) }
+  scope :uncrawled, -> { where(last_crawled_at: nil) }
+  scope :never_published, -> { where(total_articles: 0).where.not(last_crawled_at: nil) }
   scope :published_in_last, ->(days) { where("last_published_at >= ?", days.days.ago) }
   scope :dormant_since, ->(date) { where("last_published_at < ? OR last_published_at IS NULL", date) }
-  scope :needs_attention, -> { active.where("last_published_at < ? OR last_published_at IS NULL", 90.days.ago).where("total_articles > 0") }
+  scope :needs_attention, -> { active.where.not(last_crawled_at: nil).where("total_articles > 0").where("last_published_at < ? OR last_published_at IS NULL", 90.days.ago) }
   scope :by_activity_level, ->(level) {
     case level.to_s
     when "very_active" then where("articles_last_7_days > 0")
     when "active"      then where("articles_last_30_days > 0 AND articles_last_7_days = 0")
     when "slow"        then where("articles_last_30_days = 0").where("last_published_at >= ?", 90.days.ago).where("total_articles > 0")
     when "dormant"     then where("total_articles > 0").where("last_published_at < ? OR last_published_at IS NULL", 90.days.ago)
-    when "dead"        then where(total_articles: 0)
+    when "dead"        then where(total_articles: 0).where.not(last_crawled_at: nil)
+    when "uncrawled"   then where(last_crawled_at: nil)
     else all
     end
   }
@@ -95,6 +97,7 @@ class Account < ApplicationRecord
 
   # Returns the publish status category for this account.
   def publish_status
+    return :uncrawled if last_crawled_at.nil?
     return :never if total_articles.to_i == 0
     return :dead if last_published_at.nil?
     return :active if last_published_at >= 7.days.ago
@@ -134,8 +137,8 @@ class Account < ApplicationRecord
     puts "=" * 80
     puts "Account Activity Summary — #{Time.current.strftime('%Y-%m-%d %H:%M')}"
     puts "=" * 80
-    puts "Platform".ljust(16) + "Total".rjust(8) + "Active(≤7d)".rjust(14) + "Slow(8-30d)".rjust(14) + "Dormant(31-90d)".rjust(18) + "Dead(>90d)".rjust(14) + "Never".rjust(8)
-    puts "-" * 92
+    puts "Platform".ljust(16) + "Total".rjust(8) + "Active(≤7d)".rjust(14) + "Slow(8-30d)".rjust(14) + "Dormant(31-90d)".rjust(18) + "Dead(>90d)".rjust(14) + "Never".rjust(8) + "Uncrawled".rjust(10)
+    puts "-" * 100
 
     descendants = Account.descendants.sort_by(&:name)
     descendants.each do |klass|
@@ -146,9 +149,10 @@ class Account < ApplicationRecord
            "#{scope.where("last_published_at >= ?", 30.days.ago).where("last_published_at < ?", 7.days.ago).count.to_s.rjust(14)} " \
            "#{scope.where("total_articles > 0").where("last_published_at >= ?", 90.days.ago).where("last_published_at < ?", 30.days.ago).count.to_s.rjust(18)} " \
            "#{scope.where("total_articles > 0").where("last_published_at < ? OR last_published_at IS NULL", 90.days.ago).count.to_s.rjust(14)} " \
-           "#{scope.where(total_articles: 0).count.to_s.rjust(8)}"
+           "#{scope.where(total_articles: 0).where.not(last_crawled_at: nil).count.to_s.rjust(8)} " \
+           "#{scope.where(last_crawled_at: nil).count.to_s.rjust(10)}"
     end
-    puts "-" * 92
+    puts "-" * 100
 
     total = Account.all
     puts "#{'All'.ljust(14)} " \
@@ -157,7 +161,8 @@ class Account < ApplicationRecord
          "#{total.where("last_published_at >= ?", 30.days.ago).where("last_published_at < ?", 7.days.ago).count.to_s.rjust(14)} " \
          "#{total.where("total_articles > 0").where("last_published_at >= ?", 90.days.ago).where("last_published_at < ?", 30.days.ago).count.to_s.rjust(18)} " \
          "#{total.where("total_articles > 0").where("last_published_at < ? OR last_published_at IS NULL", 90.days.ago).count.to_s.rjust(14)} " \
-         "#{total.where(total_articles: 0).count.to_s.rjust(8)}"
+         "#{total.where(total_articles: 0).where.not(last_crawled_at: nil).count.to_s.rjust(8)} " \
+         "#{total.where(last_crawled_at: nil).count.to_s.rjust(10)}"
     puts "=" * 80
     nil
   end
@@ -171,7 +176,8 @@ class Account < ApplicationRecord
         active_7d: scope.where("last_published_at >= ?", 7.days.ago).count,
         active_30d: scope.where("last_published_at >= ?", 30.days.ago).count,
         dormant_90d: scope.active.where("total_articles > 0").where("last_published_at < ? OR last_published_at IS NULL", 90.days.ago).count,
-        never_published: scope.where(total_articles: 0).count,
+        never_published: scope.where(total_articles: 0).where.not(last_crawled_at: nil).count,
+        uncrawled: scope.where(last_crawled_at: nil).count,
         avg_score: scope.average(:activity_score)&.round(1) || 0,
       }
     end

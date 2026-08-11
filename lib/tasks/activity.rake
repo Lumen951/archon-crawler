@@ -22,6 +22,7 @@ namespace :crawl do
     cutoff = days.days.ago
 
     scope = Account.active
+      .where.not(last_crawled_at: nil)
       .where("total_articles > 0")
       .where("last_published_at < ? OR last_published_at IS NULL", cutoff)
       .order(:last_published_at)

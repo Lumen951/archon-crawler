@@ -8,6 +8,7 @@ class Admin::AnalyticsController < Admin::BaseController
       slow:        Account.by_activity_level("slow").count,
       dormant:     Account.by_activity_level("dormant").count,
       dead:        Account.by_activity_level("dead").count,
+      uncrawled:   Account.by_activity_level("uncrawled").count,
     }
     @top_publishers_7d = Account.active
       .where("articles_last_7_days > 0")
@@ -30,7 +31,7 @@ class Admin::AnalyticsController < Admin::BaseController
   def bulk_disable_dormant
     days = (params[:days] || 90).to_i
     cutoff = days.days.ago
-    scope = Account.active.where("total_articles > 0").where("last_published_at < ? OR last_published_at IS NULL", cutoff)
+    scope = Account.active.where.not(last_crawled_at: nil).where("total_articles > 0").where("last_published_at < ? OR last_published_at IS NULL", cutoff)
     count = scope.update_all(status: :inactive, updated_at: Time.current)
     flash[:success] = "已停用 #{count} 个长期未更新的帐号（#{days}天以上无发布）"
     redirect_to admin_analytics_path
@@ -44,8 +45,9 @@ class Admin::AnalyticsController < Admin::BaseController
       active: Account.active.count,
       published_7d: Account.where("last_published_at >= ?", 7.days.ago).count,
       published_30d: Account.where("last_published_at >= ?", 30.days.ago).count,
-      dormant_90d: Account.active.where("total_articles > 0").where("last_published_at < ? OR last_published_at IS NULL", 90.days.ago).count,
-      never_published: Account.where(total_articles: 0).count,
+      dormant_90d: Account.active.where.not(last_crawled_at: nil).where("total_articles > 0").where("last_published_at < ? OR last_published_at IS NULL", 90.days.ago).count,
+      never_published: Account.where(total_articles: 0).where.not(last_crawled_at: nil).count,
+      uncrawled: Account.where(last_crawled_at: nil).count,
       avg_score: Account.average(:activity_score)&.round(1) || 0,
     }
   end

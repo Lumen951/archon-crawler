@@ -72,6 +72,7 @@
     ["发布减速", "slow"],
     ["长期停更 (90d+)", "dormant"],
     ["从未发布", "dead"],
+    ["从未抓取", "uncrawled"],
   ] %>
   <div class="bg-bg-card border border-border-primary rounded-2xl p-4 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
     <div class="flex flex-wrap gap-2">
@@ -190,7 +191,7 @@
               <td class="px-6 py-4 whitespace-nowrap">
                 <%= render 'shared/status_badge', status: account.status %>
               </td>
-              <td class="px-2 py-4 whitespace-nowrap text-center" title="综合活跃度评分 (0-100)。基于近期发布频率和文章总量计算。🟢≥50 活跃，🟡≥20 较低，🟠>0 停更中，⚪0 无文章">
+              <td class="px-2 py-4 whitespace-nowrap text-center" title="综合活跃度评分 (0-100)。基于近期发布频率和文章总量计算。🟢≥50 活跃，🟡≥20 较低，🟠>0 停更中，⚪0 无文章，🌫️ 从未抓取">
                 <% score = account.activity_score.to_i %>
                 <% status = account.publish_status %>
                 <span class="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-semibold min-w-[36px]
@@ -199,9 +200,10 @@
                       when :slow    then 'bg-yellow-100 text-yellow-700'
                       when :dormant then 'bg-orange-100 text-orange-700'
                       when :dead    then 'bg-red-100 text-red-600'
+                      when :uncrawled then 'bg-gray-100 text-gray-400'
                       else 'bg-gray-100 text-gray-500'
                       end %>">
-                  <%= { active: '🟢', slow: '🟡', dormant: '🟠', dead: '🔴', never: '⚪' }[status] %>&nbsp;<%= score %>
+                  <%= { active: '🟢', slow: '🟡', dormant: '🟠', dead: '🔴', never: '⚪', uncrawled: '🌫️' }[status] %>&nbsp;<%= score %>
                 </span>
               </td>
               <td class="px-2 py-4 whitespace-nowrap text-center text-sm" title="过去 7 天内发布的文章数量">
@@ -221,6 +223,8 @@
                                    'text-orange-600' %>">
                     <%= time_ago_in_words(account.last_published_at) %>前
                   </span>
+                <% elsif account.last_crawled_at.nil? %>
+                  <span class="text-gray-400 font-medium">从未抓取</span>
                 <% else %>
                   <span class="text-red-500 font-medium">从未发布</span>
                 <% end %>
@@ -305,9 +309,10 @@
                     when :slow    then 'bg-yellow-100 text-yellow-700'
                     when :dormant then 'bg-orange-100 text-orange-700'
                     when :dead    then 'bg-red-100 text-red-600'
+                    when :uncrawled then 'bg-gray-100 text-gray-400'
                     else 'bg-gray-100 text-gray-500'
                     end %>">
-                <%= { active: '🟢 活跃', slow: '🟡 减速', dormant: '🟠 停更', dead: '🔴 失活', never: '⚪ 无文章' }[status] %>
+                <%= { active: '🟢 活跃', slow: '🟡 减速', dormant: '🟠 停更', dead: '🔴 失活', never: '⚪ 无文章', uncrawled: '🌫️ 从未抓取' }[status] %>
               </span>
             </div>
             <div class="grid grid-cols-3 gap-2 text-center">
@@ -329,6 +334,8 @@
               <span class="text-text-primary font-semibold">
                 <% if account.last_published_at %>
                   <%= time_ago_in_words(account.last_published_at) %>前
+                <% elsif account.last_crawled_at.nil? %>
+                  <span class="text-gray-400">从未抓取</span>
                 <% else %>
                   <span class="text-red-500">从未发布</span>
                 <% end %>
