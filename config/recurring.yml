@@ -20,6 +20,10 @@ development:
     schedule: every day at 3am
 
 production:
+  refresh_activity_counters:
+    class: RefreshActivityCountersJob
+    queue: default
+    schedule: every day at 1am
   crawl_all_accounts:
     class: CrawlJob
     queue: default
