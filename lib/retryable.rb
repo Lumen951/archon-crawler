@@ -29,9 +29,14 @@ module Retryable
         crawl_task.log(:error, "#{context}: API 密钥错误，不重试：#{e.message}")
         raise e
       end
-      
+
       if e.is_a?(WechatMpNativeApiClient::RateLimitError)
         crawl_task.log(:error, "#{context}: 触发速率限制，不重试：#{e.message}")
+        raise e
+      end
+
+      if e.is_a?(WereadApiClient::NoAvailableAccountError)
+        crawl_task.log(:error, "#{context}: 没有可用的 WeRead 账号，不重试：#{e.message}")
         raise e
       end
 
