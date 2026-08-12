@@ -81,7 +81,10 @@ class AccountsController < ApplicationController
   rescue ArgumentError => e
     flash[:error] = truncate_error(e.message)
     redirect_to import_wechat_page_accounts_path
-  rescue WechatApiClient::ApiError => e
+  rescue WechatMpNativeApiClient::LoginRequiredError => e
+    flash[:error] = truncate_error("请先在管理设置中扫码登录微信公众号平台，然后再搜索")
+    redirect_to import_wechat_page_accounts_path
+  rescue WechatMpNativeApiClient::ApiError => e
     flash[:error] = truncate_error("搜索失败：#{e.message}")
     redirect_to import_wechat_page_accounts_path
   rescue StandardError => e
@@ -110,6 +113,37 @@ class AccountsController < ApplicationController
     end
 
     redirect_to accounts_path
+  rescue ArgumentError => e
+    flash[:error] = truncate_error(e.message)
+    redirect_to import_wechat_page_accounts_path
+  rescue StandardError => e
+    flash[:error] = truncate_error("导入失败：#{e.message}")
+    redirect_to import_wechat_page_accounts_path
+  end
+
+  def import_wechat_by_url
+    url = params[:article_url].to_s.strip
+
+    if url.blank?
+      flash[:error] = "请输入微信公众号文章链接"
+      redirect_to import_wechat_page_accounts_path and return
+    end
+
+    result = AccountResolver.resolve_wechat_by_url(url)
+
+    case result.status
+    when "created"
+      account = result.accounts.first
+      flash[:success] = "成功导入公众号：#{account.nickname}（mpId: #{account.weread_mp_id}）"
+      redirect_to account_path(account)
+    when "found"
+      account = result.accounts.first
+      flash[:success] = "该公众号已存在：#{account.nickname}（已更新 WeRead mpId）"
+      redirect_to account_path(account)
+    else
+      flash[:error] = truncate_error(result.error || "导入失败")
+      redirect_to import_wechat_page_accounts_path
+    end
   rescue ArgumentError => e
     flash[:error] = truncate_error(e.message)
     redirect_to import_wechat_page_accounts_path
@@ -153,7 +187,10 @@ class AccountsController < ApplicationController
   rescue ArgumentError => e
     flash[:error] = truncate_error(e.message)
     redirect_to import_wechat_page_accounts_path
-  rescue WechatApiClient::ApiError => e
+  rescue WechatMpNativeApiClient::LoginRequiredError => e
+    flash[:error] = truncate_error("请先在管理设置中扫码登录微信公众号平台，然后再导入")
+    redirect_to import_wechat_page_accounts_path
+  rescue WechatMpNativeApiClient::ApiError => e
     flash[:error] = truncate_error("搜索失败：#{e.message}")
     redirect_to import_wechat_page_accounts_path
   rescue StandardError => e
@@ -577,6 +614,41 @@ class AccountsController < ApplicationController
   rescue StandardError => e
     flash[:error] = truncate_error("导入失败：#{e.message}")
     redirect_to import_twitter_page_accounts_path
+  end
+
+  def resolve_weread_mp_id
+    @account = Account.find(params[:id])
+    url = params[:article_url].to_s.strip
+
+    if url.blank?
+      flash[:error] = "请输入微信公众号文章链接"
+      redirect_to account_path(@account) and return
+    end
+
+    unless url.include?("mp.weixin.qq.com")
+      flash[:error] = "请输入有效的微信公众号文章链接（包含 mp.weixin.qq.com）"
+      redirect_to account_path(@account) and return
+    end
+
+    result = WereadApiClient.get_mp_info(url)
+    if result.is_a?(Array) && result.any? && result.first["id"].present?
+      mp_info = result.first
+      new_mp_id = mp_info["id"]
+      @account.metadata ||= {}
+      @account.metadata["weread_mp_id"] = new_mp_id
+      @account.save!
+      flash[:success] = "WeRead mpId 已更新: #{new_mp_id}（公众号: #{mp_info['name']}）"
+    else
+      flash[:error] = "未能从该链接解析到公众号信息，请确认链接有效"
+    end
+    redirect_to account_path(@account)
+  rescue WereadApiClient::ApiError => e
+    flash[:error] = "解析失败：#{e.message}"
+    redirect_to account_path(@account)
+  rescue StandardError => e
+    Rails.logger.error("[WeRead] resolve_mp_id error: #{e.message}")
+    flash[:error] = "解析失败：#{e.message[0..200]}"
+    redirect_to account_path(@account)
   end
 
   private

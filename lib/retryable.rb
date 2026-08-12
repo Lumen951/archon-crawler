@@ -30,7 +30,7 @@ module Retryable
         raise e
       end
       
-      if e.is_a?(WechatApiClient::ApiRateLimitError)
+      if e.is_a?(WechatMpNativeApiClient::RateLimitError)
         crawl_task.log(:error, "#{context}: 触发速率限制，不重试：#{e.message}")
         raise e
       end

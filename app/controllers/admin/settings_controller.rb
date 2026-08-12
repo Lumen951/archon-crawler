@@ -1,7 +1,5 @@
 class Admin::SettingsController < Admin::BaseController
   def show
-    @api_key_value = Option.api_key
-    @api_key_expires_at = Option.get('wechat_api_key_expires_at')
     @wechat_api_provider = Option.wechat_api_provider
     @dajiala_api_key = Option.dajiala_api_key
     @rednote_api_key = Option.rednote_api_key
@@ -14,7 +12,6 @@ class Admin::SettingsController < Admin::BaseController
     @twitter_auth_token = Option.get('twitter_auth_token')
     @twitter_proxy = Option.get('twitter_proxy')
     @tikhub_api_key = Option.tikhub_api_key
-    @wechat_key_check = Rails.cache.read('api_key_check:wechat')
     @dajiala_key_check = Rails.cache.read('api_key_check:dajiala')
     @rednote_key_check = Rails.cache.read('api_key_check:rednote')
     @twitter_key_check = Rails.cache.read('api_key_check:twitter')
@@ -22,6 +19,25 @@ class Admin::SettingsController < Admin::BaseController
     @crawl_wechat_enabled = Option.crawl_wechat_enabled?
     @crawl_rednote_enabled = Option.crawl_rednote_enabled?
     @crawl_twitter_enabled = Option.crawl_twitter_enabled?
+    @profile_ext_credentials = Option.profile_ext_credentials
+    @profile_ext_expired = Option.profile_ext_credentials_expired?
+    @profile_ext_updated_at = Option.profile_ext_credentials_updated_at
+    @profile_ext_age_minutes = Option.profile_ext_credentials_age_minutes
+    @profile_ext_account_bizs = ProfileExtApiClient.all_account_bizs rescue []
+    # MP Native
+    @wechat_mp_cookie = Option.wechat_mp_cookie
+    @wechat_mp_token = Option.wechat_mp_token
+    @wechat_mp_session_valid = Option.wechat_mp_session_valid?
+    @wechat_mp_login_state = Option.wechat_mp_login_state
+    @wechat_mp_expires_at = Option.wechat_mp_expires_at
+    @wechat_mp_account_info = Option.wechat_mp_account_info
+    @mp_native_key_check = Rails.cache.read('api_key_check:mp_native')
+    # WeRead
+    @weread_accounts = Option.weread_accounts
+    @weread_has_valid_accounts = Option.weread_accounts_valid?
+    @weread_blocked_accounts = Option.weread_blocked_accounts
+    @weread_today_blocked = (@weread_blocked_accounts[WereadApiClient.today_shanghai] || [])
+    @weread_key_check = Rails.cache.read('api_key_check:weread')
   end
 
   def update
@@ -35,13 +51,6 @@ class Admin::SettingsController < Admin::BaseController
     if params[:dajiala_api_key].present?
       Option.dajiala_api_key = params[:dajiala_api_key]
       message = "Dajiala API 密钥更新成功"
-    end
-
-    if params[:api_key].present?
-      expires_at = params[:expires_days].to_i.days.from_now
-      Option.api_key = params[:api_key]
-      Option.set('wechat_api_key_expires_at', expires_at.iso8601)
-      message = "API 密钥更新成功"
     end
 
     if params[:rednote_api_key].present?
@@ -111,6 +120,22 @@ class Admin::SettingsController < Admin::BaseController
       Option.set("crawl_twitter_enabled", params[:crawl_twitter_enabled] == "1")
     end
 
+    if params.key?(:profile_ext_credentials)
+      begin
+        if params[:profile_ext_credentials].present?
+          JSON.parse(params[:profile_ext_credentials]) # validate
+          Option.profile_ext_credentials = params[:profile_ext_credentials]
+          message = "profile_ext 凭证更新成功"
+        else
+          Option.set('profile_ext_credentials', nil)
+          Option.set('profile_ext_credentials_updated_at', nil)
+          message = "profile_ext 凭证已清除"
+        end
+      rescue JSON::ParserError
+        message = "凭证 JSON 格式无效，请检查后重新提交"
+      end
+    end
+
     respond_to do |format|
       format.turbo_stream { render turbo_stream: helpers.toast_stream(message || "设置已更新") }
       format.html { flash[:success] = message; redirect_to admin_settings_path }
@@ -118,16 +143,16 @@ class Admin::SettingsController < Admin::BaseController
   end
 
   def validate_wechat_key
-    valid = WechatApiClient.validate_key
+    valid = WechatMpNativeApiClient.validate_key
     result = { valid: valid, checked_at: Time.current.iso8601 }
     Rails.cache.write('api_key_check:wechat', result, expires_in: 2.hours)
-    message = valid ? "✓ 微信 API 密钥有效" : "✗ 微信 API 密钥无效或已过期"
+    message = valid ? "✓ MP 原生会话有效" : "✗ MP 原生会话无效或已过期，请扫码登录"
     respond_to do |format|
       format.turbo_stream { render turbo_stream: helpers.toast_stream(message, type: valid ? :success : :error) }
       format.html { flash[:success] = message; redirect_to admin_settings_path }
     end
   rescue => e
-    Rails.logger.error("WeChat API key validation error: #{e.message}")
+    Rails.logger.error("MP Native session validation error: #{e.message}")
     respond_to do |format|
       format.turbo_stream { render turbo_stream: helpers.toast_stream("验证失败：#{e.message[0..200]}", type: :error) }
       format.html { flash[:error] = "验证失败：#{e.message[0..200]}"; redirect_to admin_settings_path }
@@ -200,5 +225,229 @@ class Admin::SettingsController < Admin::BaseController
       format.turbo_stream { render turbo_stream: helpers.toast_stream("验证失败：#{e.message[0..200]}", type: :error) }
       format.html { flash[:error] = "验证失败：#{e.message[0..200]}"; redirect_to admin_settings_path }
     end
+  end
+
+  def validate_profile_ext_key
+    valid = Option.profile_ext_credentials_valid?
+    age = Option.profile_ext_credentials_age_minutes
+    message = if valid
+                "✓ Profile Ext 凭证有效（#{age} 分钟前更新）"
+              elsif Option.profile_ext_credentials.present?
+                "✗ Profile Ext 凭证已过期（#{age} 分钟前更新，有效期 25 分钟）"
+              else
+                "✗ 未配置 Profile Ext 凭证"
+              end
+    respond_to do |format|
+      format.turbo_stream { render turbo_stream: helpers.toast_stream(message, type: valid ? :success : :error) }
+      format.html { flash[:success] = message; redirect_to admin_settings_path }
+    end
+  rescue => e
+    Rails.logger.error("Profile Ext validation error: #{e.message}")
+    respond_to do |format|
+      format.turbo_stream { render turbo_stream: helpers.toast_stream("验证失败：#{e.message[0..200]}", type: :error) }
+      format.html { flash[:error] = "验证失败：#{e.message[0..200]}"; redirect_to admin_settings_path }
+    end
+  end
+
+  # ── MP Native QR Code Login ──────────────────────────
+
+  def wechat_mp_request_qrcode
+    result = WechatMpNativeApiClient.request_qr_code
+    # Store login cookies temporarily for polling
+    session[:wechat_mp_uuid] = result[:uuid]
+    session[:wechat_mp_cookie_jar] = (result[:cookie_jar] || {}).to_json
+    render json: { qr_url: result[:qr_url], uuid: result[:uuid], image_path: result[:image_path] }
+  rescue => e
+    Rails.logger.error("[MP Native] request_qrcode error: #{e.message}")
+    render json: { error: e.message }, status: :unprocessable_entity
+  end
+
+  def wechat_mp_qrcode_status
+    uuid = session[:wechat_mp_uuid]
+    cookie_jar_json = session[:wechat_mp_cookie_jar]
+    cookie_jar = cookie_jar_json.present? ? JSON.parse(cookie_jar_json) : nil
+
+    unless uuid
+      render json: { status: "expired", message: "二维码会话已过期，请重新获取" }
+      return
+    end
+
+    result = WechatMpNativeApiClient.check_qr_status(uuid, cookie_jar)
+
+    if result[:status] == "success"
+      session.delete(:wechat_mp_uuid)
+      session.delete(:wechat_mp_cookie_jar)
+    end
+
+    render json: {
+      status: result[:status],
+      message: result[:message],
+      account_info: result[:account_info]
+    }
+  rescue => e
+    Rails.logger.error("[MP Native] qrcode_status error: #{e.message}")
+    render json: { status: "error", message: e.message }
+  end
+
+  def wechat_mp_logout
+    WechatMpNativeApiClient.logout
+    session.delete(:wechat_mp_uuid)
+    session.delete(:wechat_mp_cookie_jar)
+    message = "已退出微信公众号平台登录"
+    respond_to do |format|
+      format.turbo_stream { render turbo_stream: helpers.toast_stream(message, type: :success) }
+      format.html { flash[:success] = message; redirect_to admin_settings_path }
+      format.json { render json: { status: "logged_out" } }
+    end
+  rescue => e
+    Rails.logger.error("[MP Native] logout error: #{e.message}")
+    respond_to do |format|
+      format.turbo_stream { render turbo_stream: helpers.toast_stream("登出失败：#{e.message[0..200]}", type: :error) }
+      format.html { flash[:error] = "登出失败：#{e.message[0..200]}"; redirect_to admin_settings_path }
+      format.json { render json: { error: e.message }, status: :unprocessable_entity }
+    end
+  end
+
+  def validate_mp_native_key
+    valid = WechatMpNativeApiClient.validate_session
+    result = { valid: valid, checked_at: Time.current.iso8601 }
+    Rails.cache.write('api_key_check:mp_native', result, expires_in: 2.hours)
+    message = valid ? "✓ MP 原生会话有效" : "✗ MP 原生会话无效或已过期"
+    respond_to do |format|
+      format.turbo_stream { render turbo_stream: helpers.toast_stream(message, type: valid ? :success : :error) }
+      format.html { flash[:success] = message; redirect_to admin_settings_path }
+      format.json { render json: result }
+    end
+  rescue => e
+    Rails.logger.error("[MP Native] validate error: #{e.message}")
+    respond_to do |format|
+      format.turbo_stream { render turbo_stream: helpers.toast_stream("验证失败：#{e.message[0..200]}", type: :error) }
+      format.html { flash[:error] = "验证失败：#{e.message[0..200]}"; redirect_to admin_settings_path }
+      format.json { render json: { error: e.message }, status: :unprocessable_entity }
+    end
+  end
+
+  # ── WeRead QR Code Login ──────────────────────────
+
+  def weread_request_qrcode
+    result = WereadApiClient.create_login_url
+    session[:weread_login_uuid] = result["uuid"]
+    render json: { uuid: result["uuid"], scan_url: result["scanUrl"] }
+  rescue => e
+    Rails.logger.error("[WeRead] request_qrcode error: #{e.message}")
+    render json: { error: e.message }, status: :unprocessable_entity
+  end
+
+  def weread_qrcode_status
+    uuid = session[:weread_login_uuid]
+    unless uuid
+      render json: { status: "expired", message: "二维码会话已过期，请重新获取" }
+      return
+    end
+
+    data = WereadApiClient.get_login_result(uuid)
+
+    if data["vid"] && data["token"]
+      vid = data["vid"].to_s
+      token = data["token"].to_s
+      username = data["username"] || "wechat_user"
+
+      # Save to Option (mirrors rake task logic)
+      accounts = Option.weread_accounts
+      existing = accounts.find { |a| a["vid"].to_s == vid }
+
+      if existing
+        existing["token"] = token
+        existing["name"] = username
+        existing["status"] = 1
+      else
+        accounts << {
+          "vid" => vid,
+          "token" => token,
+          "name" => username,
+          "status" => 1
+        }
+      end
+
+      Option.weread_accounts = accounts
+      WereadApiClient.remove_blocked_account(vid)
+      session.delete(:weread_login_uuid)
+
+      render json: { status: "success", message: "登录成功！账号: #{username}" }
+    elsif data["message"].present?
+      # Check if message indicates scanned or waiting
+      msg = data["message"]
+      if msg.include?("扫描") || msg.include?("scan") || msg.include?("已扫码")
+        render json: { status: "scanned", message: msg }
+      else
+        render json: { status: "waiting", message: msg }
+      end
+    else
+      render json: { status: "waiting", message: "等待扫码..." }
+    end
+  rescue => e
+    Rails.logger.error("[WeRead] qrcode_status error: #{e.message}")
+    render json: { status: "error", message: e.message }
+  end
+
+  def weread_logout
+    session.delete(:weread_login_uuid)
+    message = "已取消 WeRead 登录"
+    respond_to do |format|
+      format.turbo_stream { render turbo_stream: helpers.toast_stream(message, type: :success) }
+      format.html { flash[:success] = message; redirect_to admin_settings_path }
+      format.json { render json: { status: "logged_out" } }
+    end
+  end
+
+  def validate_weread_key
+    valid = WereadApiClient.validate_key
+    result = { valid: valid, checked_at: Time.current.iso8601 }
+    Rails.cache.write('api_key_check:weread', result, expires_in: 2.hours)
+    message = valid ? "✓ WeRead 账号可用" : "✗ WeRead 无可用账号"
+    respond_to do |format|
+      format.turbo_stream { render turbo_stream: helpers.toast_stream(message, type: valid ? :success : :error) }
+      format.html { flash[:success] = message; redirect_to admin_settings_path }
+      format.json { render json: result }
+    end
+  rescue => e
+    Rails.logger.error("[WeRead] validate error: #{e.message}")
+    respond_to do |format|
+      format.turbo_stream { render turbo_stream: helpers.toast_stream("验证失败：#{e.message[0..200]}", type: :error) }
+      format.html { flash[:error] = "验证失败：#{e.message[0..200]}"; redirect_to admin_settings_path }
+      format.json { render json: { error: e.message }, status: :unprocessable_entity }
+    end
+  end
+
+  def weread_enable_account
+    vid = params[:vid].to_s.strip
+    accounts = Option.weread_accounts
+    match = accounts.find { |a| a["vid"].to_s == vid }
+    if match
+      match["status"] = 1
+      Option.weread_accounts = accounts
+      WereadApiClient.remove_blocked_account(vid)
+    end
+    redirect_to admin_settings_path, notice: "WeRead 账号已启用"
+  end
+
+  def weread_disable_account
+    vid = params[:vid].to_s.strip
+    accounts = Option.weread_accounts
+    match = accounts.find { |a| a["vid"].to_s == vid }
+    if match
+      match["status"] = 2
+      Option.weread_accounts = accounts
+    end
+    redirect_to admin_settings_path, notice: "WeRead 账号已禁用"
+  end
+
+  def weread_remove_account
+    vid = params[:vid].to_s.strip
+    accounts = Option.weread_accounts
+    accounts.reject! { |a| a["vid"].to_s == vid }
+    Option.weread_accounts = accounts
+    WereadApiClient.remove_blocked_account(vid)
+    redirect_to admin_settings_path, notice: "WeRead 账号已移除"
   end
 end

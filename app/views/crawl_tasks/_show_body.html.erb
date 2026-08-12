@@ -24,6 +24,9 @@
           <%= button_to "标记失败", fail_crawl_task_path(crawl_task), method: :post, data: { turbo_confirm: "确定要将此任务标记为失败吗？" }, class: "btn btn-danger" %>
         <% elsif crawl_task.paused? || crawl_task.failed? %>
           <%= button_to "重试抓取未完成的帐号", resume_crawl_task_path(crawl_task), method: :post, class: "btn btn-primary" %>
+          <% if crawl_task.failed? && crawl_task.scheduled_job_id.present? %>
+            <%= button_to "取消自动重试", cancel_retry_crawl_task_path(crawl_task), method: :post, data: { turbo_confirm: "确定要取消自动重试吗？任务将保持失败状态，不会再次自动重试。" }, class: "btn btn-secondary" %>
+          <% end %>
         <% end %>
         <% if crawl_task.completed? || crawl_task.failed? %>
           <%= button_to "删除任务", crawl_task_path(crawl_task), method: :delete, data: { turbo_confirm: "确定要删除此抓取任务吗？关联的日志和帐号追踪记录将被删除，文章不会被删除。" }, class: "btn btn-danger" %>

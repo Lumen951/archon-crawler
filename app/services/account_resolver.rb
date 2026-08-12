@@ -8,10 +8,11 @@ class AccountResolver
 
   # ─── Search-only methods (return raw data, no DB writes) ──────────
 
-  # Search Wechat accounts by keyword via WechatApiClient.
+  # Search Wechat accounts by keyword via WechatMpNativeApiClient (direct mp.weixin.qq.com access).
+  # Requires prior QR code login via Admin Settings.
   # Returns [{fakeid:, nickname:, round_head_img:, total_articles:}]
   def self.search_wechat(keyword)
-    response = WechatApiClient.search_account(keyword)
+    response = WechatMpNativeApiClient.search_account(keyword)
     rows = extract_accounts_from_search_response(response)
     raise ArgumentError, "未搜索到匹配的帐号" if rows.empty?
     rows
@@ -47,6 +48,56 @@ class AccountResolver
   end
 
   # ─── Resolve methods (search + DB create) ────────────────────────
+
+  # Resolve a WeChat account from an article URL via WereadApiClient.
+  # Returns a Result with the found or created WechatAccount.
+  def self.resolve_wechat_by_url(url)
+    url = url.to_s.strip
+    raise ArgumentError, "请输入微信公众号文章链接" if url.blank?
+    raise ArgumentError, "请输入有效的微信公众号文章链接（包含 mp.weixin.qq.com）" unless url.include?("mp.weixin.qq.com")
+
+    mp_info_list = WereadApiClient.get_mp_info(url)
+    unless mp_info_list.is_a?(Array) && mp_info_list.any?
+      return Result.new(accounts: [], status: "error", error: "未能从该链接解析到公众号信息，请确认链接有效")
+    end
+
+    mp_info = mp_info_list.first
+    mp_id = mp_info["id"]
+    unless mp_id.present?
+      return Result.new(accounts: [], status: "error", error: "未能从该链接解析到 mpId")
+    end
+
+    # Check if account already exists (by fakeid or weread_mp_id metadata)
+    account = WechatAccount.find_by(fakeid: mp_id) ||
+              WechatAccount.where("metadata->>'weread_mp_id' = ?", mp_id).first
+
+    if account
+      # Update weread_mp_id if not set
+      if account.metadata&.dig("weread_mp_id").blank?
+        account.metadata ||= {}
+        account.metadata["weread_mp_id"] = mp_id
+        account.save!
+      end
+      Result.new(accounts: [account], status: "found", error: nil)
+    else
+      account = WechatAccount.create!(
+        fakeid: mp_id,
+        nickname: mp_info["name"].presence || "未知公众号",
+        round_head_img: mp_info["cover"].presence || "",
+        status: :active,
+        metadata: {
+          "weread_mp_id" => mp_id,
+          "weread_intro" => mp_info["intro"],
+          "weread_update_time" => mp_info["updateTime"]
+        }
+      )
+      Result.new(accounts: [account], status: "created", error: nil)
+    end
+  rescue WereadApiClient::ApiError => e
+    Result.new(accounts: [], status: "error", error: "解析失败：#{e.message}")
+  rescue ActiveRecord::RecordInvalid => e
+    Result.new(accounts: [], status: "error", error: "创建帐号失败：#{e.message}")
+  end
 
   def self.resolve(source:, id: nil, name: nil)
     new.resolve(source: source, id: id, name: name)
@@ -87,7 +138,7 @@ class AccountResolver
         Result.new(accounts: resolved, status: "found", error: nil)
       rescue ArgumentError
         Result.new(accounts: [], status: "not_found", error: "微信帐号未找到: #{name}")
-      rescue WechatApiClient::ApiError => e
+      rescue WechatMpNativeApiClient::ApiError => e
         Result.new(accounts: [], status: "error", error: "微信搜索失败: #{e.message}")
       rescue StandardError => e
         Result.new(accounts: [], status: "error", error: "微信搜索失败: #{e.message}")

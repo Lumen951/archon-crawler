@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_11_000001) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_11_092642) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -112,10 +112,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_11_000001) do
     t.json "platform_error_counts"
     t.integer "progress", default: 0
     t.integer "retry_count", default: 0, null: false
+    t.string "scheduled_job_id"
     t.datetime "started_at"
     t.integer "status", default: 0
     t.integer "total"
     t.datetime "updated_at", null: false
+    t.index ["scheduled_job_id"], name: "index_crawl_tasks_on_scheduled_job_id"
     t.index ["status"], name: "index_crawl_tasks_on_status"
   end
 

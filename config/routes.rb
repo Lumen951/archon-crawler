@@ -35,6 +35,7 @@ Rails.application.routes.draw do
       get  :import_wechat_search
       post :import_wechat
       post :import_wechat_file
+      post :import_wechat_by_url
       # RedNote import routes
       get  "import/rednote", to: "accounts#import_rednote_page", as: :import_rednote_page
       get  :import_rednote_search
@@ -50,6 +51,7 @@ Rails.application.routes.draw do
     member do
       post :crawl
       post :toggle_status
+      post :resolve_weread_mp_id
     end
   end
 
@@ -61,6 +63,7 @@ Rails.application.routes.draw do
       post :pause
       post :resume
       post :fail
+      post :cancel_retry
       get :logs
       get :articles
       get :poll
@@ -95,12 +98,25 @@ Rails.application.routes.draw do
     end
 
     resource :settings, only: [:show, :update] do
-      post :validate_wechat_key
       post :validate_dajiala_key
       post :validate_rednote_key
       post :validate_twitter_key
       post :validate_tikhub_key
       post :validate_profile_ext_key
+      # MP Native QR code login
+      post :wechat_mp_request_qrcode
+      get  :wechat_mp_qrcode_status
+      post :wechat_mp_logout
+      post :validate_mp_native_key
+      # WeRead QR code login
+      post :weread_request_qrcode
+      get  :weread_qrcode_status
+      post :weread_logout
+      post :validate_weread_key
+      # WeRead account management
+      post :weread_enable_account
+      post :weread_disable_account
+      post :weread_remove_account
     end
 
     resource :analytics, only: [:show] do

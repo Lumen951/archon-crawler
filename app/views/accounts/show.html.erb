@@ -133,6 +133,39 @@
     </div>
   </div>
 
+  <!-- WeRead mpId Section (WechatAccount only) -->
+  <% if @account.wechat? %>
+    <div class="bg-bg-card border border-border-primary rounded-xl p-6 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+      <h3 class="text-lg font-semibold text-text-primary mb-3">WeRead 配置</h3>
+      <div class="mb-3">
+        <span class="text-sm text-text-secondary">当前 mpId：</span>
+        <% mp_id = @account.metadata&.dig("weread_mp_id") %>
+        <% if mp_id.present? %>
+          <code class="bg-bg-secondary px-2 py-1 rounded text-xs text-brand font-mono"><%= mp_id %></code>
+          <% if mp_id.match?(/\AMP_WXS_/) %>
+            <span class="text-xs text-green-600 ml-1">✓ 有效</span>
+          <% else %>
+            <span class="text-xs text-yellow-600 ml-1">⚠ 格式可能不正确（期望 MP_WXS_xxx）</span>
+          <% end %>
+        <% else %>
+          <span class="text-xs text-yellow-600">未设置（将尝试通过文章URL自动解析）</span>
+        <% end %>
+      </div>
+
+      <div class="border-t border-border-primary pt-3">
+        <p class="text-sm text-text-secondary mb-2">通过微信公众号文章链接手动更新 mpId：</p>
+        <%= form_with url: resolve_weread_mp_id_account_path(@account), method: :post, class: "flex gap-2" do |f| %>
+          <%= text_field_tag :article_url, nil, placeholder: "https://mp.weixin.qq.com/s/...",
+              class: "flex-1 h-9 px-3 rounded-lg border border-border-primary bg-bg-secondary text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand/30" %>
+          <button type="submit" class="h-9 px-4 rounded-lg bg-brand text-white hover:bg-brand-dark text-sm font-semibold transition whitespace-nowrap">
+            解析并更新
+          </button>
+        <% end %>
+        <p class="text-xs text-text-muted mt-1">粘贴该公众号任意一篇文章的链接，系统将自动解析并更新 WeRead mpId</p>
+      </div>
+    </div>
+  <% end %>
+
   <!-- Recent Articles -->
   <div>
     <h2 class="text-xl font-bold text-text-primary mb-4 flex items-center gap-2">

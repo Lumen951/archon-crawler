@@ -32,7 +32,7 @@ MP-Crawler 是一个基于 Ruby on Rails 的应用，用于自动抓取微信公
 - 手动触发抓取
 
 ### 2. 文章抓取
-- **微信公众号**：使用 WeChat Article Exporter API（`down.mptext.top`）
+- **微信公众号**：直接访问微信公众号平台（`mp.weixin.qq.com`），通过扫码登录获取 Cookie/Token
 - **小红书**：使用第三方 API（`api.yddm.com`）
 - **Twitter**：使用 twitter-api-client Python 库（cookie 认证）
 - 异步并发抓取（可配置帐号并发数和文章并发数）
@@ -83,7 +83,7 @@ MP-Crawler 是一个基于 Ruby on Rails 的应用，用于自动抓取微信公
 - `AdminMailer`：邀请邮件、登录链接邮件、新用户凭据邮件
 
 ### 8. API Key 管理
-- **微信公众号**：`wechat_api_key`，有效期 4 天，支持过期检测和即将过期警告
+- **微信公众号**：通过 QR 码扫码登录（在 `/admin/settings` 页面），Cookie/Token 有效期约 2 小时
 - **小红书**：`rednote_api_key`，无过期机制
 - 在 `/admin/settings` 页面统一管理
 
@@ -129,7 +129,7 @@ CrawlLog (抓取日志)
 └── 仅在 verbose_mode 开启时写入
 
 Option (系统配置 - key-value 存储)
-- wechat_api_key / wechat_api_key_expires_at
+- wechat_mp_cookie / wechat_mp_token / wechat_mp_expires_at
 - rednote_api_key
 - twitter_ct0 / twitter_auth_token (Twitter cookie 认证)
 - default_article_concurrency / default_account_concurrency
@@ -179,12 +179,11 @@ User (用户)
 - 各平台 API 密钥错误的通用 mixin（`include CrawlerApiKeyError`）
 - `Retryable` 和 `CrawlOrchestrator` 通过它统一识别"密钥缺失/过期"类错误并立即失败/暂停任务，无需逐个平台硬编码错误类
 
-**WechatApiClient** (`lib/wechat_api_client.rb`)
-- 封装微信文章导出 API（`down.mptext.top`）
-- 认证方式：`X-Auth-Key` header
-- 主要接口：`get_articles`、`download_content`
-- 双连接架构：`connection`（搜索/文章列表，无限流）+ `download_connection`（下载端点，带 `RateLimiterMiddleware` 限流 60 次/分钟）
-- 自定义错误类：`ApiError`、`ApiKeyExpiredError`（包含 `CrawlerApiKeyError`）、`ApiRateLimitError`
+**WechatMpNativeApiClient** (`lib/wechat_mp_native_api_client.rb`)
+- 直接访问微信公众号平台（`mp.weixin.qq.com`），无需第三方 API
+- 认证方式：QR 码扫码登录，获取 Cookie + Token（有效期约 2 小时）
+- 主要接口：`search_account`、`get_articles`、`download_content`
+- 自定义错误类：`ApiError`、`SessionExpiredError`（包含 `CrawlerApiKeyError`）、`LoginRequiredError`（包含 `CrawlerApiKeyError`）、`RateLimitError`
 
 **WechatCrawler** (`lib/wechat_crawler.rb`, `< BaseCrawler`)
 - 抓取单个微信公众号：分页获取文章列表 → 下载正文（Markdown/HTML）→ 保存
@@ -413,9 +412,7 @@ EDITOR="code --wait" rails credentials:edit
 # 命令行导入帐号
 rails import:accounts
 
-# 设置 API Key（rails console）
-Option.set('wechat_api_key', 'your-key-here')
-Option.set('wechat_api_key_expires_at', 4.days.from_now.iso8601)
+# 设置默认并发数和页数（rails console）
 Option.set('default_article_concurrency', '10')
 Option.set('default_account_concurrency', '3')
 Option.set('max_crawl_pages', '1')
@@ -458,7 +455,7 @@ rails crawl:cleanup_logs
 ### 2. 配置 API Key
 
 访问 `/admin/settings`：
-- **微信公众号 Key**：从 https://down.mptext.top/dashboard/api 获取，每 4 天过期
+- **微信公众号**：点击"获取登录二维码"，使用微信扫描二维码登录（有效期约 2 小时）
 - **小红书 Key**：从 API 提供商获取
 - **Twitter Cookies**：需要 `ct0` 和 `auth_token` 两个 cookie（从浏览器登录 Twitter 后的 Cookie 中获取）
 
@@ -603,7 +600,7 @@ mp-crawler/
 │   ├── crawler_api_key_error.rb (API 密钥错误通用 mixin)
 │   ├── rate_limiter.rb          (通用滑动窗口速率限制器)
 │   ├── rate_limiter_middleware.rb (Faraday 速率限制中间件)
-│   ├── wechat_api_client.rb
+│   ├── wechat_mp_native_api_client.rb
 │   ├── wechat_crawler.rb       (< BaseCrawler)
 │   ├── rednote_api_client.rb
 │   ├── rednote_crawler.rb      (< BaseCrawler)
@@ -625,9 +622,9 @@ mp-crawler/
 - 两个 API 均可能有频率限制，超出时自动重试
 
 ### API Key 管理
-- 微信 Key 每 4 天过期，需人工登录更新
+- 微信 Cookie/Token 约 2 小时过期，需重新扫码登录
 - 小红书 Key 无过期机制
-- 过期后任务自动暂停
+- 密钥/会话过期后对应平台的帐号抓取失败，任务继续
 
 ### 并发控制
 - 建议帐号并发：3-5

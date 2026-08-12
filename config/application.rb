@@ -29,6 +29,10 @@ module MpCrawler
     # config.eager_load_paths << Rails.root.join("extras")
     config.i18n.default_locale = :"zh-CN"
 
+    # Allow requests with null Origin (caused by Referrer-Policy: no-referrer
+    # meta tag needed for loading WeChat CDN images). CSRF token validation still runs.
+    config.action_controller.forgery_protection_origin_check = false
+
     # https://edgeguides.rubyonrails.org/configuring.html#config-active-support-isolation-level
     config.active_support.isolation_level = :fiber
   end

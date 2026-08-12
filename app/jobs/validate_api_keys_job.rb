@@ -4,12 +4,12 @@ class ValidateApiKeysJob < ApplicationJob
   def perform
     expired_keys = []
 
-    wechat_valid = WechatApiClient.validate_key
+    wechat_valid = WechatMpNativeApiClient.validate_key
     result = { valid: wechat_valid, checked_at: Time.current.iso8601 }
     Rails.cache.write('api_key_check:wechat', result, expires_in: 2.hours)
     unless wechat_valid
       expired_keys << :wechat
-      Rails.logger.warn "[ValidateApiKeysJob] WeChat API key is invalid or expired"
+      Rails.logger.warn "[ValidateApiKeysJob] MP Native session is invalid or expired"
     end
 
     rednote_valid = RednoteApiClient.validate_key

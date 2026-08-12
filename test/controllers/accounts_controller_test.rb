@@ -58,16 +58,24 @@ class AccountsControllerTest < ActionDispatch::IntegrationTest
       }
     }
 
-    WechatApiClient.singleton_class.alias_method :__original_search_account_for_test, :search_account
-    WechatApiClient.singleton_class.define_method(:search_account) do |_keyword|
+    # Stub WechatMpNativeApiClient.search_account (requires QR login session)
+    WechatMpNativeApiClient.singleton_class.alias_method :__original_search_account_for_test, :search_account
+    WechatMpNativeApiClient.singleton_class.define_method(:search_account) do |_keyword|
       api_response
+    end
+    # Also stub load_session! to bypass QR login check
+    WechatMpNativeApiClient.singleton_class.alias_method :__original_load_session_for_test, :load_session!
+    WechatMpNativeApiClient.singleton_class.define_method(:load_session!) do
+      ["cookie_str", "token_str"]
     end
 
     begin
       get import_wechat_search_accounts_path, params: { keyword: "测试关键词" }
     ensure
-      WechatApiClient.singleton_class.alias_method :search_account, :__original_search_account_for_test
-      WechatApiClient.singleton_class.remove_method :__original_search_account_for_test
+      WechatMpNativeApiClient.singleton_class.alias_method :search_account, :__original_search_account_for_test
+      WechatMpNativeApiClient.singleton_class.remove_method :__original_search_account_for_test
+      WechatMpNativeApiClient.singleton_class.alias_method :load_session!, :__original_load_session_for_test
+      WechatMpNativeApiClient.singleton_class.remove_method :__original_load_session_for_test
     end
 
     assert_response :success

@@ -15,83 +15,29 @@
         <select name="wechat_api_provider" id="wechat_provider_select"
                 class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                 onchange="this.form.requestSubmit()">
-          <option value="mptext" <%= 'selected' if @wechat_api_provider == 'mptext' %>>MPText (down.mptext.top)</option>
+          <option value="mp_native" <%= 'selected' if @wechat_api_provider == 'mp_native' || @wechat_api_provider == 'mptext' %>>MP 原生 (扫码登录 mp.weixin.qq.com)</option>
           <option value="dajiala" <%= 'selected' if @wechat_api_provider == 'dajiala' %>>Dajiala (dajiala.com)</option>
+          <option value="profile_ext" <%= 'selected' if @wechat_api_provider == 'profile_ext' %>>Profile Ext (mitmproxy 凭证抓取)</option>
+          <option value="weread" <%= 'selected' if @wechat_api_provider == 'weread' %>>WeRead (微信读书转发)</option>
         </select>
         <noscript><button type="submit" class="btn btn-primary text-sm">切换</button></noscript>
       <% end %>
       <p class="mt-1 text-sm text-gray-500">选择用于抓取微信公众号文章的 API 服务</p>
     </div>
 
-    <!-- MPText Section -->
-    <div id="mptext_section" style="display: <%= @wechat_api_provider == 'mptext' ? 'block' : 'none' %>">
-      <h3 class="text-lg font-semibold text-gray-800 mb-3">MPText API</h3>
-
-      <% if @api_key_value.present? %>
-        <div class="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm font-medium text-blue-900">当前 API 密钥</p>
-              <p class="text-sm text-blue-700 mt-1 font-mono"><%= mask_api_key(@api_key_value) %></p>
-              <p class="text-sm text-blue-700 mt-1">
-                过期时间：<%= @api_key_expires_at ? Time.parse(@api_key_expires_at).strftime('%Y-%m-%d %H:%M') : '永不过期' %>
-                <% if @api_key_expires_at && Time.parse(@api_key_expires_at) < 24.hours.from_now %>
-                  <span class="ml-2 text-red-600 font-semibold">⚠️ 即将过期！</span>
-                <% end %>
-              </p>
-              <% if @wechat_key_check %>
-                <p class="text-sm mt-1">
-                  上次验证：
-                  <% if @wechat_key_check[:valid] == true %>
-                    <span class="text-green-700 font-semibold">✓ 有效</span>
-                  <% elsif @wechat_key_check[:valid] == false %>
-                    <span class="text-red-700 font-semibold">✗ 无效</span>
-                  <% else %>
-                    <span class="text-yellow-700 font-semibold">? 验证失败</span>
-                  <% end %>
-                  <span class="text-gray-500 text-xs ml-1">(<%= Time.parse(@wechat_key_check[:checked_at]).strftime('%Y-%m-%d %H:%M') %>)</span>
-                </p>
-              <% end %>
-            </div>
-            <div class="flex flex-col items-end gap-2">
-              <%= button_to "验证接口", validate_wechat_key_admin_settings_path, method: :post,
-                  class: "text-sm px-3 py-1.5 rounded bg-blue-600 text-white hover:bg-blue-700 transition" %>
-            </div>
-          </div>
-        </div>
-      <% else %>
-        <div class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-          <p class="text-sm text-yellow-800">未配置 API 密钥。请在下方添加。</p>
-        </div>
-      <% end %>
-
-      <%= form_with url: admin_settings_path, method: :patch, class: "space-y-4" do |f| %>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">API 密钥</label>
-          <input type="text" name="api_key" placeholder="输入您从 down.mptext.top 获取的 API 密钥"
-                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
-          <p class="mt-1 text-sm text-gray-500">
-            从 <a href="https://down.mptext.top/dashboard/api" target="_blank" class="text-primary hover:underline">https://down.mptext.top/dashboard/api</a> 获取您的 API 密钥
-          </p>
-        </div>
-
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">过期时间（天）</label>
-          <select name="expires_days" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
-            <option value="4" selected>4 天（推荐）</option>
-            <option value="3">3 天</option>
-            <option value="5">5 天</option>
-          </select>
-        </div>
-
-        <button type="submit" class="btn btn-primary">更新 API 密钥</button>
-      <% end %>
+    <!-- Tabs -->
+    <% active_tab = case @wechat_api_provider; when 'dajiala' then 'dajiala'; when 'profile_ext' then 'profile_ext'; when 'weread' then 'weread'; else 'mp_native'; end %>
+    <div class="border-b border-gray-200 mb-4">
+      <nav class="flex gap-0 -mb-px" role="tablist">
+        <button class="wechat-tab px-4 py-2 text-sm font-medium border-b-2 rounded-t-lg transition <%= active_tab == 'dajiala' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' %>" data-tab="dajiala" role="tab">Dajiala</button>
+        <button class="wechat-tab px-4 py-2 text-sm font-medium border-b-2 rounded-t-lg transition <%= active_tab == 'profile_ext' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' %>" data-tab="profile_ext" role="tab">Profile Ext</button>
+        <button class="wechat-tab px-4 py-2 text-sm font-medium border-b-2 rounded-t-lg transition <%= active_tab == 'mp_native' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' %>" data-tab="mp_native" role="tab">MP 原生</button>
+        <button class="wechat-tab px-4 py-2 text-sm font-medium border-b-2 rounded-t-lg transition <%= active_tab == 'weread' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' %>" data-tab="weread" role="tab">WeRead</button>
+      </nav>
     </div>
 
-    <!-- Dajiala Section -->
-    <div id="dajiala_section" style="display: <%= @wechat_api_provider == 'dajiala' ? 'block' : 'none' %>">
-      <h3 class="text-lg font-semibold text-gray-800 mb-3">Dajiala API</h3>
-
+    <!-- Dajiala Panel -->
+    <div class="wechat-panel <%= 'hidden' unless active_tab == 'dajiala' %>" data-tab-panel="dajiala" role="tabpanel">
       <% if @dajiala_api_key.present? %>
         <div class="mb-4 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
           <div class="flex items-center justify-between">
@@ -136,6 +82,249 @@
 
         <button type="submit" class="btn btn-primary">保存 Dajiala 密钥</button>
       <% end %>
+    </div>
+
+    <!-- Profile Ext Panel -->
+    <div class="wechat-panel <%= 'hidden' unless active_tab == 'profile_ext' %>" data-tab-panel="profile_ext" role="tabpanel">
+      <p class="text-sm text-gray-500 mb-4">
+        使用 mitmproxy 抓取的 credentials.json 内容。凭证有效期约 25 分钟，过期后需重新抓包并更新。
+      </p>
+
+      <% if @profile_ext_credentials.present? %>
+        <div class="mb-4 p-4 <%= @profile_ext_expired ? 'bg-red-50 border-red-200' : 'bg-teal-50 border-teal-200' %> border rounded-lg">
+          <p class="text-sm font-medium <%= @profile_ext_expired ? 'text-red-900' : 'text-teal-900' %>">
+            凭证状态：<%= @profile_ext_expired ? '✗ 已过期' : '✓ 有效' %>
+          </p>
+          <p class="text-sm mt-1 text-gray-600">
+            更新时间：<%= Time.parse(@profile_ext_updated_at).strftime('%Y-%m-%d %H:%M:%S') rescue '未知' %>
+            <% if @profile_ext_age_minutes %>
+              （<%= @profile_ext_age_minutes %> 分钟前）
+            <% end %>
+          </p>
+          <% if @profile_ext_expired %>
+            <p class="text-sm mt-1 text-red-700">请重新抓包获取新凭证并粘贴到下方</p>
+          <% end %>
+          <% if @profile_ext_account_bizs.any? %>
+            <p class="text-sm mt-1 text-gray-600">
+              已覆盖 <%= @profile_ext_account_bizs.size %> 个号：
+              <% @profile_ext_account_bizs.each do |biz| %>
+                <% account = Account.find_by(fakeid: biz) %>
+                <span class="font-mono text-xs"><%= account&.nickname || biz[0..12] %></span><%= biz != @profile_ext_account_bizs.last ? '、' : '' %>
+              <% end %>
+            </p>
+          <% end %>
+        </div>
+      <% else %>
+        <div class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <p class="text-sm text-yellow-800">未配置 profile_ext 凭证。请粘贴 credentials.json 内容到下方。</p>
+        </div>
+      <% end %>
+
+      <%= form_with url: admin_settings_path, method: :patch, class: "space-y-4" do |f| %>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">credentials.json 内容</label>
+          <textarea name="profile_ext_credentials" rows="8" placeholder='粘贴 credentials.json 的完整 JSON 内容'
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent font-mono text-sm"><%= @profile_ext_credentials %></textarea>
+          <p class="mt-1 text-sm text-gray-500">
+            运行 <code class="bg-gray-100 px-1 rounded">scripts/capture_credentials.rb</code> 一键抓包，
+            或手动粘贴 credentials.json 内容
+          </p>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <button type="submit" class="btn btn-primary">保存凭证</button>
+          <%= button_to "验证凭证", validate_profile_ext_key_admin_settings_path, method: :post,
+              class: "text-sm px-3 py-1.5 rounded bg-teal-600 text-white hover:bg-teal-700 transition" %>
+        </div>
+      <% end %>
+    </div>
+
+    <!-- MP Native Panel -->
+    <div class="wechat-panel <%= 'hidden' unless active_tab == 'mp_native' %>" data-tab-panel="mp_native" role="tabpanel">
+      <p class="text-sm text-gray-500 mb-4">
+        通过扫描二维码登录微信公众号平台（mp.weixin.qq.com），登录后可使用原生 API 抓取文章。Cookie/Token 有效期约 2 小时。
+      </p>
+
+      <% if @wechat_mp_session_valid %>
+        <!-- Logged in state -->
+        <div class="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm font-medium text-green-900">会话状态：✓ 已登录</p>
+              <p class="text-sm text-green-700 mt-1 font-mono">Token: <%= mask_api_key(@wechat_mp_token) %></p>
+              <% if @wechat_mp_expires_at %>
+                <p class="text-sm text-green-700 mt-1">
+                  过期时间：<%= Time.parse(@wechat_mp_expires_at).strftime('%Y-%m-%d %H:%M:%S') rescue @wechat_mp_expires_at %>
+                </p>
+              <% end %>
+              <% if @wechat_mp_account_info.present? %>
+                <% info = JSON.parse(@wechat_mp_account_info) rescue {} %>
+                <% if info['nickname'].present? %>
+                  <p class="text-sm text-green-700 mt-1">公众号：<%= info['nickname'] %></p>
+                <% end %>
+              <% end %>
+              <% if @mp_native_key_check %>
+                <p class="text-sm mt-1">
+                  上次验证：
+                  <% if @mp_native_key_check[:valid] == true %>
+                    <span class="text-green-700 font-semibold">✓ 有效</span>
+                  <% else %>
+                    <span class="text-red-700 font-semibold">✗ 无效</span>
+                  <% end %>
+                  <span class="text-gray-500 text-xs ml-1">(<%= Time.parse(@mp_native_key_check[:checked_at]).strftime('%Y-%m-%d %H:%M') %>)</span>
+                </p>
+              <% end %>
+            </div>
+            <div class="flex flex-col items-end gap-2">
+              <%= button_to "验证会话", validate_mp_native_key_admin_settings_path, method: :post,
+                  class: "text-sm px-3 py-1.5 rounded bg-green-600 text-white hover:bg-green-700 transition" %>
+              <%= button_to "退出登录", wechat_mp_logout_admin_settings_path, method: :post,
+                  class: "text-sm px-3 py-1.5 rounded bg-red-600 text-white hover:bg-red-700 transition",
+                  data: { confirm: "确定要退出微信公众号平台登录吗？" } %>
+            </div>
+          </div>
+        </div>
+      <% else %>
+        <!-- Not logged in state -->
+        <div class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <p class="text-sm text-yellow-800">未登录微信公众号平台。请点击下方按钮获取二维码，然后使用微信扫码登录。</p>
+        </div>
+
+        <div id="mp_native_qr_area" class="mb-4" style="display: none;">
+          <div class="flex flex-col items-center p-4 bg-white border border-gray-200 rounded-lg">
+            <p class="text-sm text-gray-600 mb-3">请使用微信扫描下方二维码</p>
+            <img id="mp_native_qr_image" src="" alt="微信扫码登录二维码" class="w-64 h-64 border border-gray-300 rounded" />
+            <p id="mp_native_qr_status" class="text-sm mt-3 text-gray-500">等待扫码...</p>
+            <div id="mp_native_qr_spinner" class="mt-2 hidden">
+              <div class="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full mx-auto"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <button id="mp_native_get_qr_btn" class="btn btn-primary" onclick="WechatMpQrPoller.requestQrCode()">
+            获取登录二维码
+          </button>
+        </div>
+      <% end %>
+    </div>
+
+    <!-- WeRead Panel -->
+    <div class="wechat-panel <%= 'hidden' unless active_tab == 'weread' %>" data-tab-panel="weread" role="tabpanel">
+      <p class="text-sm text-gray-500 mb-4">
+        管理微信读书转发服务的登录账号。登录后可抓取微信公众号文章。
+      </p>
+
+      <!-- Account Status -->
+      <% if @weread_accounts.any? %>
+        <div class="mb-4 p-4 <%= @weread_has_valid_accounts ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200' %> border rounded-lg">
+          <p class="text-sm font-medium <%= @weread_has_valid_accounts ? 'text-green-900' : 'text-yellow-900' %>">
+            账号状态：<%= @weread_has_valid_accounts ? '✓ 有可用账号' : '⚠ 无可用账号' %>
+          </p>
+          <p class="text-sm mt-1 text-gray-600">
+            共 <%= @weread_accounts.size %> 个账号，
+            启用 <%= @weread_accounts.count { |a| a['status'].to_i == 1 } %> 个，
+            今日黑名单 <%= @weread_today_blocked.size %> 个
+          </p>
+          <% if @weread_key_check %>
+            <p class="text-sm mt-1">
+              上次验证：
+              <% if @weread_key_check[:valid] == true %>
+                <span class="text-green-700 font-semibold">✓ 有效</span>
+              <% else %>
+                <span class="text-red-700 font-semibold">✗ 无效</span>
+              <% end %>
+              <span class="text-gray-500 text-xs ml-1">(<%= Time.parse(@weread_key_check[:checked_at]).strftime('%Y-%m-%d %H:%M') %>)</span>
+            </p>
+          <% end %>
+        </div>
+
+        <!-- Account List Table -->
+        <div class="mb-4 overflow-x-auto">
+          <table class="w-full text-sm border border-gray-200 rounded-lg">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-3 py-2 text-left text-gray-600">VID</th>
+                <th class="px-3 py-2 text-left text-gray-600">用户名</th>
+                <th class="px-3 py-2 text-left text-gray-600">状态</th>
+                <th class="px-3 py-2 text-left text-gray-600">备注</th>
+                <th class="px-3 py-2 text-right text-gray-600">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% @weread_accounts.each do |a| %>
+                <% vid = a['vid'].to_s %>
+                <% status = a['status'].to_i %>
+                <% is_blocked = @weread_today_blocked.include?(vid) %>
+                <tr class="border-t border-gray-200 <%= 'bg-red-50' if status == 0 %>">
+                  <td class="px-3 py-2 font-mono text-xs"><%= vid[0..14] %></td>
+                  <td class="px-3 py-2"><%= a['name'] %></td>
+                  <td class="px-3 py-2">
+                    <% case status
+                       when 1 %>
+                      <span class="text-xs px-2 py-0.5 rounded bg-green-100 text-green-800">启用</span>
+                    <% when 0 %>
+                      <span class="text-xs px-2 py-0.5 rounded bg-red-100 text-red-800">失效</span>
+                    <% when 2 %>
+                      <span class="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-800">禁用</span>
+                    <% end %>
+                    <% if is_blocked %>
+                      <span class="text-xs px-2 py-0.5 rounded bg-orange-100 text-orange-800 ml-1">今日限流</span>
+                    <% end %>
+                  </td>
+                  <td class="px-3 py-2 text-xs text-gray-500">
+                    <%= '已失效，请重新登录' if status == 0 %>
+                    <%= '今日被限流' if is_blocked %>
+                  </td>
+                  <td class="px-3 py-2 text-right">
+                    <div class="flex items-center justify-end gap-1">
+                      <% if status != 1 %>
+                        <%= button_to "启用", weread_enable_account_admin_settings_path(vid: vid),
+                            method: :post, class: "text-xs px-2 py-1 rounded bg-green-600 text-white hover:bg-green-700",
+                            form: { style: "display: inline;" } %>
+                      <% end %>
+                      <% if status == 1 %>
+                        <%= button_to "禁用", weread_disable_account_admin_settings_path(vid: vid),
+                            method: :post, class: "text-xs px-2 py-1 rounded bg-gray-500 text-white hover:bg-gray-600",
+                            form: { style: "display: inline;" } %>
+                      <% end %>
+                      <%= button_to "移除", weread_remove_account_admin_settings_path(vid: vid),
+                          method: :post, class: "text-xs px-2 py-1 rounded bg-red-500 text-white hover:bg-red-600",
+                          form: { style: "display: inline;" },
+                          data: { confirm: "确定要移除账号 #{a['name']} 吗？" } %>
+                    </div>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      <% else %>
+        <div class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <p class="text-sm text-yellow-800">暂无 WeRead 账号。请使用下方的二维码登录功能添加账号。</p>
+        </div>
+      <% end %>
+
+      <div class="flex items-center gap-3 mb-4">
+        <%= button_to "验证账号", validate_weread_key_admin_settings_path, method: :post,
+            class: "text-sm px-3 py-1.5 rounded bg-indigo-600 text-white hover:bg-indigo-700 transition" %>
+      </div>
+
+      <!-- QR Code Login Area -->
+      <hr class="my-4 border-gray-200">
+      <h3 class="text-lg font-semibold text-gray-800 mb-3">添加新账号（扫码登录）</h3>
+
+      <div id="weread_qr_area" class="mb-4" style="display: none;">
+        <div class="flex flex-col items-center p-4 bg-white border border-gray-200 rounded-lg">
+          <p class="text-sm text-gray-600 mb-3">请使用微信扫描下方二维码</p>
+          <img id="weread_qr_image" src="" alt="微信读书登录二维码" class="w-64 h-64 border border-gray-300 rounded" />
+          <p id="weread_qr_status" class="text-sm mt-3 text-gray-500">等待扫码...</p>
+        </div>
+      </div>
+
+      <button id="weread_get_qr_btn" class="btn btn-primary" onclick="WereadQrPoller.requestQrCode()">
+        获取登录二维码
+      </button>
     </div>
   </div>
 
@@ -422,10 +611,285 @@
   <div class="card bg-gray-50">
     <h3 class="font-semibold text-gray-900 mb-2">重要说明</h3>
     <ul class="space-y-2 text-sm text-gray-600">
-      <li>• <strong>MPText</strong>：API 密钥每 4 天过期一次，必须手动更新；当密钥过期时，抓取任务将自动暂停</li>
-      <li>• <strong>Dajiala</strong>：使用公众号名称抓取文章，无需 fakeid；如遇频率限制可切换回 MPText</li>
-      <li>• 两个提供商的搜索导入功能均使用 MPText API</li>
+      <li>• <strong>MP 原生</strong>：扫码登录微信公众号平台后台，Cookie/Token 有效期约 2 小时，过期需重新扫码</li>
+      <li>• <strong>Dajiala</strong>：使用公众号名称抓取文章，无需 fakeid；如遇频率限制可切换回 MP 原生</li>
+      <li>• <strong>Profile Ext</strong>：使用 mitmproxy 抓包凭证，有效期约 25 分钟，过期需重新抓包</li>
+      <li>• 搜索导入功能需要先扫码登录 MP 原生</li>
       <li>• 更高的并发数 = 更快的抓取速度，但可能触发速率限制</li>
     </ul>
   </div>
 </div>
+
+<script>
+  // WeChat Tab Switcher
+  (function() {
+    const tabs = document.querySelectorAll('.wechat-tab');
+    const panels = document.querySelectorAll('.wechat-panel');
+
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        const target = tab.dataset.tab;
+
+        // Deactivate all tabs
+        tabs.forEach(t => {
+          t.classList.remove('border-primary', 'text-primary');
+          t.classList.add('border-transparent', 'text-gray-500');
+        });
+
+        // Activate clicked tab
+        tab.classList.remove('border-transparent', 'text-gray-500');
+        tab.classList.add('border-primary', 'text-primary');
+
+        // Show target panel, hide others
+        panels.forEach(p => {
+          if (p.dataset.tabPanel === target) {
+            p.classList.remove('hidden');
+          } else {
+            p.classList.add('hidden');
+          }
+        });
+      });
+    });
+  })();
+</script>
+
+<script>
+  // MP Native QR Code Poller
+  const WechatMpQrPoller = {
+    pollTimer: null,
+    uuid: null,
+
+    async requestQrCode() {
+      const btn = document.getElementById('mp_native_get_qr_btn');
+      const area = document.getElementById('mp_native_qr_area');
+      const img = document.getElementById('mp_native_qr_image');
+      const status = document.getElementById('mp_native_qr_status');
+
+      // Stop any existing polling
+      this.stopPolling();
+
+      btn.disabled = true;
+      btn.textContent = '获取中...';
+
+      try {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+        const resp = await fetch('/admin/settings/wechat_mp_request_qrcode', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': csrfToken,
+          },
+        });
+
+        if (!resp.ok) {
+          const data = await resp.json();
+          throw new Error(data.error || '获取二维码失败');
+        }
+
+        const data = await resp.json();
+        this.uuid = data.uuid;
+        // Add cache-busting timestamp
+        img.src = data.image_path + '?t=' + Date.now();
+        img.onerror = () => {
+          status.textContent = '二维码图片加载失败，请重试';
+          status.className = 'text-sm mt-3 text-red-600';
+          btn.disabled = false;
+          btn.textContent = '获取登录二维码';
+        };
+        area.style.display = 'block';
+        status.textContent = '等待扫码...';
+        status.className = 'text-sm mt-3 text-gray-500';
+        btn.textContent = '重新获取二维码';
+
+        // Start polling
+        this.startPolling();
+      } catch (err) {
+        status.textContent = '获取二维码失败: ' + err.message;
+        status.className = 'text-sm mt-3 text-red-600';
+        area.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = '获取登录二维码';
+      }
+    },
+
+    startPolling() {
+      if (this.pollTimer) clearInterval(this.pollTimer);
+
+      const status = document.getElementById('mp_native_qr_status');
+      const img = document.getElementById('mp_native_qr_image');
+
+      this.pollTimer = setInterval(async () => {
+        try {
+          const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+          const resp = await fetch('/admin/settings/wechat_mp_qrcode_status', {
+            headers: { 'X-CSRF-Token': csrfToken },
+          });
+
+          if (!resp.ok) throw new Error('HTTP ' + resp.status);
+
+          const data = await resp.json();
+
+          switch (data.status) {
+            case 'waiting':
+              status.textContent = '等待扫码...';
+              status.className = 'text-sm mt-3 text-gray-500';
+              break;
+            case 'scanned':
+              status.textContent = '已扫码，请在手机上确认登录...';
+              status.className = 'text-sm mt-3 text-blue-600 font-semibold';
+              break;
+            case 'success':
+              status.textContent = '登录成功！页面即将刷新...';
+              status.className = 'text-sm mt-3 text-green-600 font-semibold';
+              this.stopPolling();
+              img.style.opacity = '0.5';
+              setTimeout(() => { window.location.reload(); }, 1500);
+              break;
+            case 'expired':
+              status.textContent = '二维码已过期，请重新获取';
+              status.className = 'text-sm mt-3 text-red-600';
+              this.stopPolling();
+              break;
+            case 'error':
+              status.textContent = '错误: ' + (data.message || '未知错误');
+              status.className = 'text-sm mt-3 text-red-600';
+              this.stopPolling();
+              break;
+          }
+        } catch (err) {
+          status.textContent = '轮询出错: ' + err.message;
+          status.className = 'text-sm mt-3 text-red-600';
+          this.stopPolling();
+        }
+      }, 2000); // Poll every 2 seconds
+    },
+
+    stopPolling() {
+      if (this.pollTimer) {
+        clearInterval(this.pollTimer);
+        this.pollTimer = null;
+      }
+      const btn = document.getElementById('mp_native_get_qr_btn');
+      if (btn) btn.disabled = false;
+    }
+  };
+</script>
+
+<script>
+  // WeRead QR Code Poller
+  const WereadQrPoller = {
+    pollTimer: null,
+
+    async requestQrCode() {
+      const btn = document.getElementById('weread_get_qr_btn');
+      const area = document.getElementById('weread_qr_area');
+      const img = document.getElementById('weread_qr_image');
+      const status = document.getElementById('weread_qr_status');
+
+      this.stopPolling();
+
+      btn.disabled = true;
+      btn.textContent = '获取中...';
+
+      try {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+        const resp = await fetch('/admin/settings/weread_request_qrcode', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': csrfToken,
+          },
+        });
+
+        if (!resp.ok) {
+          const data = await resp.json();
+          throw new Error(data.error || '获取二维码失败');
+        }
+
+        const data = await resp.json();
+        // Use qrserver API to render QR code image
+        const scanUrl = data.scan_url;
+        img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=' + encodeURIComponent(scanUrl) + '&t=' + Date.now();
+        img.onerror = () => {
+          status.textContent = '二维码图片加载失败，请重试';
+          status.className = 'text-sm mt-3 text-red-600';
+          btn.disabled = false;
+          btn.textContent = '获取登录二维码';
+        };
+        area.style.display = 'block';
+        status.textContent = '等待扫码...';
+        status.className = 'text-sm mt-3 text-gray-500';
+        btn.textContent = '重新获取二维码';
+
+        this.startPolling();
+      } catch (err) {
+        status.textContent = '错误: ' + err.message;
+        status.className = 'text-sm mt-3 text-red-600';
+        area.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = '获取登录二维码';
+      }
+    },
+
+    startPolling() {
+      if (this.pollTimer) clearInterval(this.pollTimer);
+
+      const status = document.getElementById('weread_qr_status');
+      const img = document.getElementById('weread_qr_image');
+
+      this.pollTimer = setInterval(async () => {
+        try {
+          const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+          const resp = await fetch('/admin/settings/weread_qrcode_status', {
+            headers: { 'X-CSRF-Token': csrfToken },
+          });
+
+          if (!resp.ok) throw new Error('HTTP ' + resp.status);
+
+          const data = await resp.json();
+
+          switch (data.status) {
+            case 'waiting':
+              status.textContent = data.message || '等待扫码...';
+              status.className = 'text-sm mt-3 text-gray-500';
+              break;
+            case 'scanned':
+              status.textContent = data.message || '已扫码，请在手机上确认登录...';
+              status.className = 'text-sm mt-3 text-blue-600 font-semibold';
+              break;
+            case 'success':
+              status.textContent = (data.message || '登录成功') + ' 页面即将刷新...';
+              status.className = 'text-sm mt-3 text-green-600 font-semibold';
+              this.stopPolling();
+              img.style.opacity = '0.5';
+              setTimeout(() => { window.location.reload(); }, 1500);
+              break;
+            case 'expired':
+              status.textContent = '二维码已过期，请重新获取';
+              status.className = 'text-sm mt-3 text-red-600';
+              this.stopPolling();
+              break;
+            case 'error':
+              status.textContent = '错误: ' + (data.message || '未知错误');
+              status.className = 'text-sm mt-3 text-red-600';
+              this.stopPolling();
+              break;
+          }
+        } catch (err) {
+          status.textContent = '轮询出错: ' + err.message;
+          status.className = 'text-sm mt-3 text-red-600';
+          this.stopPolling();
+        }
+      }, 3000);
+    },
+
+    stopPolling() {
+      if (this.pollTimer) {
+        clearInterval(this.pollTimer);
+        this.pollTimer = null;
+      }
+      const btn = document.getElementById('weread_get_qr_btn');
+      if (btn) btn.disabled = false;
+    }
+  };
+</script>

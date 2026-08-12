@@ -10,8 +10,10 @@ require "rate_limiter_middleware"
 # knows how to crawl a single WeChat account's articles.
 #
 # Uses the API provider configured in Option.wechat_api_provider:
-#   "mptext"  (default) — WechatApiClient (down.mptext.top)
-#   "dajiala"           — DajialaApiClient (dajiala.com)
+#   "mp_native"   (default) — WechatMpNativeApiClient (扫码登录 mp.weixin.qq.com)
+#   "dajiala"               — DajialaApiClient (dajiala.com)
+#   "profile_ext"           — ProfileExtApiClient (mitmproxy 凭证)
+#   "weread"                — WereadApiClient (微信读书转发)
 class WechatCrawler < BaseCrawler
   CHROME_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.64 Safari/537.36".freeze
 
@@ -150,7 +152,8 @@ class WechatCrawler < BaseCrawler
     case Option.wechat_api_provider
     when "dajiala" then DajialaApiClient
     when "profile_ext" then ProfileExtApiClient
-    else WechatApiClient
+    when "weread" then WereadApiClient
+    else WechatMpNativeApiClient
     end
   end
   def self.crawl_account(account, crawl_task, article_concurrency:, max_pages:)

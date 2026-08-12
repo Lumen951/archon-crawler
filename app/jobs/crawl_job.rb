@@ -14,6 +14,13 @@ class CrawlJob < ApplicationJob
       return
     end
 
+    # If the task is failed and its scheduled_job_id was cleared, the
+    # auto-retry was cancelled by the user — don't restart crawling.
+    if crawl_task.failed? && crawl_task.scheduled_job_id.blank?
+      Rails.logger.info("CrawlJob: Task ##{crawl_task.id} auto-retry was cancelled, skipping")
+      return
+    end
+
     CrawlOrchestrator.crawl(crawl_task)
   end
 end

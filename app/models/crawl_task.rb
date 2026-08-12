@@ -72,7 +72,8 @@ class CrawlTask < ApplicationRecord
   end
 
   def resume!
-    update!(status: :pending, retry_count: 0)
+    cancel_scheduled_job!
+    update!(status: :pending, retry_count: 0, scheduled_job_id: nil)
     CrawlJob.perform_later(id)
   end
 
@@ -115,9 +116,9 @@ class CrawlTask < ApplicationRecord
     elsif can_retry?
       delay = retry_delay_minutes
       new_count = retry_count + 1
+      job = CrawlJob.set(wait: delay.minutes).perform_later(id)
       log(:warn, "有 #{failed_account_count} 个帐号抓取失败，#{delay} 分钟后自动重试 (#{new_count}/#{MAX_RETRIES})")
-      update!(status: :failed, error_message: "#{failed_account_count} 个帐号抓取失败，#{delay} 分钟后自动重试", completed_at: Time.current, retry_count: new_count)
-      CrawlJob.set(wait: delay.minutes).perform_later(id)
+      update!(status: :failed, error_message: "#{failed_account_count} 个帐号抓取失败，#{delay} 分钟后自动重试", completed_at: Time.current, retry_count: new_count, scheduled_job_id: job.job_id)
     else
       mark_failed!("有 #{failed_account_count} 个帐号抓取失败，已达到最大重试次数 (#{MAX_RETRIES})")
     end
@@ -126,6 +127,14 @@ class CrawlTask < ApplicationRecord
   def mark_failed!(error)
     log(:error, "抓取失败：#{error}")
     update!(status: :failed, error_message: error, completed_at: Time.current)
+  end
+
+  # Cancel the scheduled auto-retry job and keep the task in failed state.
+  # Returns true if a scheduled job was found and cancelled.
+  def cancel_scheduled_retry!
+    cancelled = cancel_scheduled_job!
+    update!(scheduled_job_id: nil, error_message: "#{failed_account_count} 个帐号抓取失败（已取消自动重试）")
+    cancelled
   end
 
   def can_retry?
@@ -152,6 +161,22 @@ class CrawlTask < ApplicationRecord
     else
       Account.active.count
     end
+  end
+
+  private
+
+  # Remove the SolidQueue scheduled job if it exists. Works across queue databases
+  # because SolidQueue::Job connects to the queue DB automatically.
+  def cancel_scheduled_job!
+    return false if scheduled_job_id.blank?
+
+    SolidQueue::Job.find_by(active_job_id: scheduled_job_id)&.destroy
+    true
+  rescue ActiveRecord::StatementInvalid, ActiveRecord::ConnectionNotEstablished => e
+    # Queue database may not be configured (e.g. async adapter in dev).
+    # The job won't fire anyway in that case — just clear the tracking.
+    Rails.logger.warn("CrawlTask##{id}: could not cancel SolidQueue job #{scheduled_job_id}: #{e.message}")
+    true
   end
 
 end

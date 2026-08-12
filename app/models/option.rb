@@ -31,33 +31,6 @@ class Option < ApplicationRecord
       where(opt_key: key).exists?
     end
 
-    # Wechat API key helpers
-    def api_key
-      get('wechat_api_key')
-    end
-
-    def api_key=(val)
-      set('wechat_api_key', val)
-    end
-
-    def api_key_valid?
-      key = api_key
-      key.present? && !api_key_expired?
-    end
-
-    def api_key_expired?
-      expires_at = get('wechat_api_key_expires_at')
-      return false if expires_at.blank?
-      Time.parse(expires_at).past? rescue false
-    end
-
-    def api_key_expires_soon?
-      expires_at = get('wechat_api_key_expires_at')
-      return false if expires_at.blank?
-      time = Time.parse(expires_at) rescue nil
-      time.present? && time < 24.hours.from_now
-    end
-
     def default_article_concurrency
       (get('default_article_concurrency') || 10).to_i
     end
@@ -104,7 +77,7 @@ class Option < ApplicationRecord
     # WeChat API provider helpers
     # Returns "mptext" (default) or "dajiala"
     def wechat_api_provider
-      get('wechat_api_provider') || 'mptext'
+      get('wechat_api_provider') || 'mp_native'
     end
 
     def wechat_api_provider=(val)
@@ -124,6 +97,64 @@ class Option < ApplicationRecord
       dajiala_api_key.present?
     end
 
+    # MP Native (QR code login) helpers
+    def wechat_mp_cookie
+      get('wechat_mp_cookie')
+    end
+
+    def wechat_mp_cookie=(val)
+      set('wechat_mp_cookie', val)
+    end
+
+    def wechat_mp_token
+      get('wechat_mp_token')
+    end
+
+    def wechat_mp_token=(val)
+      set('wechat_mp_token', val)
+    end
+
+    def wechat_mp_expires_at
+      get('wechat_mp_expires_at')
+    end
+
+    def wechat_mp_expires_at=(val)
+      set('wechat_mp_expires_at', val)
+    end
+
+    def wechat_mp_login_state
+      get('wechat_mp_login_state')
+    end
+
+    def wechat_mp_login_state=(val)
+      set('wechat_mp_login_state', val)
+    end
+
+    def wechat_mp_account_info
+      get('wechat_mp_account_info')
+    end
+
+    def wechat_mp_account_info=(val)
+      set('wechat_mp_account_info', val)
+    end
+
+    def wechat_mp_session_valid?
+      cookie = wechat_mp_cookie
+      token = wechat_mp_token
+      return false if cookie.blank? || token.blank?
+
+      expires_at = wechat_mp_expires_at
+      return true if expires_at.blank?
+      Time.parse(expires_at).future? rescue false
+    end
+
+    # Returns true if a session was configured but is now expired or expiring soon.
+    # Returns false if no session was ever created (not an error state).
+    def wechat_mp_session_expires_soon?
+      return false if wechat_mp_cookie.blank? || wechat_mp_token.blank?
+      !wechat_mp_session_valid?
+    end
+
     # Per-platform crawl toggle helpers
     def crawl_wechat_enabled?
       get("crawl_wechat_enabled") != "false"
@@ -135,6 +166,105 @@ class Option < ApplicationRecord
 
     def crawl_twitter_enabled?
       get("crawl_twitter_enabled") != "false"
+    end
+
+    # Profile Ext credential helpers
+    CREDENTIAL_LIVE_MINUTES = 25
+
+    def profile_ext_credentials
+      get('profile_ext_credentials')
+    end
+
+    def profile_ext_credentials=(val)
+      set('profile_ext_credentials', val)
+      set('profile_ext_credentials_updated_at', Time.current.iso8601)
+    end
+
+    def profile_ext_credentials_updated_at
+      get('profile_ext_credentials_updated_at')
+    end
+
+    def profile_ext_credentials_valid?
+      creds = profile_ext_credentials
+      return false unless creds.present?
+      !profile_ext_credentials_expired?
+    end
+
+    def profile_ext_credentials_expired?
+      age = profile_ext_credentials_age_minutes
+      return true unless age
+      age >= CREDENTIAL_LIVE_MINUTES
+    end
+
+    # ── WeRead (微信读书) 转发服务配置 ──────────────────
+
+    def weread_platform_url
+      get("weread_platform_url") || "https://weread.111965.xyz"
+    end
+
+    def weread_platform_url=(val)
+      set("weread_platform_url", val)
+    end
+
+    # 连续更新延迟时间(秒)，默认 60s
+    def weread_update_delay_time
+      (get("weread_update_delay_time") || 60).to_i
+    end
+
+    def weread_update_delay_time=(val)
+      set("weread_update_delay_time", val)
+    end
+
+    # WeRead 账号列表: JSON 数组 [{vid, token, name, status}]
+    # status: 0=失效, 1=启用, 2=禁用
+    def weread_accounts
+      raw = get("weread_accounts")
+      return [] if raw.blank?
+      JSON.parse(raw)
+    rescue JSON::ParserError
+      []
+    end
+
+    def weread_accounts=(val)
+      set("weread_accounts", val.is_a?(String) ? val : val.to_json)
+    end
+
+    # 当日黑名单: JSON 对象 { "YYYY-MM-DD" => ["vid1", "vid2"] }
+    def weread_blocked_accounts
+      raw = get("weread_blocked_accounts")
+      return {} if raw.blank?
+      JSON.parse(raw)
+    rescue JSON::ParserError
+      {}
+    end
+
+    def weread_blocked_accounts=(val)
+      set("weread_blocked_accounts", val.is_a?(String) ? val : val.to_json)
+    end
+
+    def weread_accounts_valid?
+      weread_accounts.any? { |a| a["status"].to_i == 1 }
+    end
+
+    def profile_ext_credentials_age_minutes
+      # 优先用 credentials.json 内部的 timestamp（毫秒时间戳）
+      raw = profile_ext_credentials
+      if raw.present?
+        cred = JSON.parse(raw) rescue nil
+        ts = cred&.dig('timestamp') if cred.is_a?(Hash)
+        ts = cred.first&.dig('timestamp') if cred.is_a?(Array)
+        if ts
+          captured_at = Time.at(ts.to_f / 1000)
+          return ((Time.current - captured_at) / 60.0).round(1)
+        end
+      end
+
+      # fallback: Option 存储时间
+      updated_at = profile_ext_credentials_updated_at
+      return nil unless updated_at
+      ((Time.current - Time.parse(updated_at)) / 60.0).round(1)
+    rescue StandardError
+      nil
     end
   end
 end

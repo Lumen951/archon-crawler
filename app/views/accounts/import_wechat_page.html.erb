@@ -2,7 +2,7 @@
   <div class="flex items-center justify-between">
     <div>
       <h1 class="text-3xl font-bold text-gray-900">导入微信公众号</h1>
-      <p class="text-gray-600 mt-1">支持搜索导入、JSON 文本和文件上传</p>
+      <p class="text-gray-600 mt-1">支持搜索导入、文章链接导入和 CSV 上传</p>
     </div>
     <%= link_to "← 返回导入页", import_accounts_path, class: "btn btn-secondary" %>
   </div>
@@ -11,7 +11,8 @@
     <div class="border-b border-gray-200 mb-6">
       <nav class="-mb-px flex space-x-8">
         <button type="button" onclick="showTab('search')" id="tab-search" class="tab-button border-b-2 border-primary text-primary py-4 px-1 text-sm font-medium">搜索导入</button>
-        <button type="button" onclick="showTab('upload')" id="tab-upload" class="tab-button border-b-2 border-transparent text-gray-500 hover:text-gray-700 py-4 px-1 text-sm font-medium">上传文件</button>
+        <button type="button" onclick="showTab('url')" id="tab-url" class="tab-button border-b-2 border-transparent text-gray-500 hover:text-gray-700 py-4 px-1 text-sm font-medium">文章链接导入</button>
+        <button type="button" onclick="showTab('upload')" id="tab-upload" class="tab-button border-b-2 border-transparent text-gray-500 hover:text-gray-700 py-4 px-1 text-sm font-medium">上传 CSV</button>
       </nav>
     </div>
 
@@ -31,11 +32,30 @@
       <% end %>
     </div>
 
+    <div id="url-tab" class="tab-content hidden">
+      <%= form_with url: import_wechat_by_url_accounts_path, method: :post, local: true do |f| %>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">微信公众号文章链接</label>
+            <%= text_field_tag :article_url, nil, placeholder: "https://mp.weixin.qq.com/s/...",
+                class: "w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent",
+                required: true %>
+            <p class="mt-2 text-sm text-gray-500">
+              粘贴任意一篇微信公众号文章链接，系统将通过微信读书转发服务解析公众号信息并导入。
+            </p>
+          </div>
+          <div class="flex justify-end">
+            <button type="submit" class="btn btn-primary">解析并导入</button>
+          </div>
+        </div>
+      <% end %>
+    </div>
+
     <%= form_with url: import_wechat_file_accounts_path, method: :post, multipart: true, id: "import-form" do |f| %>
       <div id="upload-tab" class="tab-content hidden">
         <div class="space-y-4">
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">上传 JSON / CSV 文件</label>
+            <label class="block text-sm font-medium text-gray-700 mb-2">上传 CSV 文件</label>
             <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-gray-400 transition-colors">
               <div class="space-y-1 text-center">
                 <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
@@ -44,17 +64,17 @@
                 <div class="flex text-sm text-gray-600">
                   <label for="file-upload" class="relative cursor-pointer bg-white rounded-md font-medium text-primary hover:text-blue-700 focus-within:outline-none">
                     <span>上传文件</span>
-                    <%= f.file_field :json_file, id: "file-upload", accept: ".json,.csv", class: "sr-only", onchange: "updateFileName(this)" %>
+                    <%= f.file_field :json_file, id: "file-upload", accept: ".csv", class: "sr-only", onchange: "updateFileName(this)" %>
                   </label>
                   <p class="pl-1">或拖放文件至此</p>
                 </div>
-                <p class="text-xs text-gray-500">支持 .json 和 .csv 文件</p>
+                <p class="text-xs text-gray-500">仅支持 .csv 文件</p>
                 <p id="file-name" class="text-sm text-gray-700 font-medium mt-2"></p>
               </div>
             </div>
           </div>
           <div class="flex justify-end">
-            <button type="submit" class="btn btn-primary">从文件导入</button>
+            <button type="submit" class="btn btn-primary">从 CSV 导入</button>
           </div>
         </div>
       </div>
