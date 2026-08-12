@@ -84,6 +84,23 @@ class Option < ApplicationRecord
       set('wechat_api_provider', val)
     end
 
+    # WeChat 正文下载限流参数：请求数 / 窗口秒数（默认 5 次/60 秒，保守避免触发限流）
+    def wechat_download_rate_limit
+      (get('wechat_download_rate_limit') || 5).to_i
+    end
+
+    def wechat_download_rate_limit=(val)
+      set('wechat_download_rate_limit', val)
+    end
+
+    def wechat_download_rate_window
+      (get('wechat_download_rate_window') || 60).to_i
+    end
+
+    def wechat_download_rate_window=(val)
+      set('wechat_download_rate_window', val)
+    end
+
     # Dajiala API key helpers
     def dajiala_api_key
       get('dajiala_api_key')

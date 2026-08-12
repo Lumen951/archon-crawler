@@ -74,6 +74,11 @@ class CrawlOrchestrator
       end
 
       barrier.wait
+
+      # 所有帐号的文章列表抓完后，统一下载微信文章正文（正文下载有严格 rate limit）
+      if crawl_task.reload.running?
+        download_wechat_article_contents(crawl_task, article_concurrency)
+      end
     end
 
     elapsed = (Time.current - start_time).round(1)
@@ -96,5 +101,26 @@ class CrawlOrchestrator
       article_concurrency: article_concurrency,
       max_pages: max_pages
     )
+  end
+
+  # 所有帐号列表抓完后，统一下载缺失正文的微信文章（新建的 + 上次失败的）。
+  # 分批处理（find_in_batches），避免一次性把所有文章加载进内存。
+  def self.download_wechat_article_contents(crawl_task, article_concurrency)
+    scope = crawl_task.articles
+                      .joins(:account)
+                      .where(accounts: { type: "WechatAccount" })
+                      .where(content_html: nil)
+
+    total = scope.count
+    return if total.zero?
+
+    crawl_task.log(:info, "开始统一下载 #{total} 篇微信文章正文...")
+    semaphore = Async::Semaphore.new(article_concurrency)
+
+    failed = 0
+    scope.find_in_batches(batch_size: 200) do |batch|
+      failed += WechatCrawler.download_article_contents(batch, crawl_task, semaphore)
+    end
+    crawl_task.log(:warn, "#{failed} 篇微信文章正文下载失败（下次同步会重试，也可通过界面重新下载）") if failed > 0
   end
 end

@@ -8,7 +8,7 @@ class WechatAccount < Account
   end
 
   def self.crawler_class
-    Option.wechat_api_provider == "weread" ? WereadCrawler : WechatCrawler
+    WechatCrawler
   end
 
   # WeRead API 需要的 mpId (如 MP_WXS_xxx)

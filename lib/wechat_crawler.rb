@@ -17,8 +17,13 @@ require "rate_limiter_middleware"
 class WechatCrawler < BaseCrawler
   CHROME_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.64 Safari/537.36".freeze
 
-  # 5 req/min — 保守设置，避免触发 mp.weixin.qq.com 限流
-  DOWNLOAD_RATE_LIMITER = RateLimiter.new(5, 60)
+  # 正文下载限流器：请求数/窗口秒数由 Option 配置（默认 5 次/60 秒，保守避免触发 mp.weixin.qq.com 限流）
+  def self.download_rate_limiter
+    @download_rate_limiter ||= RateLimiter.new(
+      Option.wechat_download_rate_limit,
+      Option.wechat_download_rate_window
+    )
+  end
 
   class DownloadError < StandardError; end
 
@@ -26,7 +31,7 @@ class WechatCrawler < BaseCrawler
 
   def self.download_connection
     @download_connection ||= Faraday.new do |f|
-      f.request :rate_limiter, DOWNLOAD_RATE_LIMITER
+      f.request :rate_limiter, download_rate_limiter
       f.request :retry, max: 3, interval: 1, backoff_factor: 2,
                 exceptions: [Faraday::TimeoutError, Faraday::ConnectionFailed]
       f.options.timeout = 15
@@ -44,10 +49,11 @@ class WechatCrawler < BaseCrawler
 
     log(crawl_task, :debug, "下载文章: #{article_url[0..80]}...")
 
-    if DOWNLOAD_RATE_LIMITER.remaining <= 0
-      log(crawl_task, :debug, "速率限制等待中 (5 req/min)...")
+    # 速率限制由 download_connection 的 RateLimiterMiddleware 统一控制，
+    # 这里仅记录等待状态，避免重复计数。
+    if download_rate_limiter.remaining <= 0
+      log(crawl_task, :debug, "速率限制等待中 (#{Option.wechat_download_rate_limit} req/#{Option.wechat_download_rate_window}s)...")
     end
-    DOWNLOAD_RATE_LIMITER.wait
 
     headers = {
       "User-Agent" => CHROME_UA,
@@ -161,30 +167,18 @@ class WechatCrawler < BaseCrawler
     task_account&.mark_running!
 
     crawl_task.log(:info, "开始抓取帐号：#{account.nickname}")
-    article_semaphore = Async::Semaphore.new(article_concurrency)
-
     dajiala = Option.wechat_api_provider == "dajiala"
+    weread  = Option.wechat_api_provider == "weread"
 
-    # Dajiala requires `alias` (ghid) instead of `fakeid`.
-    # Search via mptext API to get account details and cache in metadata.
-    # if dajiala
-    #   if account.metadata&.dig('alias').blank?
-    #     crawl_task.log(:info, "#{account.nickname}: 正在搜索公众号信息...")
-    #     search_result = WechatApiClient.search_account(account.nickname)
-    #     match = (search_result['list'] || []).find { |a| a['nickname'] == account.nickname }
-    #     match ||= (search_result['list'] || []).first
-    #     if match.blank?
-    #       raise DajialaApiClient::ApiError, "无法找到帐号 #{account.nickname}，请检查帐号名称是否正确"
-    #     end
-    #     account.metadata = (account.metadata || {}).merge(match)
-    #     account.save!
-    #     crawl_task.log(:info, "#{account.nickname}: 已获取帐号信息，alias = #{match['alias']}")
-    #   end
-    # end
+    # 解析抓取标识：weread 用 mpId（必要时自动解析），dajiala 用 nickname，其余用 fakeid
+    identifier = if weread
+                   resolve_weread_mp_id(account, crawl_task)
+                 elsif dajiala
+                   account.nickname
+                 else
+                   account.fakeid
+                 end
 
-    # Dajiala uses alias (ghid), mptext uses fakeid
-    # identifier = dajiala ? (account.metadata&.dig('alias').presence || account.fakeid) : account.fakeid
-    identifier = dajiala ? account.nickname : account.fakeid
     offset = dajiala ? "" : 0
     pages_crawled = 0
 
@@ -218,9 +212,7 @@ class WechatCrawler < BaseCrawler
       articles_data.each do |article_data|
         break if crawl_task.error_threshold_exceeded?(account.class.name)
 
-        article_semaphore.async do
-          fetch_and_save_article(article_data, account, crawl_task)
-        end
+        find_or_create_article(article_data, account, crawl_task)
       end
 
       # Advance pagination
@@ -232,10 +224,14 @@ class WechatCrawler < BaseCrawler
         offset += 20
       end
 
+      # weread 不足一页即到末尾，避免多发一次请求
+      break if weread && articles_data.size < 20
+
       pages_crawled += 1
-      sleep 0.5
+      sleep(weread ? Option.weread_update_delay_time : 0.5)
     end
 
+    # 正文下载已统一移到 CrawlOrchestrator（所有帐号列表抓完后执行）
     account.refresh_activity_counters!
     account.update_column(:last_crawled_at, Time.current)
     task_account&.mark_completed!
@@ -248,22 +244,58 @@ class WechatCrawler < BaseCrawler
     Rails.logger.error("Account #{account.fakeid} crawl error: #{e.message}")
   end
 
-  def self.fetch_and_save_article(article_data, account, crawl_task)
-    return if article_data['link'].blank?
+  # weread 需要 mpId（MP_WXS_xxx）；若非该格式则通过已有文章 URL 自动解析
+  def self.resolve_weread_mp_id(account, crawl_task)
+    mp_id = account.weread_mp_id
+    return mp_id if mp_id.to_s.match?(/\AMP_WXS_/)
 
-    if Article.exists?(url: article_data['link'])
-      crawl_task.log(:debug, "跳过重复文章：#{article_data['title']}")
-      return
+    article = account.articles.order(published_at: :desc).first
+    unless article&.url.present?
+      crawl_task.log(:error, "#{account.nickname}: 无文章可用于解析 WeRead mpId，无法抓取")
+      raise WereadApiClient::ApiError, "无法解析 WeRead mpId：帐号 #{account.nickname} 没有文章，无法通过文章URL获取 mpId"
     end
 
-    crawl_task.log(:debug, "正在下载内容：#{article_data['title']}")
+    begin
+      result = WereadApiClient.get_mp_info(article.url, crawl_task: crawl_task)
+    rescue => e
+      crawl_task.log(:error, "#{account.nickname}: 解析 WeRead mpId 失败: #{e.message}")
+      raise WereadApiClient::ApiError, "解析 WeRead mpId 失败：#{e.message}"
+    end
 
-    html_content = download_with_retry(article_data['link'], 'html', crawl_task)
-    # markdown 格式仅限会员（请在请求头携带有效 X-Api-Token），游客仅支持 html 格式
-    # markdown_content = download_with_retry(article_data['link'], 'markdown', crawl_task)
-    markdown_content = Html2Text.convert(html_content)
+    if result.is_a?(Array) && result.any? && result.first["id"].present?
+      new_mp_id = result.first["id"]
+      account.metadata ||= {}
+      account.metadata["weread_mp_id"] = new_mp_id
+      account.save!
+      crawl_task.log(:info, "#{account.nickname}: 已通过文章URL解析到 WeRead mpId: #{new_mp_id}")
+      new_mp_id
+    else
+      mp_id # 解析失败时退回原值（与原 WereadCrawler 行为一致）
+    end
+  end
 
-    Article.create!(
+  # 查找或创建文章（只落库元数据，不下载正文）：
+  #   - 新建的文章
+  #   - 已存在但正文缺失的文章（上次下载失败）→ 关联到当前任务，供全局下载阶段重试
+  # 已存在且正文完整时跳过。
+  # @return [Article, nil] 需要下载正文的文章；无需下载时返回 nil
+  def self.find_or_create_article(article_data, account, crawl_task)
+    return if article_data['link'].blank?
+
+    existing = Article.find_by(url: article_data['link'])
+    if existing
+      if existing.content_html.nil?
+        # 关联到当前任务，供全局下载阶段统一抓取正文
+        existing.update_column(:crawl_task_id, crawl_task.id) if existing.crawl_task_id != crawl_task.id
+        crawl_task.log(:debug, "正文缺失，将重试下载：#{article_data['title']}")
+        return existing
+      else
+        crawl_task.log(:debug, "跳过重复文章：#{article_data['title']}")
+        return
+      end
+    end
+
+    article = Article.create!(
       account: account,
       crawl_task: crawl_task,
       title: article_data['title'],
@@ -271,19 +303,57 @@ class WechatCrawler < BaseCrawler
       author: article_data['author_name'],
       digest: article_data['digest'],
       cover_url: article_data['cover'],
-      content_markdown: markdown_content,
-      content_html: html_content,
       published_at: Time.at(article_data['create_time'].to_i),
       raw_data: article_data
     )
 
     crawl_task.increment_progress!
-    crawl_task.log(:info, "已保存文章：#{article_data['title']}")
+    crawl_task.log(:info, "已创建文章：#{article_data['title']}")
+    article
   rescue ActiveRecord::RecordInvalid => e
     crawl_task.log(:debug, "跳过重复文章：#{article_data['link']}")
+    nil
   rescue StandardError => e
     crawl_task.increment_error_count!(account.class.name)
-    crawl_task.log(:error, "保存文章 #{article_data['link']} 失败：#{e.message}")
+    crawl_task.log(:error, "创建文章 #{article_data['link']} 失败：#{e.message}")
+    nil
+  end
+
+  # 并发下载一批文章的正文，返回失败数量。单篇失败不会中断其他文章。
+  def self.download_article_contents(articles, crawl_task, semaphore)
+    barrier = Async::Barrier.new
+
+    articles.each do |article|
+      barrier.async do
+        semaphore.acquire do
+          download_article_content(article, crawl_task)
+        end
+      end
+    end
+
+    failed = 0
+    barrier.wait do |task|
+      failed += 1 unless task.wait
+    end
+    failed
+  end
+
+  # 下载单篇文章正文并更新。正文下载有严格 rate limit，失败时保留文章元数据。
+  # @return [Boolean] 是否成功下载
+  def self.download_article_content(article, crawl_task)
+    html_content = download_with_retry(article.url, 'html', crawl_task)
+    markdown_content = Html2Text.convert(html_content)
+
+    article.update!(
+      content_html: html_content,
+      content_markdown: markdown_content
+    )
+    crawl_task.log(:debug, "已下载正文：#{article.title}")
+    true
+  rescue StandardError => e
+    # 正文下载失败不算抓取失败：文章元数据已落库，可稍后通过界面重新下载
+    crawl_task.log(:warn, "下载正文失败 #{article.url}：#{e.message}")
+    false
   end
 
   def self.download_with_retry(url, format, crawl_task)
