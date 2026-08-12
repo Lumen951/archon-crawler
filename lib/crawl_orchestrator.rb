@@ -54,6 +54,7 @@ class CrawlOrchestrator
 
         barrier.async do
           semaphore = Async::Semaphore.new(account_concurrency)
+          account_barrier = Async::Barrier.new
 
           platform_accounts.find_each do |account|
             break if crawl_task.reload.paused? || crawl_task.reload.failed?
@@ -65,10 +66,15 @@ class CrawlOrchestrator
               break
             end
 
-            semaphore.async do
-              crawl_one_account(account, crawl_task, article_concurrency, max_pages)
+            account_barrier.async do
+              semaphore.acquire do
+                crawl_one_account(account, crawl_task, article_concurrency, max_pages)
+              end
             end
           end
+
+          # 等待该平台所有帐号任务真正结束（semaphore.async 只调度不等待，会导致日志乱序）
+          account_barrier.wait
           crawl_task.log(:info, "#{platform_class.new.platform_name} 平台抓取完成") unless crawl_task.reload.paused? || crawl_task.reload.failed?
         end
       end
@@ -112,7 +118,11 @@ class CrawlOrchestrator
                       .where(content_html: nil)
 
     total = scope.count
-    return if total.zero?
+
+    if total.zero?
+      crawl_task.log(:info, "没有缺失正文的微信文章，无需下载")
+      return
+    end
 
     crawl_task.log(:info, "开始统一下载 #{total} 篇微信文章正文...")
     semaphore = Async::Semaphore.new(article_concurrency)
