@@ -13,6 +13,21 @@ class Article < ApplicationRecord
   scope :last_7_days, -> { where("published_at >= ?", 7.days.ago) }
   scope :last_month, -> { where("published_at >= ?", 1.month.ago) }
 
+  # 从原文 URL 重新下载文章内容 (仅支持微信公众号)
+  def download_content!
+    return false unless url&.include?("mp.weixin.qq.com/s")
+
+    html = WechatCrawler.download_content(url)
+    return false if html.blank?
+
+    self.content_html = html
+    self.content_markdown = Html2Text.convert(html)
+    save!
+
+    Rails.cache.delete("article_content_#{id}")
+    true
+  end
+
   def to_rss_item
     {
       title: title,

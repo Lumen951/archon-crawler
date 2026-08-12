@@ -36,6 +36,17 @@
         </svg>
         查看原文
       <% end %>
+
+      <% if @article.url&.include?("mp.weixin.qq.com/s") %>
+        <%= link_to download_content_article_path(@article),
+              data: { turbo_method: :post, turbo_confirm: "确定要重新下载文章内容吗？这将覆盖现有内容。" },
+              class: "inline-flex items-center gap-1.5 text-amber-600 hover:text-amber-700 font-medium transition text-sm" do %>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          </svg>
+          重新下载
+        <% end %>
+      <% end %>
     </div>
   </div>
 
