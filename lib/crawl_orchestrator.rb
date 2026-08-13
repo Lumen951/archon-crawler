@@ -69,6 +69,7 @@ class CrawlOrchestrator
             account_barrier.async do
               semaphore.acquire do
                 next if crawl_task.reload.paused? || crawl_task.reload.failed?
+                next if crawl_task.reload.error_threshold_exceeded?(platform_key)
                 crawl_one_account(account, crawl_task, article_concurrency, max_pages)
               end
             end

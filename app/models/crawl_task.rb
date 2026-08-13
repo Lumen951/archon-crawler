@@ -59,6 +59,15 @@ class CrawlTask < ApplicationRecord
     update!(platform_error_counts: counts)
   end
 
+  # 立即标记某平台为失败（如微信读书账号池耗尽，任何账号都无法继续抓取）。
+  # 复用 error_threshold_exceeded? 的跳过逻辑，使该平台剩余账号尽快跳过，
+  # 其他平台不受影响。
+  def fail_platform!(platform_key)
+    counts = (platform_error_counts || {}).dup
+    counts[platform_key.to_s] = ERROR_THRESHOLD
+    update!(platform_error_counts: counts)
+  end
+
   def increment_progress!
     increment!(:progress)
   end

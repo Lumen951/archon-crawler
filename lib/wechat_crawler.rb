@@ -237,6 +237,12 @@ class WechatCrawler < BaseCrawler
     account.update_column(:last_crawled_at, Time.current)
     task_account&.mark_completed!
     crawl_task.log(:info, "#{account.nickname}: 抓取完成")
+  rescue WereadApiClient::NoAvailableAccountError => e
+    # 微信读书账号池耗尽，剩余微信账号都会失败，尽快中断微信平台抓取。
+    crawl_task.fail_platform!(account.class.name)
+    task_account&.mark_failed!(e.message)
+    crawl_task.log(:error, "#{account.nickname}: #{e.message}，已中断微信平台剩余帐号抓取")
+    Rails.logger.error("Account #{account.fakeid} crawl error: #{e.message}")
   rescue StandardError => e
     task_account&.mark_failed!(e.message)
     crawl_task.increment_error_count!(account.class.name)
@@ -258,6 +264,9 @@ class WechatCrawler < BaseCrawler
 
     begin
       result = WereadApiClient.get_mp_info(article.url, crawl_task: crawl_task)
+    rescue WereadApiClient::NoAvailableAccountError
+      # 保留原始错误类型，交给 crawl_account 中断整个微信平台
+      raise
     rescue => e
       crawl_task.log(:error, "#{account.nickname}: 解析 WeRead mpId 失败: #{e.message}")
       raise WereadApiClient::ApiError, "解析 WeRead mpId 失败：#{e.message}"
