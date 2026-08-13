@@ -210,6 +210,7 @@ class WechatCrawler < BaseCrawler
       crawl_task.log(:info, "#{account.nickname}: 获取了 #{articles_data.size} 篇文章（第 #{pages_crawled + 1} 页）")
 
       articles_data.each do |article_data|
+        break if crawl_task.reload.paused? || crawl_task.reload.failed?
         break if crawl_task.error_threshold_exceeded?(account.class.name)
 
         find_or_create_article(article_data, account, crawl_task)
@@ -324,6 +325,7 @@ class WechatCrawler < BaseCrawler
     barrier = Async::Barrier.new
 
     articles.each do |article|
+      break if crawl_task.reload.paused? || crawl_task.reload.failed?
       barrier.async do
         semaphore.acquire do
           download_article_content(article, crawl_task)

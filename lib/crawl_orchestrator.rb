@@ -68,6 +68,7 @@ class CrawlOrchestrator
 
             account_barrier.async do
               semaphore.acquire do
+                next if crawl_task.reload.paused? || crawl_task.reload.failed?
                 crawl_one_account(account, crawl_task, article_concurrency, max_pages)
               end
             end
@@ -129,6 +130,7 @@ class CrawlOrchestrator
 
     failed = 0
     scope.find_in_batches(batch_size: 200) do |batch|
+      break if crawl_task.reload.paused? || crawl_task.reload.failed?
       failed += WechatCrawler.download_article_contents(batch, crawl_task, semaphore)
     end
     crawl_task.log(:warn, "#{failed} 篇微信文章正文下载失败（下次同步会重试，也可通过界面重新下载）") if failed > 0
