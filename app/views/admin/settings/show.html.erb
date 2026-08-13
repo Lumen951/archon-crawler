@@ -17,7 +17,7 @@
                 onchange="this.form.requestSubmit()">
           <option value="mp_native" <%= 'selected' if @wechat_api_provider == 'mp_native' || @wechat_api_provider == 'mptext' %>>MP 原生 (扫码登录 mp.weixin.qq.com)</option>
           <option value="dajiala" <%= 'selected' if @wechat_api_provider == 'dajiala' %>>Dajiala (dajiala.com)</option>
-          <option value="profile_ext" <%= 'selected' if @wechat_api_provider == 'profile_ext' %>>Profile Ext (mitmproxy 凭证抓取)</option>
+          <option value="profile_ext" hidden <%= 'selected' if @wechat_api_provider == 'profile_ext' %>>Profile Ext (mitmproxy 凭证抓取)</option>
           <option value="weread" <%= 'selected' if @wechat_api_provider == 'weread' %>>WeRead (微信读书转发)</option>
         </select>
         <noscript><button type="submit" class="btn btn-primary text-sm">切换</button></noscript>
@@ -30,7 +30,7 @@
     <div class="border-b border-gray-200 mb-4">
       <nav class="flex gap-0 -mb-px" role="tablist">
         <button class="wechat-tab px-4 py-2 text-sm font-medium border-b-2 rounded-t-lg transition <%= active_tab == 'dajiala' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' %>" data-tab="dajiala" role="tab">Dajiala</button>
-        <button class="wechat-tab px-4 py-2 text-sm font-medium border-b-2 rounded-t-lg transition <%= active_tab == 'profile_ext' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' %>" data-tab="profile_ext" role="tab">Profile Ext</button>
+        <button class="wechat-tab px-4 py-2 text-sm font-medium border-b-2 rounded-t-lg transition <%= active_tab == 'profile_ext' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' %>" data-tab="profile_ext" role="tab" hidden>Profile Ext</button>
         <button class="wechat-tab px-4 py-2 text-sm font-medium border-b-2 rounded-t-lg transition <%= active_tab == 'mp_native' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' %>" data-tab="mp_native" role="tab">MP 原生</button>
         <button class="wechat-tab px-4 py-2 text-sm font-medium border-b-2 rounded-t-lg transition <%= active_tab == 'weread' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' %>" data-tab="weread" role="tab">WeRead</button>
       </nav>
@@ -85,7 +85,7 @@
     </div>
 
     <!-- Profile Ext Panel -->
-    <div class="wechat-panel <%= 'hidden' unless active_tab == 'profile_ext' %>" data-tab-panel="profile_ext" role="tabpanel">
+    <div class="wechat-panel hidden" data-tab-panel="profile_ext" role="tabpanel" hidden>
       <p class="text-sm text-gray-500 mb-4">
         使用 mitmproxy 抓取的 credentials.json 内容。凭证有效期约 25 分钟，过期后需重新抓包并更新。
       </p>

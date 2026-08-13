@@ -165,13 +165,6 @@ class Option < ApplicationRecord
       Time.parse(expires_at).future? rescue false
     end
 
-    # Returns true if a session was configured but is now expired or expiring soon.
-    # Returns false if no session was ever created (not an error state).
-    def wechat_mp_session_expires_soon?
-      return false if wechat_mp_cookie.blank? || wechat_mp_token.blank?
-      !wechat_mp_session_valid?
-    end
-
     # Per-platform crawl toggle helpers
     def crawl_wechat_enabled?
       get("crawl_wechat_enabled") != "false"
@@ -221,15 +214,6 @@ class Option < ApplicationRecord
 
     def weread_platform_url=(val)
       set("weread_platform_url", val)
-    end
-
-    # 连续更新延迟时间(秒)，默认 60s
-    def weread_update_delay_time
-      (get("weread_update_delay_time") || 60).to_i
-    end
-
-    def weread_update_delay_time=(val)
-      set("weread_update_delay_time", val)
     end
 
     # WeRead 账号列表: JSON 数组 [{vid, token, name, status}]

@@ -17,7 +17,7 @@ require "rate_limiter_middleware"
 class WechatCrawler < BaseCrawler
   CHROME_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.64 Safari/537.36".freeze
 
-  # 正文下载限流器：请求数/窗口秒数由 Option 配置（默认 5 次/60 秒，保守避免触发 mp.weixin.qq.com 限流）
+  # 正文下载限流器: 请求数/窗口秒数由 Option 配置（默认 5 次/60 秒，保守避免触发 mp.weixin.qq.com 限流）
   def self.download_rate_limiter
     @download_rate_limiter ||= RateLimiter.new(
       Option.wechat_download_rate_limit,
@@ -47,13 +47,7 @@ class WechatCrawler < BaseCrawler
   def self.download_content(url, crawl_task: nil)
     article_url = normalize_article_url(url)
 
-    log(crawl_task, :debug, "下载文章: #{article_url[0..80]}...")
-
-    # 速率限制由 download_connection 的 RateLimiterMiddleware 统一控制，
-    # 这里仅记录等待状态，避免重复计数。
-    if download_rate_limiter.remaining <= 0
-      log(crawl_task, :debug, "速率限制等待中 (#{Option.wechat_download_rate_limit} req/#{Option.wechat_download_rate_window}s)...")
-    end
+    log(crawl_task, :debug, "下载文章: #{article_url[0..80]}..., 速率限制: #{download_rate_limiter.remaining}/#{Option.wechat_download_rate_limit}")
 
     headers = {
       "User-Agent" => CHROME_UA,
@@ -162,15 +156,16 @@ class WechatCrawler < BaseCrawler
     else WechatMpNativeApiClient
     end
   end
+
   def self.crawl_account(account, crawl_task, article_concurrency:, max_pages:)
     task_account = crawl_task.crawl_task_accounts.find_by(account: account)
     task_account&.mark_running!
 
-    crawl_task.log(:info, "开始抓取帐号：#{account.nickname}")
+    log(crawl_task, :info, "开始抓取微信帐号: #{account.nickname} (fakeid: #{account.fakeid})")
     dajiala = Option.wechat_api_provider == "dajiala"
     weread  = Option.wechat_api_provider == "weread"
 
-    # 解析抓取标识：weread 用 mpId（必要时自动解析），dajiala 用 nickname，其余用 fakeid
+    # 解析抓取标识: weread 用 mpId（必要时自动解析），dajiala 用 nickname，其余用 fakeid
     identifier = if weread
                    resolve_weread_mp_id(account, crawl_task)
                  elsif dajiala
@@ -187,7 +182,7 @@ class WechatCrawler < BaseCrawler
       break if crawl_task.error_threshold_exceeded?(account.class.name)
 
       if max_pages > 0 && pages_crawled >= max_pages
-        crawl_task.log(:info, "#{account.nickname}: 已达到最大页数限制（#{max_pages} 页）")
+        log(crawl_task, :debug, "#{account.nickname}: 已达到最大页数限制（#{max_pages} 页）")
         break
       end
 
@@ -195,7 +190,6 @@ class WechatCrawler < BaseCrawler
         crawl_task: crawl_task,
         context: "#{account.nickname}: 文章列表获取 (offset: #{offset})"
       ) do
-        # mptext uses fakeid, Dajiala uses biz (stored in metadata)
         api_client.get_articles(identifier, begin_offset: offset, size: 20, crawl_task: crawl_task)
       end
       break unless response
@@ -203,11 +197,11 @@ class WechatCrawler < BaseCrawler
       articles_data = response['articles'] || []
 
       if articles_data.empty?
-        crawl_task.log(:info, "#{account.nickname}: 已到达末尾")
+        log(crawl_task, :debug, "#{account.nickname}: 已到达末尾")
         break
       end
 
-      crawl_task.log(:info, "#{account.nickname}: 获取了 #{articles_data.size} 篇文章（第 #{pages_crawled + 1} 页）")
+      log(crawl_task, :info, "#{account.nickname}: 获取了 #{articles_data.size} 篇文章（第 #{pages_crawled + 1} 页）")
 
       articles_data.each do |article_data|
         break if crawl_task.reload.paused? || crawl_task.reload.failed?
@@ -229,26 +223,23 @@ class WechatCrawler < BaseCrawler
       break if weread && articles_data.size < 20
 
       pages_crawled += 1
-      sleep(weread ? Option.weread_update_delay_time : 0.5)
     end
 
     # 正文下载已统一移到 CrawlOrchestrator（所有帐号列表抓完后执行）
     account.refresh_activity_counters!
     account.update_column(:last_crawled_at, Time.current)
     task_account&.mark_completed!
-    crawl_task.log(:info, "#{account.nickname}: 抓取完成")
-  rescue WereadApiClient::NoAvailableAccountError => e
-    # 微信读书账号池耗尽，剩余微信账号都会失败，尽快中断微信平台抓取。
-    crawl_task.fail_platform!(account.class.name)
-    task_account&.mark_failed!(e.message)
-    crawl_task.log(:error, "#{account.nickname}: #{e.message}，已中断微信平台剩余帐号抓取")
-    Rails.logger.error("Account #{account.fakeid} crawl error: #{e.message}")
+    log(crawl_task, :info, "#{account.nickname}: 抓取完成")
   rescue StandardError => e
     task_account&.mark_failed!(e.message)
     crawl_task.increment_error_count!(account.class.name)
-    crawl_task.log(:error, "#{account.nickname}: 抓取出错 - #{e.message}")
-    crawl_task.log(:error, "#{account.nickname}: 异常 backtrace: #{e.backtrace&.first(5)&.join(' | ')}")
-    Rails.logger.error("Account #{account.fakeid} crawl error: #{e.message}")
+    log(crawl_task, :error, "#{account.nickname}: 抓取出错 - #{e.message}")
+    log(crawl_task, :error, "#{account.nickname}: 异常 backtrace: #{e.backtrace&.first(5)&.join(' | ')}")
+
+    if [ WereadApiClient::NoAvailableAccountError, WereadApiClient::WeReadAccountExpiredError ].any? { |err| e.is_a?(err) }
+      crawl_task.fail_platform!(account.class.name)
+      log(crawl_task, :error, "#{account.nickname}: #{e.message}，已中断微信平台剩余帐号抓取")
+    end
   end
 
   # weread 需要 mpId（MP_WXS_xxx）；若非该格式则通过已有文章 URL 自动解析
@@ -258,18 +249,18 @@ class WechatCrawler < BaseCrawler
 
     article = account.articles.order(published_at: :desc).first
     unless article&.url.present?
-      crawl_task.log(:error, "#{account.nickname}: 无文章可用于解析 WeRead mpId，无法抓取")
-      raise WereadApiClient::ApiError, "无法解析 WeRead mpId：帐号 #{account.nickname} 没有文章，无法通过文章URL获取 mpId"
+      log(crawl_task, :error, "#{account.nickname}: 无文章可用于解析 WeRead mpId，无法抓取")
+      raise WereadApiClient::ApiError, "无法解析 WeRead mpId: 帐号 #{account.nickname} 没有文章，无法通过文章URL获取 mpId"
     end
 
     begin
       result = WereadApiClient.get_mp_info(article.url, crawl_task: crawl_task)
-    rescue WereadApiClient::NoAvailableAccountError
+    rescue WereadApiClient::NoAvailableAccountError, WereadApiClient::WeReadAccountExpiredError => e
       # 保留原始错误类型，交给 crawl_account 中断整个微信平台
       raise
     rescue => e
-      crawl_task.log(:error, "#{account.nickname}: 解析 WeRead mpId 失败: #{e.message}")
-      raise WereadApiClient::ApiError, "解析 WeRead mpId 失败：#{e.message}"
+      log(crawl_task, :error, "#{account.nickname}: 解析 WeRead mpId 失败: #{e.message}")
+      raise WereadApiClient::ApiError, "解析 WeRead mpId 失败: #{e.message}"
     end
 
     if result.is_a?(Array) && result.any? && result.first["id"].present?
@@ -277,14 +268,14 @@ class WechatCrawler < BaseCrawler
       account.metadata ||= {}
       account.metadata["weread_mp_id"] = new_mp_id
       account.save!
-      crawl_task.log(:info, "#{account.nickname}: 已通过文章URL解析到 WeRead mpId: #{new_mp_id}")
+      log(crawl_task, :info, "#{account.nickname}: 已通过文章URL解析到 WeRead mpId: #{new_mp_id}")
       new_mp_id
     else
       mp_id # 解析失败时退回原值（与原 WereadCrawler 行为一致）
     end
   end
 
-  # 查找或创建文章（只落库元数据，不下载正文）：
+  # 查找或创建文章（只落库元数据，不下载正文）:
   #   - 新建的文章
   #   - 已存在但正文缺失的文章（上次下载失败）→ 关联到当前任务，供全局下载阶段重试
   # 已存在且正文完整时跳过。
@@ -297,10 +288,10 @@ class WechatCrawler < BaseCrawler
       if existing.content_html.nil?
         # 关联到当前任务，供全局下载阶段统一抓取正文
         existing.update_column(:crawl_task_id, crawl_task.id) if existing.crawl_task_id != crawl_task.id
-        crawl_task.log(:debug, "正文缺失，将重试下载：#{article_data['title']}")
+        log(crawl_task, :debug, "正文缺失，将重试下载: #{article_data['title']}")
         return existing
       else
-        crawl_task.log(:debug, "跳过重复文章：#{article_data['title']}")
+        log(crawl_task, :debug, "跳过重复文章: #{article_data['title']}")
         return
       end
     end
@@ -318,14 +309,14 @@ class WechatCrawler < BaseCrawler
     )
 
     crawl_task.increment_progress!
-    crawl_task.log(:info, "已创建文章：#{article_data['title']}")
+    log(crawl_task, :info, "已创建文章: #{article_data['title']}")
     article
   rescue ActiveRecord::RecordInvalid => e
-    crawl_task.log(:debug, "跳过重复文章：#{article_data['link']}")
+    log(crawl_task, :debug, "跳过重复文章: #{article_data['link']}")
     nil
   rescue StandardError => e
     crawl_task.increment_error_count!(account.class.name)
-    crawl_task.log(:error, "创建文章 #{article_data['link']} 失败：#{e.message}")
+    log(crawl_task, :error, "创建文章 #{article_data['link']} 失败: #{e.message}")
     nil
   end
 
@@ -359,11 +350,11 @@ class WechatCrawler < BaseCrawler
       content_html: html_content,
       content_markdown: markdown_content
     )
-    crawl_task.log(:debug, "已下载正文：#{article.title}")
+    log(crawl_task, :debug, "已下载正文: #{article.title}")
     true
   rescue StandardError => e
-    # 正文下载失败不算抓取失败：文章元数据已落库，可稍后通过界面重新下载
-    crawl_task.log(:warn, "下载正文失败 #{article.url}：#{e.message}")
+    # 正文下载失败不算抓取失败: 文章元数据已落库，可稍后通过界面重新下载
+    log(crawl_task, :warn, "下载正文失败 #{article.url}: #{e.message}")
     false
   end
 

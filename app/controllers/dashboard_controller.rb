@@ -5,7 +5,6 @@ class DashboardController < ApplicationController
     @total_articles = Article.count
     @pending_tasks = CrawlTask.active.count
     @recent_tasks = CrawlTask.recent.limit(10)
-    @api_key_expires_soon = Option.wechat_mp_session_expires_soon?
 
     # Recent articles filtered by user's followed tags
     followed_tag_ids = current_user&.followed_tags&.pluck(:id) || []

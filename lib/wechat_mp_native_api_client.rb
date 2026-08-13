@@ -366,7 +366,7 @@ class WechatMpNativeApiClient
         Option.wechat_mp_cookie = result[:cookie_str]
         Option.wechat_mp_token = result[:token]
         Option.wechat_mp_login_state = "success"
-        Option.wechat_mp_expires_at = (Time.current + 2.hours).iso8601
+        Option.wechat_mp_expires_at = (Time.current + 4.days).iso8601
         Option.wechat_mp_account_info = result[:account_info].to_json
 
         Rails.logger.info("[MP Native] Login successful, token=#{result[:token]&.slice(0, 8)}...")

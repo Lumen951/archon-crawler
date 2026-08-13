@@ -26,7 +26,7 @@ class WereadApiClient
   WECHAT_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MicroMessenger/8.0.34(0x16082222) NetType/WIFI Language/zh_CN".freeze
 
   # Rate limiters
-  ARTICLE_LIST_RATE_LIMITER = RateLimiter.new(10, 60)  # 10 req/min for relay
+  ARTICLE_LIST_RATE_LIMITER = RateLimiter.new(5, 60)  # 5 req/min for relay
 
   # ── Error classes ──────────────────────────────────────
 

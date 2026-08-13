@@ -304,7 +304,6 @@ namespace :weread do
     puts "WeRead 配置状态"
     puts "=" * 60
     puts "转发服务: #{Option.weread_platform_url}"
-    puts "更新延迟: #{Option.weread_update_delay_time}s"
     puts "可用账号: #{Option.weread_accounts_valid? ? '✅ 有' : '❌ 无'}"
     puts "账号数量: #{Option.weread_accounts.size}"
     puts "启用账号: #{Option.weread_accounts.count { |a| a['status'].to_i == 1 }}"

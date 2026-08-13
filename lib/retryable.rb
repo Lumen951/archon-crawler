@@ -26,24 +26,24 @@ module Retryable
       # API key errors are not retryable — no point retrying with an invalid/expired key.
       # Any platform's API client can mark its key error class with `include CrawlerApiKeyError`.
       if e.is_a?(CrawlerApiKeyError)
-        crawl_task.log(:error, "#{context}: API 密钥错误，不重试：#{e.message}")
+        crawl_task.log(:error, "#{context}: API 密钥错误，不重试: #{e.message}")
         raise e
       end
 
       if e.is_a?(WechatMpNativeApiClient::RateLimitError)
-        crawl_task.log(:error, "#{context}: 触发速率限制，不重试：#{e.message}")
+        crawl_task.log(:error, "#{context}: 触发速率限制，不重试: #{e.message}")
         raise e
       end
 
       if e.is_a?(WereadApiClient::NoAvailableAccountError)
-        crawl_task.log(:error, "#{context}: 没有可用的 WeRead 账号，不重试：#{e.message}")
+        crawl_task.log(:error, "#{context}: 没有可用的 WeRead 账号，不重试: #{e.message}")
         raise e
       end
 
       # For HTTP errors, check status code before retrying
       if e.respond_to?(:status_code) && e.status_code.present?
         unless retryable_codes.include?(e.status_code)
-          crawl_task.log(:error, "#{context}: HTTP #{e.status_code} 客户端错误，不重试：#{e.message}")
+          crawl_task.log(:error, "#{context}: HTTP #{e.status_code} 客户端错误，不重试: #{e.message}")
           raise e
         end
       end
@@ -55,7 +55,7 @@ module Retryable
         sleep wait
         retry
       else
-        crawl_task.log(:error, "#{context}: 超过重试次数（#{max_retries}），放弃：#{e.class} - #{e.message}")
+        crawl_task.log(:error, "#{context}: 超过重试次数（#{max_retries}），放弃: #{e.class} - #{e.message}")
         raise e
       end
     end
