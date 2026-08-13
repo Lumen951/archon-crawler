@@ -56,7 +56,7 @@ class CrawlOrchestrator
           semaphore = Async::Semaphore.new(account_concurrency)
           account_barrier = Async::Barrier.new
 
-          platform_accounts.find_each do |account|
+          platform_accounts.order(Arel.sql("last_crawled_at ASC NULLS FIRST")).each do |account|
             break if crawl_task.reload.paused? || crawl_task.reload.failed?
 
             if crawl_task.error_threshold_exceeded?(platform_key)
