@@ -16,7 +16,7 @@ MP-Crawler 是一个基于 Ruby on Rails 的应用，用于自动抓取微信公
 - **HTTP Client**: Faraday with faraday-retry
 - **Pagination**: Kaminari
 - **Search**: Ransack
-- **Authentication**: has_secure_password + magic link login
+- **Authentication**: has_secure_password + magic link login + MiraclePlus OAuth
 
 ## 核心功能
 
@@ -24,23 +24,25 @@ MP-Crawler 是一个基于 Ruby on Rails 的应用，用于自动抓取微信公
 - 支持微信公众号（WechatAccount）、小红书（RednoteAccount）和 Twitter（TwitterAccount）三种平台
 - 使用 STI（Single Table Inheritance）模型：`Account` 基类，`WechatAccount` / `RednoteAccount` / `TwitterAccount` 子类
 - 从 JSON 文件导入帐号列表（支持粘贴或上传）
-- 从 API 搜索帐号并导入（微信公众号搜索、Twitter 用户名查找）
-- 网页界面导入：支持 JSON 文本、文件上传、搜索导入
+- 从 API 搜索帐号并导入（微信公众号搜索、小红书搜索、Twitter 用户名查找、微信文章 URL 解析）
+- 网页界面导入：支持 JSON 文本、文件上传、搜索导入、按 URL/ID 导入
 - 命令行导入：`rails import:accounts`
 - 查看帐号详情和文章列表（支持分页和 Ransack 搜索）
-- 设置帐号状态（active/inactive）
+- 设置帐号状态（active/inactive）、批量启用/停用/删除
+- 按活跃度分层查看与调度（active/slow/dormant/dead/uncrawled）
 - 手动触发抓取
 
 ### 2. 文章抓取
-- **微信公众号**：直接访问微信公众号平台（`mp.weixin.qq.com`），通过扫码登录获取 Cookie/Token
-- **小红书**：使用第三方 API（`api.yddm.com`）
+- **微信公众号**：支持多种 API 提供方（`Option.wechat_api_provider` 切换）——`mp_native`（默认，扫码登录 `mp.weixin.qq.com`）/ `dajiala` / `profile_ext`（mitmproxy 凭证）/ `weread`（微信读书转发）
+- **文章正文下载**：两阶段抓取 —— 先抓取所有帐号的文章列表，再统一下载微信文章正文（正文直接从 `mp.weixin.qq.com` 抓取，严格限流）；缺失正文的文章可在界面重新下载
+- **小红书**：使用第三方 API（`api.yddm.com`），用户搜索走 TikHub API（`api.tikhub.io`）
 - **Twitter**：使用 twitter-api-client Python 库（cookie 认证）
 - 异步并发抓取（可配置帐号并发数和文章并发数）
 - 支持暂停和恢复
 - 自动保存进度，支持断点续传
 - 重复文章自动跳过（URL 唯一索引）
 - 统一重试机制（`Retryable` 模块，指数退避）
-- 错误阈值保护（累计错误 >= 20 自动终止任务）
+- 错误阈值保护（累计错误 >= 50，按平台统计，超出后仅终止该平台）
 
 ### 3. 抓取任务管理
 - `CrawlTask`：抓取任务，支持 pending/running/paused/completed/failed 状态
@@ -48,7 +50,6 @@ MP-Crawler 是一个基于 Ruby on Rails 的应用，用于自动抓取微信公
 - `CrawlLog`：结构化日志记录
 - JS 轮询实时更新任务进度到 UI（指数退避，任务完成自动停止）
 - 按帐号并发和文章并发分别控制
-- 自动重试：若有帐号抓取失败，自动调度重试（最多 5 次，指数退避）
 
 ### 4. 抓取日志
 - `CrawlLog`：结构化日志记录（debug/info/warn/error）
@@ -83,9 +84,24 @@ MP-Crawler 是一个基于 Ruby on Rails 的应用，用于自动抓取微信公
 - `AdminMailer`：邀请邮件、登录链接邮件、新用户凭据邮件
 
 ### 8. API Key 管理
-- **微信公众号**：通过 QR 码扫码登录（在 `/admin/settings` 页面），Cookie/Token 有效期约 2 小时
+- **微信公众号**（`mp_native`）：通过 QR 码扫码登录（在 `/admin/settings` 页面），Cookie/Token 有效期约 2 小时
+- **微信读书（WeRead）**：转发服务帐号池（支持多账号、QR 扫码登录、每日黑名单），在 `/admin/settings` 统一管理
+- **大家拉（Dajiala）**：`dajiala_api_key`
+- **Profile Ext**：mitmproxy 抓取的凭证（`profile_ext_credentials`，约 25 分钟过期）
 - **小红书**：`rednote_api_key`，无过期机制
-- 在 `/admin/settings` 页面统一管理
+- **TikHub**：`tikhub_api_key`（用于小红书用户搜索）
+- **Twitter**：`twitter_ct0` + `twitter_auth_token` cookie
+- 在 `/admin/settings` 页面统一管理，`ValidateApiKeysJob` 定期校验并向管理员发送失效通知
+
+### 9. 帐号分组
+- `Group` / `GroupAccount`：用户可创建分组（`ref_key` 唯一），将帐号归入不同分组
+- 提供 REST API（`/api/v1/groups`）供第三方读取分组、文章和帐号列表
+
+### 10. REST API
+- `/api/v1/groups`：分组的 CRUD
+- `/api/v1/articles`：文章列表
+- `/api/v1/accounts`：帐号列表
+- 基于用户 `ApiKey`（`has_secure_token`，SHA256 摘要存储）鉴权
 
 ## 架构设计
 
@@ -97,15 +113,21 @@ Account (帐号 - STI 基类)
 ├── RednoteAccount (小红书)
 ├── TwitterAccount (Twitter)
 ├── has_many :articles
+├── has_many :groups, through: :group_accounts
 ├── enum status: { active: 0, inactive: 1 }
+├── 活跃度字段: activity_score / articles_last_7_days / articles_last_30_days / total_articles / last_published_at
+├── 调度字段: last_crawled_at / next_crawl_at（按活跃度分层计算下次抓取时间）
+├── CRAWL_INTERVALS: active 1 天 / slow 3 天 / dormant 7 天 / dead 21 天 / never 30 天
 ├── self.crawler_class (子类各自返回对应的 Crawler，供 CrawlOrchestrator 分发)
-└── scope :active, :needs_crawling, :recently_crawled
+└── scope :active, :needs_crawling, :recently_crawled, :due_for_crawl, :uncrawled, :never_published
 
 Article (文章)
 ├── belongs_to :account
 ├── belongs_to :crawl_task (optional)
 ├── validates :url, uniqueness: true
 ├── raw_data (json - 原始 API 响应数据，微信为文章列表项，小红书为笔记详情完整响应)
+├── content_html / content_markdown (正文，微信文章正文下载失败时为 nil，可重新下载)
+├── download_content! (从原文 URL 重新下载微信文章正文)
 └── scope :recent, :today, :yesterday, :last_7_days, :last_month
 
 CrawlTask (抓取任务)
@@ -113,9 +135,8 @@ CrawlTask (抓取任务)
 ├── has_many :crawl_task_accounts
 ├── has_many :articles
 ├── enum status: { pending: 0, running: 1, paused: 2, completed: 3, failed: 4 }
-├── ERROR_THRESHOLD = 200
-├── MAX_RETRIES = 5
-└── retry_count (自动重试次数，指数退避调度)
+├── ERROR_THRESHOLD = 50（支持按平台统计 platform_error_counts）
+└── 失败帐号不再自动重试，完成后标记为 failed，由用户手动重试
 
 CrawlTaskAccount (帐号抓取状态)
 ├── belongs_to :crawl_task
@@ -129,11 +150,17 @@ CrawlLog (抓取日志)
 └── 仅在 verbose_mode 开启时写入
 
 Option (系统配置 - key-value 存储)
-- wechat_mp_cookie / wechat_mp_token / wechat_mp_expires_at
-- rednote_api_key
+- wechat_mp_cookie / wechat_mp_token / wechat_mp_expires_at (微信 mp_native 扫码登录)
+- wechat_api_provider (微信 API 提供方：mp_native / dajiala / profile_ext / weread)
+- dajiala_api_key / tikhub_api_key / rednote_api_key
+- profile_ext_credentials (mitmproxy 凭证，约 25 分钟过期)
+- weread_platform_url / weread_accounts / weread_blocked_accounts (微信读书转发服务)
 - twitter_ct0 / twitter_auth_token (Twitter cookie 认证)
 - default_article_concurrency / default_account_concurrency
 - max_crawl_pages / crawler_verbose_mode
+- daily_crawl_budget (定时抓取单次最多处理的帐号数，默认 200)
+- wechat_download_rate_limit / wechat_download_rate_window (微信正文下载限流，默认 5 次/60 秒)
+- crawl_wechat_enabled / crawl_rednote_enabled / crawl_twitter_enabled (各平台抓取开关)
 
 Tag (标签)
 ├── has_many :tag_accounts (counter_cache: tag_accounts_count)
@@ -158,18 +185,38 @@ User (用户)
 ├── has_many :sessions
 ├── has_many :user_tags
 ├── has_many :followed_tags, through: :user_tags, source: :tag
+├── has_many :api_keys
 ├── has_secure_password
 └── magic link / email confirmation / password reset tokens
+
+Group (分组)
+├── belongs_to :user
+├── has_many :group_accounts
+├── has_many :accounts, through: :group_accounts
+└── validates :ref_key, uniqueness: { scope: :user_id }
+
+GroupAccount (分组-帐号关联)
+├── belongs_to :group
+├── belongs_to :account
+└── validates :account_id, uniqueness: { scope: :group_id }
+
+ApiKey (用户 API Key)
+├── belongs_to :user
+├── has_secure_token :token（SHA256 摘要存储）
+└── scope :active
 ```
 
 ### 核心服务
 
 **CrawlOrchestrator** (`lib/crawl_orchestrator.rb`)
-- 统一的抓取调度器：一个 `Async::Semaphore` 循环内交替抓取**所有平台**的帐号（微信、小红书、未来的其他平台），而不是先抓完一个平台再抓下一个
+- 统一的抓取调度器：每个平台运行在独立的 `Async::Semaphore` 任务中**交替抓取所有平台**的帐号（微信、小红书、Twitter），而非先抓完一个平台再抓下一个
 - 按 `account.class.crawler_class` 把每个帐号分发给对应平台的 Crawler
-- 负责暂停/恢复/错误阈值终止/自动重试调度等任务级别的通用逻辑
+- 负责暂停/恢复/错误阈值终止等任务级别的通用逻辑
+- 按平台统计错误（`platform_error_counts`），某平台累计错误超阈值时只跳过该平台剩余帐号，其他平台不受影响
+- 各平台可通过 `Option.crawl_*_enabled` 开关独立禁用
+- 所有帐号列表抓完后，统一进入微信文章正文下载阶段（`download_wechat_article_contents`），严格限流
 - 捕获 `CrawlerApiKeyError`（见下）并将任务置为 paused，不影响其他帐号继续抓取
-- API 速率限制由各平台 API Client 的 Faraday 中间件处理（如 `WechatApiClient` 的 `RateLimiterMiddleware`），调度层无需平台特定的 sleep
+- API 速率限制由各平台 API Client 的 Faraday 中间件处理（如 `WechatCrawler.download_connection` 的 `RateLimiterMiddleware`），调度层无需平台特定的 sleep
 
 **BaseCrawler** (`lib/base_crawler.rb`)
 - 所有平台 Crawler 的基类，只定义一个接口：`self.crawl_account(account, crawl_task, article_concurrency:, max_pages:)`
@@ -185,15 +232,38 @@ User (用户)
 - 主要接口：`search_account`、`get_articles`、`download_content`
 - 自定义错误类：`ApiError`、`SessionExpiredError`（包含 `CrawlerApiKeyError`）、`LoginRequiredError`（包含 `CrawlerApiKeyError`）、`RateLimitError`
 
+**DajialaApiClient** (`lib/dajiala_api_client.rb`)
+- 备选微信文章 API（`dajiala.com`），通过 `Option.wechat_api_provider = "dajiala"` 启用
+- 提供与 `WechatMpNativeApiClient` 相同的接口（`get_articles` / `validate_key`）
+- 自定义错误类：`ApiError`、`ApiKeyMissingError`（包含 `CrawlerApiKeyError`）、`ApiRateLimitError`
+
+**ProfileExtApiClient** (`lib/profile_ext_api_client.rb`)
+- 备选微信文章 API，使用 mitmproxy 抓取的凭证（`Option.profile_ext_credentials`，约 25 分钟过期）
+- 提供与 `WechatMpNativeApiClient` 相同的接口（`get_articles` / `download_content` / `validate_key`）
+- 自定义错误类：`ApiError`、`CredentialExpiredError`（包含 `CrawlerApiKeyError`）、`CredentialMissingError`（包含 `CrawlerApiKeyError`）
+
+**WereadApiClient** (`lib/weread_api_client.rb`)
+- 通过微信读书（WeRead）转发服务获取公众号文章列表，通过 `Option.wechat_api_provider = "weread"` 启用
+- 多账号池（`Option.weread_accounts`）随机负载均衡 + 每日黑名单（429 限流的账号当天不再使用）
+- 文章正文仍由 `WechatCrawler.download_content` 统一处理（直接访问 `mp.weixin.qq.com`）
+- 自定义错误类：`ApiError`、`WeReadAccountExpiredError`（包含 `CrawlerApiKeyError`）、`WeReadRateLimitError`、`WeReadBadRequestError`、`NoAvailableAccountError`
+
 **WechatCrawler** (`lib/wechat_crawler.rb`, `< BaseCrawler`)
-- 抓取单个微信公众号：分页获取文章列表 → 下载正文（Markdown/HTML）→ 保存
-- 帐号内部使用 `Async::Semaphore` 控制文章级并发
-- 使用 `Retryable` 模块处理重试
+- 抓取单个微信公众号：分页获取文章列表并落库（只存元数据，不下载正文）
+- 按 `Option.wechat_api_provider` 路由到对应 API Client：`mp_native` / `dajiala` / `profile_ext` / `weread`
+- 正文下载统一由 `download_article_contents` 完成（从 `mp.weixin.qq.com` 直接抓取，`RateLimiter` 严格限流，默认 5 次/60 秒），在 CrawlOrchestrator 的最后阶段批量执行
+- 使用 `Retryable` 模块处理重试；微信读书类错误（`NoAvailableAccountError` 等）会中断微信平台剩余帐号
 
 **RednoteApiClient** (`lib/rednote_api_client.rb`)
 - 封装小红书 API（`api.yddm.com`）
 - 认证方式：`X-API-Key` header
 - 主要接口：`get_user_notes`、`get_note_detail`
+- 自定义错误类：`ApiError`、`ApiKeyMissingError`（包含 `CrawlerApiKeyError`）、`ApiRateLimitError`
+
+**TikHubApiClient** (`lib/tik_hub_api_client.rb`)
+- 封装 TikHub API（`api.tikhub.io`），用于小红书用户搜索
+- 认证方式：`Authorization: Bearer` header（`Option.tikhub_api_key`）
+- 主要接口：`search_users`
 - 自定义错误类：`ApiError`、`ApiKeyMissingError`（包含 `CrawlerApiKeyError`）、`ApiRateLimitError`
 
 **RednoteCrawler** (`lib/rednote_crawler.rb`, `< BaseCrawler`)
@@ -215,18 +285,31 @@ User (用户)
 - 通用滑动窗口速率限制器
 - 线程安全（Mutex）+ 协程安全（Async 兼容 — sleep 会让出 reactor）
 - 按实例隔离，不同端点可设不同限制
-- 主要用于限制微信下载 API（60 次/分钟）
+- 主要用于限制微信正文下载（`Option.wechat_download_rate_limit`，默认 5 次/60 秒）及各平台文章列表请求
 
 **RateLimiterMiddleware** (`lib/rate_limiter_middleware.rb`)
 - Faraday 中间件，在每次 HTTP 请求前调用 `rate_limiter.wait`
 - 注册为 `:rate_limiter`，可与 retry 等中间件组合使用
-- 仅应用于需要限流的连接（如 `WechatApiClient.download_connection`）
+- 仅应用于需要限流的连接（如 `WechatCrawler.download_connection`、`WereadApiClient.platform_connection` 等）
 
 **Retryable** (`lib/retryable.rb`)
 - 应用层重试模块，专注于 API 语义级错误处理
 - 传输层重试（超时、连接失败、HTTP 5xx）由 Faraday retry 中间件处理
 - `Retryable` 负责：应用层错误重试（如响应体中的频率限制）、API 密钥错误短路（`CrawlerApiKeyError` 立即失败）、抓取任务错误追踪和日志记录（`crawl_task.log`）
-- 指数退避（2s → 4s → 8s）
+- 指数退避（2s → 4s → 8s）；HTTP 客户端错误（4xx）不重试
+
+**AccountResolver** (`app/services/account_resolver.rb`)
+- 统一的多平台帐号解析/搜索服务
+- 微信：关键字搜索（`WechatMpNativeApiClient`）、文章 URL 解析（`WereadApiClient.get_mp_info`）
+- 小红书：关键字搜索（`TikHubApiClient`）、按 ID 查找（`RednoteApiClient`）
+- Twitter：按用户名查找（`TwitterApiClient`）
+- 搜索结果先查数据库，命中则复用，否则创建新帐号
+
+**ResponseCacheMiddleware** (`lib/response_cache_middleware.rb`)
+- Faraday 响应缓存中间件（`Rails.cache`），避免短时间内重复请求同一 URL
+
+**MarkdownCharsetMiddleware** (`lib/markdown_charset_middleware.rb`)
+- Faraday 中间件，修正正文响应编码为 UTF-8
 
 ### 添加新的抓取平台
 
@@ -235,7 +318,7 @@ User (用户)
 1. 新增 `Account` 的 STI 子类（如 `TwitterAccount`），实现 `platform_name` 和 `self.crawler_class`（返回下面的 Crawler 类）
 2. 新增 `XxxCrawler < BaseCrawler`，实现 `self.crawl_account(account, crawl_task, article_concurrency:, max_pages:)`
 3. 如该平台 API 有密钥失效的场景，将对应错误类 `include CrawlerApiKeyError`
-4. 如该平台 API 有频率限制，在 API Client 中使用 `RateLimiter` + `RateLimiterMiddleware`（参考 `WechatApiClient`）
+4. 如该平台 API 有频率限制，在 API Client 中使用 `RateLimiter` + `RateLimiterMiddleware`（参考 `WechatMpNativeApiClient` / `WereadApiClient`）
 5. 完成 — `CrawlJob` / `CrawlOrchestrator` 会自动把该类型帐号纳入同一个并发循环，与其他平台交替抓取
 
 ### 添加新的导入平台
@@ -299,7 +382,7 @@ end
 
 **Accounts::Importer** (`app/services/accounts/importer.rb`)
 - 微信帐号导入服务
-- 支持 JSON 文本、文件上传、搜索导入
+- 支持 JSON 文本、文件上传、搜索导入、文章 URL 解析导入
 
 **Rednote::Importer** (`app/services/rednote/importer.rb`)
 - 小红书帐号导入服务
@@ -309,20 +392,35 @@ end
 - 支持 JSON 文本导入和用户名查找导入
 
 **CrawlJob** (`app/jobs/crawl_job.rb`)
-- Active Job，负责重试时重置失败帐号、初始化帐号追踪，然后委托 `CrawlOrchestrator` 执行实际抓取
+- Active Job，初始化帐号追踪，然后委托 `CrawlOrchestrator` 执行实际抓取
 - 不再关心帐号平台类型，也不再按平台顺序调用不同 Crawler
+- 两种调用方式：
+  - 传入 `crawl_task_id`：执行指定任务（手动抓取 / 失败重试）
+  - 不传参数（定时任务）：仅抓取「到期」帐号（`Account.due_for_crawl_ids`，受 `daily_crawl_budget` 上限约束）
+
+**CleanupOldTasksJob** (`app/jobs/cleanup_old_tasks_job.rb`)
+- 定时清理一周前的终态抓取任务（completed/failed）
+
+**RefreshActivityCountersJob** (`app/jobs/refresh_activity_counters_job.rb`)
+- 每周刷新所有帐号的活跃度计数（`refresh_activity_counters!`）
+
+**ValidateApiKeysJob** (`app/jobs/validate_api_keys_job.rb`)
+- 定期校验微信 / 小红书 / Twitter 的 API Key 有效性，失效时通过 `AdminMailer` 通知管理员（24 小时内去重）
 
 ### 控制器
 
-- `AccountsController`：帐号 CRUD、导入（JSON/搜索/小红书/Twitter）、触发抓取
-- `CrawlTasksController`：任务列表/详情、暂停/恢复/标记失败、查看日志和文章
+- `AccountsController`：帐号 CRUD、导入（JSON/搜索/按 URL/按 ID/小红书/Twitter）、触发抓取、批量操作
+- `CrawlTasksController`：任务列表/详情、暂停/恢复/标记失败、查看日志和文章、抓取到期帐号
+- `ArticlesController`：文章详情、重新下载正文（`download_content`）
 - `DashboardController`：仪表盘首页
-- `SessionsController`：登录/登出、magic link、dev_login
-- `ProfilesController`：用户密码管理
+- `SessionsController`：登录/登出、magic link、dev_login、OAuth 登录
+- `ProfilesController`：用户密码管理、关注标签、API Key 管理
 - `RssController`：RSS feed 输出
 - `Admin::UsersController`：用户管理（admin only）、管理用户关注标签
 - `Admin::TagsController`：标签管理（admin only）、编辑/删除/刷新计数
-- `Admin::SettingsController`：系统设置（admin only）
+- `Admin::SettingsController`：系统设置（admin only），含各平台 API Key 校验、微信/微信读书扫码登录
+- `Admin::AnalyticsController`：活跃度分析看板、批量停用停更帐号（admin only）
+- `Api::V1::GroupsController` / `AccountsController` / `ArticlesController`：REST API（基于 ApiKey 鉴权）
 
 ### 关注点分离（Concerns）
 
@@ -334,15 +432,17 @@ end
 
 ```
 # 认证
-resource :session + magic_link + dev_login
+resource :session + magic_link + dev_login + OAuth (GET /auth/:provider, /oauth/:provider/callback)
 GET /magic_link/:token -> sessions#magic_link_login
 
+# 文章
+resources :articles (show) + post :download_content (重新下载微信正文)
+
 # 业务
-resources :accounts (index, show, destroy, crawl, toggle_status) do
+resources :accounts (index, show, update, destroy) do
   collection do
     # 标签操作
-    post :bulk_tag
-    post :bulk_untag
+    post :bulk_tag / :bulk_untag / :bulk_enable / :bulk_disable / :bulk_destroy / :bulk_crawl
     get  :tag_suggestions
     post :toggle_tag_follow
 
@@ -354,11 +454,14 @@ resources :accounts (index, show, destroy, crawl, toggle_status) do
     get  :import_wechat_search
     post :import_wechat
     post :import_wechat_file
+    post :import_wechat_by_url        # 通过文章 URL 解析并导入
 
     # 小红书导入
     get  "import/rednote", to: :import_rednote_page, as: :import_rednote_page
+    get  :import_rednote_search
     post :import_rednote
     post :import_rednote_file
+    post :import_rednote_by_id        # 通过用户 ID 导入
 
     # Twitter 导入
     get  "import/twitter", to: :import_twitter_page, as: :import_twitter_page
@@ -366,21 +469,39 @@ resources :accounts (index, show, destroy, crawl, toggle_status) do
     post :import_twitter
     post :import_twitter_file
   end
+  member do
+    post :crawl
+    post :toggle_status
+    post :resolve_weread_mp_id
+  end
 end
-resources :crawl_tasks (index, show, crawl_all, pause, resume, fail, logs, articles)
-resource :profile (edit, update, update_password, update_followed_tags)
+resources :crawl_tasks (index, show, destroy) do
+  collection { post :crawl_due }       # 抓取到期帐号
+  member { post :pause / :resume / :fail; get :logs / :articles / :poll }
+end
+resource :profile (edit, update, update_password, update_followed_tags, create_api_key, revoke_api_key)
 
 # Admin
 namespace :admin {
   resources :users (reset_password, update_followed_tags, credentials)
   resources :tags (edit, update, destroy, refresh_counts)
-  resource :settings
+  resource :settings (validate_*_key, wechat_mp QR 登录, weread QR 登录/帐号管理)
+  resource :analytics (bulk_disable_dormant)
+}
+
+# API (REST, ApiKey 鉴权)
+namespace :api v1 {
+  resources :groups (index, show, create, update, destroy)
+  resources :articles (index)
+  resources :accounts (index)
 }
 
 # RSS
 GET /rss                              # 全局（支持 ?period=today|yesterday|7days|1month）
 GET /rss/accounts                     # 帐号列表
 GET /rss/accounts/active              # 活跃帐号列表
+GET /rss/tag/:tag_id                  # 按标签过滤
+GET /rss/user/:token                  # 按用户关注标签过滤
 GET /rss/:fakeid                      # 单帐号
 
 # 系统
@@ -425,11 +546,28 @@ bin/dev          # 开发环境（含 TailwindCSS watch）
 rails server     # 或直接启动 Rails
 ```
 
-### 定时清理日志
+### 命令行任务
 
 ```bash
 # 清理过期日志（按 Option 中的 crawler_log_retention_days 配置）
 rails crawl:cleanup_logs
+
+# 刷新所有帐号的活跃度计数
+rails crawl:refresh_activity_counters
+
+# 检测停更帐号（可加 DAYS 天数，DISABLE=true 时自动停用）
+rails crawl:detect_dormant[90,false]
+
+# 微信读书（WeRead）转发帐号管理
+rails weread:login                # 扫码登录新增转发帐号
+rails weread:accounts_list        # 列出所有转发帐号
+rails weread:add_account          # 手动添加 (VID=xxx TOKEN=xxx NAME=xxx)
+rails weread:remove_account       # 移除 (VID=xxx)
+rails weread:enable_account       # 启用 (VID=xxx)
+rails weread:disable_account      # 禁用 (VID=xxx)
+rails weread:lookup_mp            # 通过文章 URL 查询公众号信息 (URL=xxx)
+rails weread:clear_blocked        # 清除当日黑名单
+rails weread:status               # 显示 WeRead 配置状态
 ```
 
 ## 使用说明
@@ -437,13 +575,15 @@ rails crawl:cleanup_logs
 ### 1. 导入帐号
 
 **微信公众号**：
-1. `/accounts/import` → 选择 "Paste JSON" / "Upload File" / "Search"
+1. `/accounts/import` → 选择 "Paste JSON" / "Upload File" / "Search" / "By URL"
 2. 搜索导入：输入关键词 → 预览结果 → 选择帐号 → 导入
 3. JSON 导入：粘贴或上传 JSON 文件
+4. URL 导入：粘贴公众号文章链接 → 通过微信读书转发服务解析公众号信息并导入
 
 **小红书**：
 1. `/accounts/import` → 选择小红书导入 Tab
 2. 粘贴或上传 JSON 数据
+3. 按 ID 导入：输入小红书用户 ID 查找并导入（搜索走 TikHub API）
 
 **Twitter**：
 1. `/accounts/import` → 选择 Twitter 导入 Tab
@@ -455,25 +595,29 @@ rails crawl:cleanup_logs
 ### 2. 配置 API Key
 
 访问 `/admin/settings`：
-- **微信公众号**：点击"获取登录二维码"，使用微信扫描二维码登录（有效期约 2 小时）
+- **微信公众号（mp_native）**：点击"获取登录二维码"，使用微信扫描二维码登录（有效期约 2 小时）
+- **微信 API 提供方**：通过 `wechat_api_provider` 在 `mp_native` / `dajiala` / `profile_ext` / `weread` 之间切换
+- **微信读书（WeRead）**：扫码登录转发服务，可管理多个转发帐号（启用/禁用/移除）
+- **大家拉（Dajiala）Key**：从 API 提供商获取
 - **小红书 Key**：从 API 提供商获取
+- **TikHub Key**：用于小红书用户搜索
 - **Twitter Cookies**：需要 `ct0` 和 `auth_token` 两个 cookie（从浏览器登录 Twitter 后的 Cookie 中获取）
 
 ### 3. 手动抓取
 
-- 单帐号：帐号详情页点击 "Crawl Now"
-- 全部帐号：任务列表页点击 "Crawl All"
+- 单帐号：帐号详情页点击 "立即抓取"
+- 到期帐号：任务列表页点击 "抓取到期帐号"（仅抓取 `next_crawl_at` 已到期的活跃帐号）
 - 所有帐号（不分平台）在同一个抓取任务中并发交替执行，而非按平台分批顺序抓取
+- 抓取分两阶段：先抓取文章列表，再统一下载微信文章正文
 
 ### 4. 重试失败帐号
-
-**自动重试**：任务完成时若有帐号失败，系统自动调度重试（最多 5 次，指数退避 5→10→20→40→60 分钟）。
 
 **手动重试**：任务运行中或完成后，如有失败帐号，显示 "重试失败帐号" 按钮：
 - 运行中：先暂停 → 重试失败帐号
 - 已完成：重新启动任务，只处理失败帐号
 - 已完成的帐号不会被重复抓取
-- 手动 resume 会重置自动重试计数器
+
+**重新下载正文**：文章详情页提供"重新下载"按钮，可对正文缺失（上次下载失败）的微信文章单独重新抓取正文。
 
 ### 5. 订阅 RSS
 
@@ -489,6 +633,35 @@ https://your-domain.com/rss/user/{token}              # 按用户关注标签过
 https://your-domain.com/rss/accounts                  # 帐号列表
 https://your-domain.com/rss/accounts/active           # 活跃帐号列表
 ```
+
+## 抓取调度
+
+按帐号活跃度分层调度：每个帐号抓取完成后，根据其发布活跃度计算下次抓取时间（`next_crawl_at`），避免对停更帐号做无意义的高频抓取，也避免一次性抓取全部帐号触发反爬限制。
+
+### 活跃度分层与抓取间隔
+
+| 活跃度分层 | 判定条件 | 抓取间隔 |
+| --- | --- | --- |
+| active（活跃） | 最近 7 天内发布 | 1 天 |
+| slow（减速） | 最近 30 天内发布 | 3 天 |
+| dormant（停更） | 最近 90 天内发布 | 7 天 |
+| dead（失活） | 超过 90 天未发布 | 21 天 |
+| never（从未发布） | 已抓取但无文章 | 30 天 |
+
+从未抓取的帐号 `next_crawl_at` 为 NULL，视为「立即到期」。
+
+### 到期帐号的选取
+
+- `Account.due_for_crawl`：活跃且 `next_crawl_at` 已到期的帐号
+- `Account.due_for_crawl_ids(limit:)`：按优先级排序并限量返回 —— 从未抓取优先 → 活跃度最高优先 → 逾期最久优先
+
+### 定时任务
+
+`config/recurring.yml` 每天定时触发 `CrawlJob`（不传 `crawl_task_id`），只抓取到期帐号，单次数量受 `daily_crawl_budget` 上限约束（默认 200），超出部分顺延到下次。
+
+### 手动触发
+
+任务列表页「抓取到期帐号」按钮复用同一逻辑，同样只抓取到期帐号。
 
 ## 并发控制
 
@@ -525,17 +698,18 @@ end
 - 遇到 API 密钥错误时，**只标记该帐号失败**，不暂停整个任务
 - 任务继续运行，**其他平台的帐号不受影响**（如微信密钥失效，小红书仍可继续）
 - 同平台的其他帐号仍会尝试（虽然大概率也失败）
-- 失败帐号可在任务结束后通过自动重试或手动重试恢复（更新密钥后）
+- 微信读书类错误（`NoAvailableAccountError` / `WeReadAccountExpiredError` / `WeReadBadRequestError`）会通过 `fail_platform!` 中断微信平台剩余帐号，其他平台不受影响
+- 失败帐号可在任务结束后通过手动重试恢复（更新密钥后）
 
 ### 限流 (429)
-- **预防**：`RateLimiter` + `RateLimiterMiddleware` 在 HTTP 层主动限流（如微信下载 60 次/分钟），避免触发 429
+- **预防**：`RateLimiter` + `RateLimiterMiddleware` 在 HTTP 层主动限流（如微信正文下载默认 5 次/60 秒、微信读书文章列表 2 次/分钟），避免触发 429
 - **兜底**：若仍收到应用层频率限制（如响应体 `ret: 200013`），`Retryable` 模块自动重试，指数退避（2s → 4s → 8s）
 - 超过重试次数后该帐号标记为失败，任务继续
-- API 密钥错误不重试，立即标记帐号失败（由 `CrawlerApiKeyError` mixin 统一识别）
+- API 密钥错误不重试，立即标记帐号失败（由 `CrawlerApiKeyError` mixin 统一识别）；微信 `RateLimitError` 不重试
 
 ### 错误阈值
-- 累计错误 >= 200（`ERROR_THRESHOLD`）自动终止任务
-- 每个帐号独立追踪错误
+- 累计错误 >= 50（`ERROR_THRESHOLD`）时自动终止**该平台**的剩余帐号（按平台统计 `platform_error_counts`），其他平台继续
+- 每个平台独立追踪错误；可通过 `fail_platform!` 立即标记某平台失败
 
 ### 帐号级别重试
 - 每个帐号独立状态（pending/running/completed/failed）
@@ -557,41 +731,44 @@ mp-crawler/
 ├── app/
 │   ├── controllers/
 │   │   ├── accounts_controller.rb
+│   │   ├── articles_controller.rb
 │   │   ├── crawl_tasks_controller.rb
 │   │   ├── dashboard_controller.rb
 │   │   ├── profiles_controller.rb
 │   │   ├── rss_controller.rb
 │   │   ├── sessions_controller.rb
 │   │   ├── concerns/ (authentication, authorization, query_persistence)
-│   │   └── admin/ (settings, users)
+│   │   ├── admin/ (settings, users, tags, analytics)
+│   │   └── api/v1/ (groups, accounts, articles)
 │   ├── models/
 │   │   ├── account.rb (STI base)
 │   │   ├── wechat_account.rb
 │   │   ├── rednote_account.rb
 │   │   ├── twitter_account.rb
 │   │   ├── article.rb
-│   │   ├── tag.rb
-│   │   ├── tag_account.rb
-│   │   ├── user_tag.rb
-│   │   ├── crawl_task.rb
-│   │   ├── crawl_task_account.rb
-│   │   ├── crawl_log.rb
-│   │   ├── option.rb
-│   │   ├── user.rb
-│   │   └── session.rb
+│   │   ├── tag.rb / tag_account.rb / user_tag.rb
+│   │   ├── group.rb / group_account.rb
+│   │   ├── crawl_task.rb / crawl_task_account.rb / crawl_log.rb
+│   │   ├── option.rb / api_key.rb / oauth2_client.rb
+│   │   ├── user.rb / session.rb
 │   ├── services/
+│   │   ├── account_resolver.rb
 │   │   ├── accounts/importer.rb
 │   │   ├── rednote/importer.rb
 │   │   └── twitter/importer.rb
 │   ├── jobs/
-│   │   └── crawl_job.rb
+│   │   ├── crawl_job.rb
+│   │   ├── cleanup_old_tasks_job.rb
+│   │   ├── refresh_activity_counters_job.rb
+│   │   └── validate_api_keys_job.rb
 │   ├── mailers/
 │   │   ├── admin_mailer.rb
 │   │   └── application_mailer.rb
 │   └── views/
 │       ├── accounts/ (index, show, import, import_preview)
+│       ├── articles/ (show)
 │       ├── crawl_tasks/ (index, show, logs, articles, partials)
-│       ├── admin/ (settings, users, tags)
+│       ├── admin/ (settings, users, tags, analytics)
 │       ├── rss/ (index, show, accounts, active_accounts)
 │       └── sessions/ (new)
 ├── lib/
@@ -600,9 +777,15 @@ mp-crawler/
 │   ├── crawler_api_key_error.rb (API 密钥错误通用 mixin)
 │   ├── rate_limiter.rb          (通用滑动窗口速率限制器)
 │   ├── rate_limiter_middleware.rb (Faraday 速率限制中间件)
-│   ├── wechat_mp_native_api_client.rb
+│   ├── response_cache_middleware.rb (Faraday 响应缓存中间件)
+│   ├── markdown_charset_middleware.rb (正文编码修正中间件)
+│   ├── wechat_mp_native_api_client.rb (微信 mp_native API)
+│   ├── dajiala_api_client.rb   (大家拉 API)
+│   ├── profile_ext_api_client.rb (mitmproxy 凭证 API)
+│   ├── weread_api_client.rb    (微信读书转发 API)
 │   ├── wechat_crawler.rb       (< BaseCrawler)
 │   ├── rednote_api_client.rb
+│   ├── tik_hub_api_client.rb   (TikHub 小红书搜索)
 │   ├── rednote_crawler.rb      (< BaseCrawler)
 │   ├── twitter_api_client.rb
 │   ├── twitter_crawler.rb      (< BaseCrawler)
@@ -610,19 +793,23 @@ mp-crawler/
 ├── bin/
 │   └── twitter_fetch.py        (Twitter API Python CLI wrapper)
 ├── db/migrate/
-└── config/routes.rb
+├── config/routes.rb
+└── config/recurring.yml        (定时任务：每日抓取 / 日志清理 / 刷新活跃度计数)
 ```
 
 ## 限制与注意事项
 
 ### API 限制
 - 微信：每请求最多 20 篇文章，需翻页
-- 微信下载 API：60 次/分钟，由 `RateLimiterMiddleware` 主动限流
+- 微信正文下载：默认 5 次/60 秒（`wechat_download_rate_limit` 可配置），由 `RateLimiterMiddleware` 主动限流
+- 微信读书（WeRead）：文章列表 2 次/分钟；429 限流的账号当天进入黑名单
 - 小红书：分页获取，每页间隔 1 秒
-- 两个 API 均可能有频率限制，超出时自动重试
+- 各 API 均可能有频率限制，超出时自动重试
 
 ### API Key 管理
-- 微信 Cookie/Token 约 2 小时过期，需重新扫码登录
+- 微信（mp_native）Cookie/Token 约 2 小时过期，需重新扫码登录
+- 微信读书转发帐号可配置多个，失效/限流的账号会被自动跳过
+- Profile Ext 凭证约 25 分钟过期
 - 小红书 Key 无过期机制
 - 密钥/会话过期后对应平台的帐号抓取失败，任务继续
 
@@ -632,16 +819,8 @@ mp-crawler/
 - 过高可能触发限流
 
 ### 错误阈值
-- 累计 200 个错误自动终止任务
+- 累计 50 个错误自动终止**该平台**的剩余帐号（按平台统计）
 - 防止无限重试导致资源浪费
-
-### 自动重试
-- 任务完成时若有帐号抓取失败，自动调度重试（而非直接标记为完成）
-- 最多重试 5 次（`CrawlTask::MAX_RETRIES`）
-- 指数退避：5 → 10 → 20 → 40 → 60 分钟（上限 60 分钟）
-- 重试时自动重置失败帐号为 pending，已完成帐号不会重复抓取
-- 超过最大重试次数后，任务标记为失败并记录原因
-- 手动 resume 会重置重试计数器
 
 ### 实时更新机制
 - 使用 JS 轮询替代 ActionCable 广播，避免 cable 数据库膨胀问题
@@ -654,6 +833,4 @@ mp-crawler/
 - [ ] 活动分析看板
 - [ ] 文章全文搜索
 - [ ] 批量导出功能
-- [ ] API 接口（供第三方调用）
 - [ ] 邮件通知（抓取完成/失败）
-- [ ] 定时调度

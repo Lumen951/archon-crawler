@@ -113,13 +113,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_14_000001) do
     t.text "error_message"
     t.json "platform_error_counts"
     t.integer "progress", default: 0
-    t.integer "retry_count", default: 0, null: false
-    t.string "scheduled_job_id"
     t.datetime "started_at"
     t.integer "status", default: 0
     t.integer "total"
     t.datetime "updated_at", null: false
-    t.index ["scheduled_job_id"], name: "index_crawl_tasks_on_scheduled_job_id"
     t.index ["status"], name: "index_crawl_tasks_on_status"
   end
 

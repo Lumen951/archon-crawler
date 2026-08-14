@@ -95,7 +95,7 @@ class CrawlOrchestrator
 
     if crawl_task.running?
       crawl_task.log(:warn, "以下平台累计错误数超过阈值，已提前终止：#{skipped_platforms.to_a.join('，')}") if skipped_platforms.any?
-      crawl_task.mark_complete_or_schedule_retry!
+      crawl_task.mark_complete_or_fail!
     end
   rescue StandardError => e
     crawl_task.mark_failed!(e.message)

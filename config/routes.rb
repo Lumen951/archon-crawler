@@ -63,7 +63,6 @@ Rails.application.routes.draw do
       post :pause
       post :resume
       post :fail
-      post :cancel_retry
       get :logs
       get :articles
       get :poll

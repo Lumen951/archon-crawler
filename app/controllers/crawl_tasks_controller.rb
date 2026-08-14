@@ -61,13 +61,6 @@ class CrawlTasksController < ApplicationController
     redirect_to crawl_tasks_path
   end
 
-  def cancel_retry
-    @crawl_task = CrawlTask.find(params[:id])
-    @crawl_task.cancel_scheduled_retry!
-    flash[:success] = "已取消自动重试"
-    redirect_to crawl_task_path(@crawl_task)
-  end
-
   def articles
     @crawl_task = CrawlTask.find(params[:id])
     @articles = @crawl_task.articles.recent.page(params[:page]).per(20)
