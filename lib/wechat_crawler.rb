@@ -236,7 +236,7 @@ class WechatCrawler < BaseCrawler
     log(crawl_task, :error, "#{account.nickname}: 抓取出错 - #{e.message}")
     log(crawl_task, :error, "#{account.nickname}: 异常 backtrace: #{e.backtrace&.first(5)&.join(' | ')}")
 
-    if [ WereadApiClient::NoAvailableAccountError, WereadApiClient::WeReadAccountExpiredError ].any? { |err| e.is_a?(err) }
+    if [ WereadApiClient::NoAvailableAccountError, WereadApiClient::WeReadAccountExpiredError, WereadApiClient::WeReadBadRequestError ].any? { |err| e.is_a?(err) }
       crawl_task.fail_platform!(account.class.name)
       log(crawl_task, :error, "#{account.nickname}: #{e.message}，已中断微信平台剩余帐号抓取")
     end
@@ -255,11 +255,14 @@ class WechatCrawler < BaseCrawler
 
     begin
       result = WereadApiClient.get_mp_info(article.url, crawl_task: crawl_task)
-    rescue WereadApiClient::NoAvailableAccountError, WereadApiClient::WeReadAccountExpiredError => e
-      # 保留原始错误类型，交给 crawl_account 中断整个微信平台
-      raise
     rescue => e
       log(crawl_task, :error, "#{account.nickname}: 解析 WeRead mpId 失败: #{e.message}")
+
+      if [ WereadApiClient::NoAvailableAccountError, WereadApiClient::WeReadAccountExpiredError, WereadApiClient::WeReadBadRequestError ].any? { |err| e.is_a?(err) }
+        # 保留原始错误类型，交给 crawl_account 中断整个微信平台
+        raise
+      end
+
       raise WereadApiClient::ApiError, "解析 WeRead mpId 失败: #{e.message}"
     end
 
