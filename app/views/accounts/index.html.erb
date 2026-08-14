@@ -140,6 +140,7 @@
             <th class="px-6 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">最近发布</th>
             <th class="px-6 py-3 text-center text-xs font-semibold text-text-secondary uppercase tracking-wider">总文章</th>
             <th class="px-6 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">最后抓取</th>
+            <th class="px-6 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">下次抓取</th>
             <th class="px-6 py-3 text-right text-xs font-semibold text-text-secondary uppercase tracking-wider">操作</th>
           </tr>
         </thead>
@@ -237,6 +238,13 @@
                   <%= time_ago_in_words(account.last_crawled_at) %>前
                 <% else %>
                   从未抓取
+                <% end %>
+              </td>
+              <td class="px-3 py-4 whitespace-nowrap text-sm text-text-muted">
+                <% if account.next_crawl_at && account.next_crawl_at > Time.current %>
+                  <%= distance_of_time_in_words(Time.current, account.next_crawl_at) %>后
+                <% else %>
+                  <span class="text-brand font-medium">待抓取</span>
                 <% end %>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -348,6 +356,16 @@
                   <%= time_ago_in_words(account.last_crawled_at) %>前
                 <% else %>
                   从未抓取
+                <% end %>
+              </span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-text-secondary">下次抓取:</span>
+              <span class="text-text-primary">
+                <% if account.next_crawl_at && account.next_crawl_at > Time.current %>
+                  <%= distance_of_time_in_words(Time.current, account.next_crawl_at) %>后
+                <% else %>
+                  <span class="text-brand font-medium">待抓取</span>
                 <% end %>
               </span>
             </div>

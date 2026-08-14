@@ -43,6 +43,11 @@ class Option < ApplicationRecord
       (get('max_crawl_pages') || 1).to_i
     end
 
+    # Max accounts crawled per scheduled run (daily budget, anti-throttle cap).
+    def daily_crawl_budget
+      (get('daily_crawl_budget') || 200).to_i
+    end
+
     # Verbose logging mode
     def verbose_mode?
       get('crawler_verbose_mode') == 'true'

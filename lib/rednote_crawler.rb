@@ -83,7 +83,7 @@ class RednoteCrawler < BaseCrawler
 
     elapsed = (Time.current - start_time).round(1)
     account.refresh_activity_counters!
-    account.update_column(:last_crawled_at, Time.current)
+    account.mark_crawled!
     task_account&.mark_completed!
     log(crawl_task, :info, "#{account.nickname}: 小红书抓取完成，耗时 #{elapsed} 秒 — 新增 #{new_count} 篇，跳过 #{skip_count} 篇，失败 #{error_count} 篇")
 

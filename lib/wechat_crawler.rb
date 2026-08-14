@@ -227,7 +227,7 @@ class WechatCrawler < BaseCrawler
 
     # 正文下载已统一移到 CrawlOrchestrator（所有帐号列表抓完后执行）
     account.refresh_activity_counters!
-    account.update_column(:last_crawled_at, Time.current)
+    account.mark_crawled!
     task_account&.mark_completed!
     log(crawl_task, :info, "#{account.nickname}: 抓取完成")
   rescue StandardError => e

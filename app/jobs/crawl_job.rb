@@ -4,7 +4,14 @@ class CrawlJob < ApplicationJob
   # @param crawl_task_id [Integer] ID of the CrawlTask to execute
   def perform(crawl_task_id = nil)
     if crawl_task_id.nil?
-      crawl_task = CrawlTask.create!(account_ids: nil, status: :pending)
+      # Scheduled run: only crawl accounts due per their activity tier, capped
+      # by the daily budget. Manual "crawl all" runs still pass a task id.
+      account_ids = Account.due_for_crawl_ids(limit: Option.daily_crawl_budget)
+      if account_ids.empty?
+        Rails.logger.info("CrawlJob: no accounts due for crawl, skipping")
+        return
+      end
+      crawl_task = CrawlTask.create!(account_ids: account_ids, status: :pending)
     else
       crawl_task = CrawlTask.find(crawl_task_id)
     end

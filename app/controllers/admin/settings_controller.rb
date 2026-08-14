@@ -6,6 +6,7 @@ class Admin::SettingsController < Admin::BaseController
     @default_article_concurrency = Option.default_article_concurrency
     @default_account_concurrency = Option.default_account_concurrency
     @max_crawl_pages = Option.max_crawl_pages
+    @daily_crawl_budget = Option.daily_crawl_budget
     @verbose_mode = Option[:crawler_verbose_mode]
     @log_retention_days = Option[:crawler_log_retention_days]
     @twitter_ct0 = Option.get('twitter_ct0')
@@ -96,6 +97,11 @@ class Admin::SettingsController < Admin::BaseController
     if params[:max_crawl_pages].present?
       Option.set('max_crawl_pages', params[:max_crawl_pages])
       message = "最大抓取页数更新成功"
+    end
+
+    if params[:daily_crawl_budget].present?
+      Option.set('daily_crawl_budget', params[:daily_crawl_budget])
+      message = "每日抓取配额更新成功"
     end
 
     if params[:verbose_mode].present?

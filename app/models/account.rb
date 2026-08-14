@@ -10,12 +10,22 @@ class Account < ApplicationRecord
 
   enum :status, { active: 0, inactive: 1 }
 
+  # How long to wait before re-crawling, by activity tier (see #publish_status).
+  CRAWL_INTERVALS = {
+    active: 1.day,
+    slow: 3.days,
+    dormant: 7.days,
+    dead: 21.days,
+    never: 30.days,
+  }.freeze
+
   validates :fakeid, presence: true, uniqueness: true
   validates :nickname, presence: true
 
   scope :active, -> { where(status: :active) }
   scope :recently_crawled, -> { where.not(last_crawled_at: nil).order(last_crawled_at: :desc) }
   scope :needs_crawling, -> { active.where(last_crawled_at: nil).or(active.where("last_crawled_at < ?", 1.day.ago)) }
+  scope :due_for_crawl, -> { active.where("next_crawl_at IS NULL OR next_crawl_at <= ?", Time.current) }
   scope :with_tag, ->(tag_id) { joins(:tag_accounts).where(tag_accounts: { tag_id: tag_id }) }
   scope :with_any_tag, ->(tag_ids) { joins(:tag_accounts).where(tag_accounts: { tag_id: tag_ids }).distinct }
   scope :without_tag, -> { where.not(id: TagAccount.select(:account_id)) }
@@ -122,6 +132,20 @@ class Account < ApplicationRecord
     update_columns(attrs)
   end
 
+  # Update crawl schedule after a successful crawl: record when we crawled and
+  # compute the next due time from this account's publish activity tier.
+  def mark_crawled!(at: Time.current)
+    interval = self.class.crawl_interval_for(last_published_at: last_published_at, total_articles: total_articles)
+    update_columns(last_crawled_at: at, next_crawl_at: at + interval)
+  end
+
+  # Next crawl time based on the last crawl and current activity tier.
+  # nil for never-crawled accounts (treated as due immediately).
+  def compute_next_crawl_at
+    return nil if last_crawled_at.nil?
+    last_crawled_at + self.class.crawl_interval_for(last_published_at: last_published_at, total_articles: total_articles)
+  end
+
   # === Class Methods ===
 
   def self.compute_activity_score(attrs)
@@ -131,6 +155,32 @@ class Account < ApplicationRecord
     score += 25 if attrs[:articles_last_30_days].to_i > 10
     score += 20 if attrs[:articles_count].to_i > 50
     [score, 100].min
+  end
+
+  # Crawl interval for an already-crawled account, mirroring #publish_status
+  # buckets. Computed from the given attrs so it works before columns are saved.
+  def self.crawl_interval_for(last_published_at:, total_articles:)
+    return CRAWL_INTERVALS[:never] if total_articles.to_i == 0
+    return CRAWL_INTERVALS[:dead] if last_published_at.nil?
+
+    if last_published_at >= 7.days.ago
+      CRAWL_INTERVALS[:active]
+    elsif last_published_at >= 30.days.ago
+      CRAWL_INTERVALS[:slow]
+    elsif last_published_at >= 90.days.ago
+      CRAWL_INTERVALS[:dormant]
+    else
+      CRAWL_INTERVALS[:dead]
+    end
+  end
+
+  # IDs of active accounts due for crawling, prioritized and capped by limit.
+  # Order: never-crawled first, then most active, then longest overdue.
+  def self.due_for_crawl_ids(limit:)
+    due_for_crawl
+      .order(Arel.sql("next_crawl_at IS NULL DESC, activity_score DESC, next_crawl_at ASC"))
+      .limit(limit)
+      .pluck(:id)
   end
 
   def self.activity_summary

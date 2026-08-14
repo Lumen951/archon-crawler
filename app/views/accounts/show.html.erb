@@ -119,16 +119,70 @@
   </div>
 
   <!-- Stats -->
-  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-    <div class="bg-bg-card border border-border-primary rounded-xl p-6 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
-      <div class="text-sm font-medium text-text-secondary">文章总数</div>
-      <div class="mt-2 text-3xl font-bold text-text-primary"><%= @account.articles.count %></div>
+  <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+    <div class="bg-bg-card border border-border-primary rounded-xl p-5 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+      <div class="text-sm font-medium text-text-secondary">活跃度</div>
+      <div class="mt-2">
+        <% score = @account.activity_score.to_i %>
+        <% status = @account.publish_status %>
+        <span class="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-semibold min-w-[36px]
+          <%= case status
+              when :active  then 'bg-green-100 text-green-700'
+              when :slow    then 'bg-yellow-100 text-yellow-700'
+              when :dormant then 'bg-orange-100 text-orange-700'
+              when :dead    then 'bg-red-100 text-red-600'
+              when :uncrawled then 'bg-gray-100 text-gray-400'
+              else 'bg-gray-100 text-gray-500'
+              end %>">
+          <%= { active: '🟢', slow: '🟡', dormant: '🟠', dead: '🔴', never: '⚪', uncrawled: '🌫️' }[status] %>&nbsp;<%= score %>
+        </span>
+        <span class="ml-1 text-xs text-text-muted"><%= { active: '活跃', slow: '减速', dormant: '停更', dead: '失活', never: '无文章', uncrawled: '从未抓取' }[status] %></span>
+      </div>
     </div>
 
-    <div class="bg-bg-card border border-border-primary rounded-xl p-6 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+    <div class="bg-bg-card border border-border-primary rounded-xl p-5 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+      <div class="text-sm font-medium text-text-secondary">文章总数</div>
+      <div class="mt-2 text-3xl font-bold text-text-primary"><%= @account.total_articles %></div>
+    </div>
+
+    <div class="bg-bg-card border border-border-primary rounded-xl p-5 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+      <div class="text-sm font-medium text-text-secondary">7 天发布</div>
+      <div class="mt-2 text-3xl font-bold <%= @account.articles_last_7_days > 0 ? 'text-green-600' : 'text-text-muted' %>"><%= @account.articles_last_7_days %></div>
+    </div>
+
+    <div class="bg-bg-card border border-border-primary rounded-xl p-5 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+      <div class="text-sm font-medium text-text-secondary">30 天发布</div>
+      <div class="mt-2 text-3xl font-bold <%= @account.articles_last_30_days > 0 ? 'text-text-primary' : 'text-text-muted' %>"><%= @account.articles_last_30_days %></div>
+    </div>
+
+    <div class="bg-bg-card border border-border-primary rounded-xl p-5 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+      <div class="text-sm font-medium text-text-secondary">最近发布</div>
+      <div class="mt-2 text-lg font-semibold text-text-primary">
+        <% if @account.last_published_at %>
+          <%= time_ago_in_words(@account.last_published_at) %>前
+        <% elsif @account.last_crawled_at.nil? %>
+          <span class="text-text-muted">从未抓取</span>
+        <% else %>
+          <span class="text-red-500">从未发布</span>
+        <% end %>
+      </div>
+    </div>
+
+    <div class="bg-bg-card border border-border-primary rounded-xl p-5 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
       <div class="text-sm font-medium text-text-secondary">最后抓取</div>
       <div class="mt-2 text-lg font-semibold text-text-primary">
         <%= @account.last_crawled_at ? time_ago_in_words(@account.last_crawled_at) + '前' : '从未抓取' %>
+      </div>
+    </div>
+
+    <div class="bg-bg-card border border-border-primary rounded-xl p-5 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+      <div class="text-sm font-medium text-text-secondary">下次抓取</div>
+      <div class="mt-2 text-lg font-semibold text-text-primary">
+        <% if @account.next_crawl_at && @account.next_crawl_at > Time.current %>
+          <%= distance_of_time_in_words(Time.current, @account.next_crawl_at) %>后
+        <% else %>
+          <span class="text-brand">待抓取</span>
+        <% end %>
       </div>
     </div>
   </div>

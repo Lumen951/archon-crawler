@@ -57,7 +57,7 @@ Rails.application.routes.draw do
 
   resources :crawl_tasks, only: [:index, :show, :destroy] do
     collection do
-      post :crawl_all
+      post :crawl_due
     end
     member do
       post :pause
