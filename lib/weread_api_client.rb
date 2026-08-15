@@ -228,7 +228,7 @@ class WereadApiClient
     vid = account["vid"].to_s
     token = account["token"].to_s
 
-    log(crawl_task, :info, "get_mp_info: #{url[0..60]}...")
+    log(crawl_task, :debug, "get_mp_info: #{url[0..60]}...")
 
     resp = platform_connection.post(
       "/api/v2/platform/wxs2mp",

@@ -249,15 +249,12 @@ class WechatCrawler < BaseCrawler
 
     article = account.articles.order(published_at: :desc).first
     unless article&.url.present?
-      log(crawl_task, :error, "#{account.nickname}: 无文章可用于解析 WeRead mpId，无法抓取")
       raise WereadApiClient::ApiError, "无法解析 WeRead mpId: 帐号 #{account.nickname} 没有文章，无法通过文章URL获取 mpId"
     end
 
     begin
       result = WereadApiClient.get_mp_info(article.url, crawl_task: crawl_task)
     rescue => e
-      log(crawl_task, :error, "#{account.nickname}: 解析 WeRead mpId 失败: #{e.message}")
-
       if [ WereadApiClient::NoAvailableAccountError, WereadApiClient::WeReadAccountExpiredError, WereadApiClient::WeReadBadRequestError ].any? { |err| e.is_a?(err) }
         # 保留原始错误类型，交给 crawl_account 中断整个微信平台
         raise
@@ -271,7 +268,7 @@ class WechatCrawler < BaseCrawler
       account.metadata ||= {}
       account.metadata["weread_mp_id"] = new_mp_id
       account.save!
-      log(crawl_task, :info, "#{account.nickname}: 已通过文章URL解析到 WeRead mpId: #{new_mp_id}")
+      log(crawl_task, :debug, "#{account.nickname}: 已通过文章URL解析到 WeRead mpId: #{new_mp_id}")
       new_mp_id
     else
       mp_id # 解析失败时退回原值（与原 WereadCrawler 行为一致）
@@ -312,7 +309,7 @@ class WechatCrawler < BaseCrawler
     )
 
     crawl_task.increment_progress!
-    log(crawl_task, :info, "已创建文章: #{article_data['title']}")
+    log(crawl_task, :debug, "已创建文章: #{article_data['title']}")
     article
   rescue ActiveRecord::RecordInvalid => e
     log(crawl_task, :debug, "跳过重复文章: #{article_data['link']}")
