@@ -14,9 +14,6 @@ class WechatContentDownloadJob < ApplicationJob
   # transaction-scoped lock only guards the short claim section in claim_task.
   ADVISORY_LOCK_KEY = 7_285_526_931
 
-  # A run whose heartbeat is older than this is considered dead and replaced.
-  HEARTBEAT_STALE_THRESHOLD = 1.hour
-
   BATCH_SIZE = 50
 
   def perform
@@ -71,7 +68,7 @@ class WechatContentDownloadJob < ApplicationJob
       ActiveRecord::Base.connection.execute("SELECT pg_advisory_xact_lock(#{ADVISORY_LOCK_KEY})")
 
       WechatContentDownloadTask.active
-        .where("heartbeat_at < ?", HEARTBEAT_STALE_THRESHOLD.ago)
+        .where("heartbeat_at < ?", WechatContentDownloadTask::HEARTBEAT_STALE_THRESHOLD.ago)
         .update_all(
           status: WechatContentDownloadTask.statuses[:stale],
           finished_at: Time.current,

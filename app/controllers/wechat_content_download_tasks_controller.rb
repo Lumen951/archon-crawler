@@ -20,7 +20,7 @@ class WechatContentDownloadTasksController < ApplicationController
   end
 
   def run
-    if WechatContentDownloadTask.active.exists?
+    if WechatContentDownloadTask.alive.exists?
       flash[:warning] = "已有正在运行的正文下载任务"
     else
       WechatContentDownloadJob.perform_later

@@ -6,7 +6,13 @@ class WechatContentDownloadTask < ApplicationRecord
 
   enum :status, { running: 0, completed: 1, failed: 2, stale: 3 }
 
+  # A run whose heartbeat is older than this is considered dead and replaced.
+  HEARTBEAT_STALE_THRESHOLD = 1.hour
+
   scope :active, -> { where(status: :running) }
+  # An "alive" run is active with a fresh heartbeat. A stale active run is dead
+  # and should be taken over, not treated as still running.
+  scope :alive, -> { active.where("heartbeat_at >= ?", HEARTBEAT_STALE_THRESHOLD.ago) }
   scope :terminal, -> { where(status: [:completed, :failed, :stale]) }
   scope :recent, -> { order(created_at: :desc) }
 
