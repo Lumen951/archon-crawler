@@ -1,5 +1,5 @@
 class CrawlTask < ApplicationRecord
-  has_many :crawl_logs, dependent: :destroy
+  has_many :crawl_logs, as: :loggable, dependent: :destroy
   has_many :articles, dependent: :nullify
   has_many :crawl_task_accounts, dependent: :destroy
 

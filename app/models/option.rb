@@ -89,9 +89,9 @@ class Option < ApplicationRecord
       set('wechat_api_provider', val)
     end
 
-    # WeChat 正文下载限流参数：请求数 / 窗口秒数（默认 5 次/60 秒，保守避免触发限流）
+    # WeChat 正文下载限流参数：请求数 / 窗口秒数（默认 20 次/60 秒，保守避免触发限流）
     def wechat_download_rate_limit
-      (get('wechat_download_rate_limit') || 5).to_i
+      (get('wechat_download_rate_limit') || 20).to_i
     end
 
     def wechat_download_rate_limit=(val)

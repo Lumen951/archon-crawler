@@ -1,0 +1,35 @@
+# Tracks a single run of WechatContentDownloadJob. Uses job_id + heartbeat so a
+# new daily run can detect whether the previous run is still alive (fresh
+# heartbeat) or dead (stale heartbeat, taken over).
+class WechatContentDownloadTask < ApplicationRecord
+  has_many :crawl_logs, as: :loggable, dependent: :destroy
+
+  enum :status, { running: 0, completed: 1, failed: 2, stale: 3 }
+
+  scope :active, -> { where(status: :running) }
+  scope :terminal, -> { where(status: [:completed, :failed, :stale]) }
+  scope :recent, -> { order(created_at: :desc) }
+
+  def processed_count
+    articles_downloaded.to_i + articles_failed.to_i
+  end
+
+  def progress_percentage
+    return 0 if articles_total.to_i.zero?
+    ((processed_count.to_f / articles_total) * 100).round(1)
+  end
+
+  # Reuse CrawlLog with the same signature as CrawlTask#log, so this object can
+  # be passed as the `crawl_task:` argument to Retryable / WechatCrawler and
+  # their existing logging just works.
+  def log(level, message, context: nil)
+    CrawlLog.log(self, level, message, context: context)
+  end
+
+  # Called once per downloaded article: increment the counter and refresh the
+  # heartbeat in a single SQL statement.
+  def record_download!(success)
+    col = success ? "articles_downloaded" : "articles_failed"
+    self.class.where(id: id).update_all(["#{col} = #{col} + 1, heartbeat_at = ?", Time.current])
+  end
+end

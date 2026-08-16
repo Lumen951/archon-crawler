@@ -34,7 +34,7 @@ MP-Crawler 是一个基于 Ruby on Rails 的应用，用于自动抓取微信公
 
 ### 2. 文章抓取
 - **微信公众号**：支持多种 API 提供方（`Option.wechat_api_provider` 切换）——`mp_native`（默认，扫码登录 `mp.weixin.qq.com`）/ `dajiala` / `profile_ext`（mitmproxy 凭证）/ `weread`（微信读书转发）
-- **文章正文下载**：两阶段抓取 —— 先抓取所有帐号的文章列表，再统一下载微信文章正文（正文直接从 `mp.weixin.qq.com` 抓取，严格限流）；缺失正文的文章可在界面重新下载
+- **文章正文下载**：由独立每日任务 `WechatContentDownloadJob` 下载所有缺失正文的微信文章（正文直接从 `mp.weixin.qq.com` 抓取，严格限流，最新文章优先）；缺失正文的文章也可在界面重新下载
 - **小红书**：使用第三方 API（`api.yddm.com`），用户搜索走 TikHub API（`api.tikhub.io`）
 - **Twitter**：使用 twitter-api-client Python 库（cookie 认证）
 - 异步并发抓取（可配置帐号并发数和文章并发数）
@@ -145,9 +145,14 @@ CrawlTaskAccount (帐号抓取状态)
 └── scope :incomplete
 
 CrawlLog (抓取日志)
-├── belongs_to :crawl_task
+├── belongs_to :loggable (polymorphic，可挂 CrawlTask 或 WechatContentDownloadTask)
 ├── LEVELS: debug, info, warn, error
 └── 仅在 verbose_mode 开启时写入
+
+WechatContentDownloadTask (微信正文下载任务)
+├── has_many :crawl_logs, as: :loggable
+├── enum status: { running / completed / failed / stale }
+└── job_id + heartbeat_at（每日 Job 防重叠，心跳过期接管）
 
 Option (系统配置 - key-value 存储)
 - wechat_mp_cookie / wechat_mp_token / wechat_mp_expires_at (微信 mp_native 扫码登录)
@@ -214,7 +219,7 @@ ApiKey (用户 API Key)
 - 负责暂停/恢复/错误阈值终止等任务级别的通用逻辑
 - 按平台统计错误（`platform_error_counts`），某平台累计错误超阈值时只跳过该平台剩余帐号，其他平台不受影响
 - 各平台可通过 `Option.crawl_*_enabled` 开关独立禁用
-- 所有帐号列表抓完后，统一进入微信文章正文下载阶段（`download_wechat_article_contents`），严格限流
+- 只负责抓取文章列表；正文下载由独立每日任务 `WechatContentDownloadJob` 处理
 - 捕获 `CrawlerApiKeyError`（见下）并将任务置为 paused，不影响其他帐号继续抓取
 - API 速率限制由各平台 API Client 的 Faraday 中间件处理（如 `WechatCrawler.download_connection` 的 `RateLimiterMiddleware`），调度层无需平台特定的 sleep
 
@@ -251,7 +256,7 @@ ApiKey (用户 API Key)
 **WechatCrawler** (`lib/wechat_crawler.rb`, `< BaseCrawler`)
 - 抓取单个微信公众号：分页获取文章列表并落库（只存元数据，不下载正文）
 - 按 `Option.wechat_api_provider` 路由到对应 API Client：`mp_native` / `dajiala` / `profile_ext` / `weread`
-- 正文下载统一由 `download_article_contents` 完成（从 `mp.weixin.qq.com` 直接抓取，`RateLimiter` 严格限流，默认 5 次/60 秒），在 CrawlOrchestrator 的最后阶段批量执行
+- 正文下载由 `download_article_contents` 完成（从 `mp.weixin.qq.com` 直接抓取，`RateLimiter` 严格限流，默认 5 次/60 秒），供独立每日任务 `WechatContentDownloadJob` 批量调用
 - 使用 `Retryable` 模块处理重试；微信读书类错误（`NoAvailableAccountError` 等）会中断微信平台剩余帐号
 
 **RednoteApiClient** (`lib/rednote_api_client.rb`)
@@ -407,10 +412,15 @@ end
 **ValidateApiKeysJob** (`app/jobs/validate_api_keys_job.rb`)
 - 定期校验微信 / 小红书 / Twitter 的 API Key 有效性，失效时通过 `AdminMailer` 通知管理员（24 小时内去重）
 
+**WechatContentDownloadJob** (`app/jobs/wechat_content_download_job.rb`)
+- 每日下载所有缺失正文（`content_html IS NULL`）的微信文章，最新文章优先
+- 通过 `WechatContentDownloadTask` 的 `job_id` + `heartbeat_at` 防重叠：上一个 Job 仍在跑则跳过，心跳过期则接管
+
 ### 控制器
 
 - `AccountsController`：帐号 CRUD、导入（JSON/搜索/按 URL/按 ID/小红书/Twitter）、触发抓取、批量操作
 - `CrawlTasksController`：任务列表/详情、暂停/恢复/标记失败、查看日志和文章、抓取到期帐号
+- `WechatContentDownloadTasksController`：正文下载任务列表/详情、手动触发、查看日志
 - `ArticlesController`：文章详情、重新下载正文（`download_content`）
 - `DashboardController`：仪表盘首页
 - `SessionsController`：登录/登出、magic link、dev_login、OAuth 登录
@@ -478,6 +488,10 @@ end
 resources :crawl_tasks (index, show, destroy) do
   collection { post :crawl_due }       # 抓取到期帐号
   member { post :pause / :resume / :fail; get :logs / :articles / :poll }
+end
+resources :wechat_content_download_tasks (index, show, destroy) do
+  collection { post :run }             # 手动触发正文下载
+  member { get :logs / :poll }
 end
 resource :profile (edit, update, update_password, update_followed_tags, create_api_key, revoke_api_key)
 
@@ -608,7 +622,7 @@ rails weread:status               # 显示 WeRead 配置状态
 - 单帐号：帐号详情页点击 "立即抓取"
 - 到期帐号：任务列表页点击 "抓取到期帐号"（仅抓取 `next_crawl_at` 已到期的活跃帐号）
 - 所有帐号（不分平台）在同一个抓取任务中并发交替执行，而非按平台分批顺序抓取
-- 抓取分两阶段：先抓取文章列表，再统一下载微信文章正文
+- 抓取只负责文章列表；正文下载由每日任务 `WechatContentDownloadJob` 独立处理
 
 ### 4. 重试失败帐号
 
@@ -657,7 +671,7 @@ https://your-domain.com/rss/accounts/active           # 活跃帐号列表
 
 ### 定时任务
 
-`config/recurring.yml` 每天定时触发 `CrawlJob`（不传 `crawl_task_id`），只抓取到期帐号，单次数量受 `daily_crawl_budget` 上限约束（默认 200），超出部分顺延到下次。
+`config/recurring.yml` 每天定时触发 `CrawlJob`（不传 `crawl_task_id`），只抓取到期帐号，单次数量受 `daily_crawl_budget` 上限约束（默认 200），超出部分顺延到下次。此外每天定时触发 `WechatContentDownloadJob` 下载缺失正文的微信文章。
 
 ### 手动触发
 
@@ -758,6 +772,7 @@ mp-crawler/
 │   │   └── twitter/importer.rb
 │   ├── jobs/
 │   │   ├── crawl_job.rb
+│   │   ├── wechat_content_download_job.rb
 │   │   ├── cleanup_old_tasks_job.rb
 │   │   ├── refresh_activity_counters_job.rb
 │   │   └── validate_api_keys_job.rb
@@ -794,7 +809,7 @@ mp-crawler/
 │   └── twitter_fetch.py        (Twitter API Python CLI wrapper)
 ├── db/migrate/
 ├── config/routes.rb
-└── config/recurring.yml        (定时任务：每日抓取 / 日志清理 / 刷新活跃度计数)
+└── config/recurring.yml        (定时任务：每日抓取 / 正文下载 / 日志清理 / 刷新活跃度计数)
 ```
 
 ## 限制与注意事项

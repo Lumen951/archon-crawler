@@ -1,0 +1,119 @@
+<div id="<%= dom_id(task, :show_body) %>" class="space-y-6" data-task-status="<%= task.status %>">
+  <!-- Task Info Card -->
+  <div class="card">
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <h2 class="text-xl font-semibold text-gray-900">
+          正文下载任务
+        </h2>
+        <p class="text-sm text-gray-600 mt-1">
+          Job ID: <code class="text-xs bg-gray-100 px-1.5 py-0.5 rounded"><%= task.job_id %></code>
+        </p>
+      </div>
+      <div class="flex items-center space-x-3">
+        <%= render 'shared/status_badge', status: task.status %>
+        <% if task.completed? || task.failed? || task.stale? %>
+          <%= button_to "删除任务", wechat_content_download_task_path(task), method: :delete, data: { turbo_confirm: "确定要删除此正文下载任务吗？关联的日志将被删除。" }, class: "btn btn-danger" %>
+        <% end %>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mt-6">
+      <div>
+        <p class="text-sm text-gray-600">进度</p>
+        <p class="text-2xl font-bold text-gray-900"><%= task.progress_percentage %>%</p>
+        <div class="mt-2 w-full bg-gray-200 rounded-full h-2">
+          <div class="bg-brand h-2 rounded-full" style="width: <%= task.progress_percentage %>%"></div>
+        </div>
+      </div>
+      <div>
+        <p class="text-sm text-gray-600">成功下载</p>
+        <p class="text-2xl font-bold text-green-600"><%= task.articles_downloaded %></p>
+      </div>
+      <div>
+        <p class="text-sm text-gray-600">失败</p>
+        <p class="text-2xl font-bold <%= task.articles_failed > 0 ? 'text-red-600' : 'text-gray-900' %>"><%= task.articles_failed %></p>
+      </div>
+      <div>
+        <p class="text-sm text-gray-600">缺失总数</p>
+        <p class="text-2xl font-bold text-gray-900"><%= task.articles_total %></p>
+      </div>
+      <div>
+        <p class="text-sm text-gray-600">最后心跳</p>
+        <p class="text-lg font-semibold text-gray-900">
+          <% if task.running? %>
+            <%= time_ago_in_words(task.heartbeat_at) %>前
+          <% else %>
+            -
+          <% end %>
+        </p>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
+      <div>
+        <p class="text-sm text-gray-600">开始时间</p>
+        <p class="text-lg font-semibold text-gray-900"><%= task.started_at&.strftime('%Y-%m-%d %H:%M') || '无' %></p>
+      </div>
+      <div>
+        <p class="text-sm text-gray-600">完成时间</p>
+        <p class="text-lg font-semibold text-gray-900"><%= task.finished_at&.strftime('%Y-%m-%d %H:%M') || '无' %></p>
+      </div>
+      <div>
+        <p class="text-sm text-gray-600">总耗时</p>
+        <p class="text-lg font-semibold text-gray-900">
+          <% if task.finished_at && task.started_at %>
+            <%= distance_of_time_in_words(task.started_at, task.finished_at) %>
+          <% elsif task.running? && task.started_at %>
+            <span class="text-green-600" data-controller="elapsed-time" data-elapsed-time-start-value="<%= task.started_at.to_i %>">
+              <span data-elapsed-time-target="display">--:--:--</span>
+            </span>
+          <% else %>
+            -
+          <% end %>
+        </p>
+      </div>
+    </div>
+
+    <% if task.error_message.present? %>
+      <div class="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+        <p class="text-sm font-medium text-red-900">错误：</p>
+        <p class="text-sm text-red-700 mt-1"><%= task.error_message %></p>
+      </div>
+    <% end %>
+  </div>
+
+  <!-- Recent Logs -->
+  <div class="card">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-xl font-bold text-gray-900">最近日志</h2>
+      <%= link_to "查看所有日志 →", logs_wechat_content_download_task_path(task), class: "text-primary hover:underline text-sm font-medium" %>
+    </div>
+
+    <% if recent_logs.any? %>
+      <div class="space-y-2 font-mono text-sm">
+        <% recent_logs.each do |log| %>
+          <div class="flex items-start space-x-3 py-2 border-b border-gray-100 last:border-0">
+            <span class="text-xs text-gray-500 whitespace-nowrap">
+              <%= log.logged_at.strftime('%H:%M:%S') %>
+            </span>
+            <span class="px-2 py-0.5 rounded text-xs font-medium <%= case log.level when 'error' then 'bg-red-100 text-red-800' when 'warn' then 'bg-yellow-100 text-yellow-800' when 'info' then 'bg-blue-100 text-blue-800' else 'bg-gray-100 text-gray-700' end %>">
+              <%= log.level.upcase %>
+            </span>
+            <span class="flex-1 <%= log.level == 'error' ? 'text-red-700' : 'text-gray-700' %>">
+              <%= log.message %>
+            </span>
+          </div>
+        <% end %>
+      </div>
+    <% else %>
+      <p class="text-gray-500 text-center py-8">
+        暂无日志
+        <% unless Option.verbose_mode? %>
+          <br>
+          <span class="text-sm">详细日志已禁用。在<%= link_to "设置", admin_settings_path, class: "text-primary underline" %>中启用</span>
+        <% end %>
+      </p>
+    <% end %>
+  </div>
+</div>

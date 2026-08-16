@@ -225,7 +225,7 @@ class WechatCrawler < BaseCrawler
       pages_crawled += 1
     end
 
-    # 正文下载已统一移到 CrawlOrchestrator（所有帐号列表抓完后执行）
+    # 正文下载由 WechatContentDownloadJob 独立任务处理（每日运行）
     account.refresh_activity_counters!
     account.mark_crawled!
     task_account&.mark_completed!
@@ -321,14 +321,16 @@ class WechatCrawler < BaseCrawler
   end
 
   # 并发下载一批文章的正文，返回失败数量。单篇失败不会中断其他文章。
-  def self.download_article_contents(articles, crawl_task, semaphore)
+  # `on_article_complete` 每篇下载完成后调用（用于心跳/进度计数），不影响返回值语义。
+  def self.download_article_contents(articles, crawl_task, semaphore, on_article_complete: nil)
     barrier = Async::Barrier.new
 
     articles.each do |article|
-      break if crawl_task.reload.paused? || crawl_task.reload.failed?
       barrier.async do
         semaphore.acquire do
-          download_article_content(article, crawl_task)
+          ok = download_article_content(article, crawl_task)
+          on_article_complete&.call(article, ok)
+          ok
         end
       end
     end

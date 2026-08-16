@@ -69,6 +69,16 @@ Rails.application.routes.draw do
     end
   end
 
+  resources :wechat_content_download_tasks, only: [:index, :show, :destroy] do
+    collection do
+      post :run
+    end
+    member do
+      get :logs
+      get :poll
+    end
+  end
+
   # Profile management (users can edit their own password)
   resource :profile, only: [:edit, :update] do
     patch :update_password

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_14_000001) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_16_000002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -77,14 +77,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_14_000001) do
 
   create_table "crawl_logs", force: :cascade do |t|
     t.text "context"
-    t.bigint "crawl_task_id", null: false
     t.datetime "created_at", null: false
     t.string "level", null: false
+    t.bigint "loggable_id"
+    t.string "loggable_type"
     t.datetime "logged_at"
     t.text "message"
     t.datetime "updated_at", null: false
-    t.index ["crawl_task_id"], name: "index_crawl_logs_on_crawl_task_id"
     t.index ["level"], name: "index_crawl_logs_on_level"
+    t.index ["loggable_type", "loggable_id"], name: "index_crawl_logs_on_loggable_type_and_loggable_id"
     t.index ["logged_at"], name: "index_crawl_logs_on_logged_at"
   end
 
@@ -206,10 +207,24 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_14_000001) do
     t.index ["role"], name: "index_users_on_role"
   end
 
+  create_table "wechat_content_download_tasks", force: :cascade do |t|
+    t.integer "articles_downloaded", default: 0, null: false
+    t.integer "articles_failed", default: 0, null: false
+    t.integer "articles_total", default: 0, null: false
+    t.datetime "created_at", null: false
+    t.text "error_message"
+    t.datetime "finished_at"
+    t.datetime "heartbeat_at", null: false
+    t.string "job_id", null: false
+    t.datetime "started_at"
+    t.integer "status", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.index ["job_id"], name: "index_wechat_content_download_tasks_on_job_id", unique: true
+  end
+
   add_foreign_key "api_keys", "users"
   add_foreign_key "articles", "accounts"
   add_foreign_key "articles", "crawl_tasks"
-  add_foreign_key "crawl_logs", "crawl_tasks"
   add_foreign_key "crawl_task_accounts", "accounts"
   add_foreign_key "crawl_task_accounts", "crawl_tasks"
   add_foreign_key "group_accounts", "accounts"

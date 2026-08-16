@@ -1,0 +1,3 @@
+<%= turbo_stream.replace dom_id(@task, :show_body) do %>
+  <%= render 'show_body', task: @task, recent_logs: @recent_logs %>
+<% end %>

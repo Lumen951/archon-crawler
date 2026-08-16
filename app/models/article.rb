@@ -12,6 +12,7 @@ class Article < ApplicationRecord
   scope :yesterday, -> { where(published_at: Time.current.beginning_of_day - 1.day...Time.current.beginning_of_day) }
   scope :last_7_days, -> { where("published_at >= ?", 7.days.ago) }
   scope :last_month, -> { where("published_at >= ?", 1.month.ago) }
+  scope :wechat_missing_content, -> { joins(:account).where(accounts: { type: "WechatAccount" }, content_html: nil) }
 
   # 从原文 URL 重新下载文章内容 (仅支持微信公众号)
   def download_content!

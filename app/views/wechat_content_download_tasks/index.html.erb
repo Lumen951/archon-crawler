@@ -1,0 +1,77 @@
+<% content_for :head do %>
+  <meta name="turbo-cache-control" content="no-cache">
+<% end %>
+
+<div class="space-y-8">
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div>
+      <h1 class="text-3xl font-bold text-text-primary">正文下载任务</h1>
+      <p class="text-text-secondary mt-2">监控和管理微信文章正文下载任务</p>
+      <p class="text-sm text-text-muted mt-2">
+        系统每日凌晨自动下载缺失正文的微信文章（最新优先）。当前有
+        <span class="font-semibold text-brand"><%= @missing_count %></span>
+        篇文章缺失正文。
+      </p>
+    </div>
+    <%= button_to run_wechat_content_download_tasks_path, method: :post,
+        class: "h-10 px-5 rounded-xl bg-brand text-white hover:bg-brand-dark font-semibold text-sm transition inline-flex items-center justify-center gap-2 shadow-[0_7px_16px_rgba(59,130,246,.14)]",
+        data: { confirm: "立即启动一次正文下载任务？若已有任务在运行则会跳过。" } do %>
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+      </svg>
+      立即下载
+    <% end %>
+  </div>
+
+  <!-- Filter Tabs -->
+  <div class="flex space-x-2 border-b border-border-primary overflow-x-auto">
+    <%= link_to "全部", wechat_content_download_tasks_path, class: "px-4 py-2.5 text-sm font-semibold whitespace-nowrap transition #{params[:status].blank? ? 'border-b-2 border-brand text-brand' : 'text-text-secondary hover:text-brand'}" %>
+    <%= link_to "运行中", wechat_content_download_tasks_path(status: 'running'), class: "px-4 py-2.5 text-sm font-semibold whitespace-nowrap transition #{params[:status] == 'running' ? 'border-b-2 border-brand text-brand' : 'text-text-secondary hover:text-brand'}" %>
+    <%= link_to "已完成", wechat_content_download_tasks_path(status: 'completed'), class: "px-4 py-2.5 text-sm font-semibold whitespace-nowrap transition #{params[:status] == 'completed' ? 'border-b-2 border-brand text-brand' : 'text-text-secondary hover:text-brand'}" %>
+    <%= link_to "失败", wechat_content_download_tasks_path(status: 'failed'), class: "px-4 py-2.5 text-sm font-semibold whitespace-nowrap transition #{params[:status] == 'failed' ? 'border-b-2 border-brand text-brand' : 'text-text-secondary hover:text-brand'}" %>
+  </div>
+
+  <!-- Tasks Table -->
+  <% if @tasks.any? %>
+    <!-- Desktop Table -->
+    <div class="hidden md:block bg-bg-card border border-border-primary rounded-2xl overflow-x-auto shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+      <table class="min-w-full divide-y divide-border-primary">
+        <thead class="bg-bg-secondary">
+          <tr>
+            <th class="px-6 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">状态</th>
+            <th class="px-6 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">进度</th>
+            <th class="px-6 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">心跳</th>
+            <th class="px-6 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">开始时间</th>
+            <th class="px-6 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">耗时</th>
+            <th class="px-6 py-3 text-right text-xs font-semibold text-text-secondary uppercase tracking-wider">操作</th>
+          </tr>
+        </thead>
+        <tbody class="bg-bg-card divide-y divide-border-primary">
+          <% @tasks.each do |task| %>
+            <%= render 'task_row', task: task %>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Mobile Cards -->
+    <div class="md:hidden space-y-4">
+      <% @tasks.each do |task| %>
+        <%= render 'task_card', task: task %>
+      <% end %>
+    </div>
+  <% else %>
+    <div class="bg-bg-card border border-border-primary rounded-2xl text-center py-12 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+      <svg class="w-16 h-16 mx-auto text-text-muted mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+      </svg>
+      <p class="text-text-secondary">暂无正文下载任务</p>
+    </div>
+  <% end %>
+
+  <% if @tasks.respond_to?(:total_pages) && @tasks.total_pages > 1 %>
+    <div class="mt-6">
+      <%= paginate @tasks %>
+    </div>
+  <% end %>
+</div>

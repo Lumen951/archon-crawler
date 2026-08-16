@@ -8,6 +8,8 @@
                   'warning'
                 when 'failed', 'inactive'
                   'error'
+                when 'stale'
+                  'secondary'
                 else
                   'secondary'
                 end
@@ -26,6 +28,8 @@
                    '启用'
                  when 'inactive'
                    '停用'
+                 when 'stale'
+                   '已过期'
                  else
                    status.to_s.humanize
                  end

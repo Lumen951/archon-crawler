@@ -64,6 +64,12 @@
             </svg>
             <span class="text-xs font-medium">任务</span>
           <% end %>
+          <%= link_to wechat_content_download_tasks_path, class: "flex flex-col items-center justify-center flex-1 h-full transition #{current_page?(wechat_content_download_tasks_path) ? 'text-brand' : 'text-text-secondary'}" do %>
+            <svg class="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+            </svg>
+            <span class="text-xs font-medium">正文</span>
+          <% end %>
         </div>
       </nav>
     <% end %>

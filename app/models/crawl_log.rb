@@ -1,5 +1,5 @@
 class CrawlLog < ApplicationRecord
-  belongs_to :crawl_task
+  belongs_to :loggable, polymorphic: true
 
   LEVELS = %w[debug info warn error].freeze
 
@@ -10,11 +10,11 @@ class CrawlLog < ApplicationRecord
   scope :errors, -> { where(level: 'error') }
   scope :warnings, -> { where(level: 'warn') }
 
-  def self.log(crawl_task, level, message, context: nil)
+  def self.log(loggable, level, message, context: nil)
     return unless Option.verbose_mode?
 
     create!(
-      crawl_task: crawl_task,
+      loggable: loggable,
       level: level.to_s,
       message: message,
       context: context&.to_json,
