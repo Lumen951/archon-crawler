@@ -29,7 +29,7 @@ MP-Crawler 是一个基于 Ruby on Rails 的应用，用于自动抓取微信公
 - 命令行导入：`rails import:accounts`
 - 查看帐号详情和文章列表（支持分页和 Ransack 搜索）
 - 设置帐号状态（active/inactive）、批量启用/停用/删除
-- 按活跃度分层查看与调度（active/slow/dormant/dead/uncrawled）
+- 按活跃度分层查看与调度（active/slow/dormant/dead/never/uncrawled）
 - 手动触发抓取
 
 ### 2. 文章抓取
@@ -118,6 +118,7 @@ Account (帐号 - STI 基类)
 ├── 活跃度字段: activity_score / articles_last_7_days / articles_last_30_days / total_articles / last_published_at
 ├── 调度字段: last_crawled_at / next_crawl_at（按活跃度分层计算下次抓取时间）
 ├── CRAWL_INTERVALS: active 1 天 / slow 3 天 / dormant 7 天 / dead 21 天 / never 30 天
+├── activity_level: 活跃度分层实例方法（uncrawled/never/active/slow/dormant/dead），by_activity_level scope 与之镜像
 ├── self.crawler_class (子类各自返回对应的 Crawler，供 CrawlOrchestrator 分发)
 └── scope :active, :needs_crawling, :recently_crawled, :due_for_crawl, :uncrawled, :never_published
 

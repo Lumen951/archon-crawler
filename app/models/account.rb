@@ -10,7 +10,7 @@ class Account < ApplicationRecord
 
   enum :status, { active: 0, inactive: 1 }
 
-  # How long to wait before re-crawling, by activity tier (see #publish_status).
+  # How long to wait before re-crawling, by activity tier (see #activity_level).
   CRAWL_INTERVALS = {
     active: 1.day,
     slow: 3.days,
@@ -38,12 +38,16 @@ class Account < ApplicationRecord
   scope :needs_attention, -> { active.where.not(last_crawled_at: nil).where("total_articles > 0").where("last_published_at < ? OR last_published_at IS NULL", 90.days.ago) }
   scope :by_activity_level, ->(level) {
     case level.to_s
-    when "very_active" then where("articles_last_7_days > 0")
-    when "active"      then where("articles_last_30_days > 0 AND articles_last_7_days = 0")
-    when "slow"        then where("articles_last_30_days = 0").where("last_published_at >= ?", 90.days.ago).where("total_articles > 0")
-    when "dormant"     then where("total_articles > 0").where("last_published_at < ? OR last_published_at IS NULL", 90.days.ago)
-    when "dead"        then where(total_articles: 0).where.not(last_crawled_at: nil)
-    when "uncrawled"   then where(last_crawled_at: nil)
+    when "active"    then where("last_published_at >= ?", 7.days.ago)
+    when "slow"      then where("last_published_at >= ?", 30.days.ago)
+                          .where("last_published_at < ?", 7.days.ago)
+    when "dormant"   then where("total_articles > 0")
+                          .where("last_published_at >= ?", 90.days.ago)
+                          .where("last_published_at < ?", 30.days.ago)
+    when "dead"      then where("total_articles > 0")
+                          .where("last_published_at < ? OR last_published_at IS NULL", 90.days.ago)
+    when "never"     then where(total_articles: 0).where.not(last_crawled_at: nil)
+    when "uncrawled" then where(last_crawled_at: nil)
     else all
     end
   }
@@ -105,8 +109,10 @@ class Account < ApplicationRecord
 
   # === Activity & Health ===
 
-  # Returns the publish status category for this account.
-  def publish_status
+  # Returns the activity tier for this account, derived from `last_published_at`.
+  # This is the single source of truth for activity classification; the
+  # `by_activity_level` scope mirrors these exact buckets in SQL.
+  def activity_level
     return :uncrawled if last_crawled_at.nil?
     return :never if total_articles.to_i == 0
     return :dead if last_published_at.nil?
@@ -157,7 +163,7 @@ class Account < ApplicationRecord
     [score, 100].min
   end
 
-  # Crawl interval for an already-crawled account, mirroring #publish_status
+  # Crawl interval for an already-crawled account, mirroring #activity_level
   # buckets. Computed from the given attrs so it works before columns are saved.
   def self.crawl_interval_for(last_published_at:, total_articles:)
     return CRAWL_INTERVALS[:never] if total_articles.to_i == 0
@@ -190,7 +196,7 @@ class Account < ApplicationRecord
     puts "Platform".ljust(16) + "Total".rjust(8) + "Active(≤7d)".rjust(14) + "Slow(8-30d)".rjust(14) + "Dormant(31-90d)".rjust(18) + "Dead(>90d)".rjust(14) + "Never".rjust(8) + "Uncrawled".rjust(10)
     puts "-" * 100
 
-    descendants = Account.descendants.sort_by(&:name)
+    descendants = Account.platform_classes
     descendants.each do |klass|
       scope = klass.all
       puts "#{klass.new.platform_name.ljust(14)} " \
@@ -217,17 +223,26 @@ class Account < ApplicationRecord
     nil
   end
 
+  # Account STI subclasses currently represented in the DB, sorted by name.
+  # Drives platform filtering/breakdown deterministically. Unlike
+  # `Account.descendants`, this does not depend on autoload state — in
+  # development `descendants` is empty until each subclass has been loaded.
+  def self.platform_classes
+    Account.distinct.pluck(:type).sort.map(&:constantize)
+  end
+
   def self.platform_activity_stats
-    Account.descendants.sort_by(&:name).map do |klass|
+    platform_classes.map do |klass|
       scope = klass.all
       {
         platform: klass.new.platform_name,
         total: scope.count,
-        active_7d: scope.where("last_published_at >= ?", 7.days.ago).count,
-        active_30d: scope.where("last_published_at >= ?", 30.days.ago).count,
-        dormant_90d: scope.active.where("total_articles > 0").where("last_published_at < ? OR last_published_at IS NULL", 90.days.ago).count,
-        never_published: scope.where(total_articles: 0).where.not(last_crawled_at: nil).count,
-        uncrawled: scope.where(last_crawled_at: nil).count,
+        active:    scope.by_activity_level("active").count,
+        slow:      scope.by_activity_level("slow").count,
+        dormant:   scope.by_activity_level("dormant").count,
+        dead:      scope.by_activity_level("dead").count,
+        never:     scope.by_activity_level("never").count,
+        uncrawled: scope.by_activity_level("uncrawled").count,
         avg_score: scope.average(:activity_score)&.round(1) || 0,
       }
     end

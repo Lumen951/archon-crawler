@@ -1,15 +1,21 @@
 class Admin::AnalyticsController < Admin::BaseController
   def show
-    @summary = build_summary
-    @platform_stats = Account.platform_activity_stats
+    # Single source of truth: the disjoint activity tiers. The distribution
+    # chart and the platform table's "总计" row both derive from these buckets.
     @activity_distribution = {
-      very_active: Account.by_activity_level("very_active").count,
-      active:      Account.by_activity_level("active").count,
-      slow:        Account.by_activity_level("slow").count,
-      dormant:     Account.by_activity_level("dormant").count,
-      dead:        Account.by_activity_level("dead").count,
-      uncrawled:   Account.by_activity_level("uncrawled").count,
+      active:    Account.by_activity_level("active").count,
+      slow:      Account.by_activity_level("slow").count,
+      dormant:   Account.by_activity_level("dormant").count,
+      dead:      Account.by_activity_level("dead").count,
+      never:     Account.by_activity_level("never").count,
+      uncrawled: Account.by_activity_level("uncrawled").count,
     }
+    @summary = {
+      total: Account.count,
+      avg_score: Account.average(:activity_score)&.round(1) || 0,
+    }.merge(@activity_distribution)
+
+    @platform_stats = Account.platform_activity_stats
     @top_publishers_7d = Account.active
       .where("articles_last_7_days > 0")
       .order(articles_last_7_days: :desc)
@@ -35,20 +41,5 @@ class Admin::AnalyticsController < Admin::BaseController
     count = scope.update_all(status: :inactive, updated_at: Time.current)
     flash[:success] = "已停用 #{count} 个长期未更新的帐号（#{days}天以上无发布）"
     redirect_to admin_analytics_path
-  end
-
-  private
-
-  def build_summary
-    {
-      total: Account.count,
-      active: Account.active.count,
-      published_7d: Account.where("last_published_at >= ?", 7.days.ago).count,
-      published_30d: Account.where("last_published_at >= ?", 30.days.ago).count,
-      dormant_90d: Account.active.where.not(last_crawled_at: nil).where("total_articles > 0").where("last_published_at < ? OR last_published_at IS NULL", 90.days.ago).count,
-      never_published: Account.where(total_articles: 0).where.not(last_crawled_at: nil).count,
-      uncrawled: Account.where(last_crawled_at: nil).count,
-      avg_score: Account.average(:activity_score)&.round(1) || 0,
-    }
   end
 end

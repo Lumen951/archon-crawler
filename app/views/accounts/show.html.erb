@@ -124,7 +124,7 @@
       <div class="text-sm font-medium text-text-secondary">活跃度</div>
       <div class="mt-2">
         <% score = @account.activity_score.to_i %>
-        <% status = @account.publish_status %>
+        <% status = @account.activity_level %>
         <span class="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-semibold min-w-[36px]
           <%= case status
               when :active  then 'bg-green-100 text-green-700'

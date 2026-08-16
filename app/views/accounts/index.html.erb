@@ -67,11 +67,11 @@
   <!-- Activity Filter Bar -->
   <% activity_levels = [
     ["全部", "all"],
-    ["本周活跃", "very_active"],
-    ["本月活跃", "active"],
-    ["发布减速", "slow"],
-    ["长期停更 (90d+)", "dormant"],
-    ["从未发布", "dead"],
+    ["本周活跃", "active"],
+    ["本月活跃", "slow"],
+    ["发布减速", "dormant"],
+    ["长期停更 (90d+)", "dead"],
+    ["从未发布", "never"],
     ["从未抓取", "uncrawled"],
   ] %>
   <div class="bg-bg-card border border-border-primary rounded-2xl p-4 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
@@ -97,12 +97,12 @@
       </div>
       <div class="flex gap-3">
         <%= f.select :status_eq,
-            options_for_select([["全部状态", ""], ["活跃", 0], ["不维护", 1]], params.dig(:q, :status_eq)),
+            options_for_select([["全部状态", ""], ["已启用", 0], ["已停用", 1]], params.dig(:q, :status_eq)),
             {},
             class: "h-10 px-4 rounded-lg border border-border-primary bg-bg-secondary text-text-primary text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition" %>
         <%= f.select :type_eq,
             options_for_select(
-              [["全部平台", ""]] + Account.descendants.sort_by(&:name).map { |klass| [klass.new.platform_name, klass.name] },
+              [["全部平台", ""]] + Account.platform_classes.map { |klass| [klass.new.platform_name, klass.name] },
               params.dig(:q, :type_eq)
             ),
             {},
@@ -194,7 +194,7 @@
               </td>
               <td class="px-2 py-4 whitespace-nowrap text-center" title="综合活跃度评分 (0-100)。基于近期发布频率和文章总量计算。🟢≥50 活跃，🟡≥20 较低，🟠>0 停更中，⚪0 无文章，🌫️ 从未抓取">
                 <% score = account.activity_score.to_i %>
-                <% status = account.publish_status %>
+                <% status = account.activity_level %>
                 <span class="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-semibold min-w-[36px]
                   <%= case status
                       when :active  then 'bg-green-100 text-green-700'
@@ -308,7 +308,7 @@
           </div>
 
           <div class="space-y-2 text-sm pt-3 border-t border-border-primary">
-            <% status = account.publish_status %>
+            <% status = account.activity_level %>
             <div class="flex justify-between">
               <span class="text-text-secondary">活跃度:</span>
               <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold
