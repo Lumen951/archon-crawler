@@ -43,9 +43,15 @@ class Option < ApplicationRecord
       (get('max_crawl_pages') || 1).to_i
     end
 
-    # Max accounts crawled per scheduled run (daily budget, anti-throttle cap).
-    def daily_crawl_budget
-      (get('daily_crawl_budget') || 200).to_i
+    # Max accounts crawled per platform per scheduled run (daily budget,
+    # anti-throttle cap). Each platform has its own budget, keyed by
+    # `daily_crawl_budget_<platform>` (e.g. `daily_crawl_budget_wechat`).
+    # Falls back to the legacy global `daily_crawl_budget`, then the default.
+    DAILY_CRAWL_BUDGET_DEFAULT = 200
+
+    def daily_crawl_budget_for(platform_key)
+      value = get("daily_crawl_budget_#{platform_key}") || get("daily_crawl_budget")
+      (value || DAILY_CRAWL_BUDGET_DEFAULT).to_i
     end
 
     # Verbose logging mode

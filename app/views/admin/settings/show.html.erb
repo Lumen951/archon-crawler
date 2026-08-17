@@ -543,11 +543,26 @@
       </div>
 
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">每日抓取配额</label>
-        <input type="number" name="daily_crawl_budget" value="<%= @daily_crawl_budget %>" min="1" max="5000"
-               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+        <label class="block text-sm font-medium text-gray-700 mb-2">每日抓取配额（按平台）</label>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">微信公众号</label>
+            <input type="number" name="daily_crawl_budget_wechat" value="<%= @daily_crawl_budget_wechat %>" min="1" max="5000"
+                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">小红书</label>
+            <input type="number" name="daily_crawl_budget_rednote" value="<%= @daily_crawl_budget_rednote %>" min="1" max="5000"
+                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Twitter</label>
+            <input type="number" name="daily_crawl_budget_twitter" value="<%= @daily_crawl_budget_twitter %>" min="1" max="5000"
+                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+          </div>
+        </div>
         <p class="mt-1 text-sm text-gray-500">
-          每次定时抓取最多处理的帐号数量。按活跃度分层调度，仅抓取“到期”的帐号，超出配额的顺延到下次，避免触发反爬限制。
+          每次定时抓取各平台最多处理的帐号数量。按活跃度分层调度，仅抓取“到期”的帐号，超出配额的顺延到下次，避免触发反爬限制。
         </p>
       </div>
 
@@ -647,7 +662,7 @@
       </div>
     <% end %>
 
-    <%= form_with url: admin_settings_path, method: :patch, class: "space-y-4" do |f| %>
+    <%= form_with url: admin_settings_path, method: :patch, id: "feishu_settings_form", class: "space-y-4" do |f| %>
       <div>
         <label class="flex items-center space-x-3 cursor-pointer">
           <input type="hidden" name="feishu_enabled" value="0">
@@ -687,10 +702,10 @@
         </select>
       </div>
 
-      <button type="submit" class="btn btn-primary">保存飞书配置</button>
     <% end %>
 
     <div class="flex items-center gap-3">
+      <button type="submit" form="feishu_settings_form" class="btn btn-primary">保存飞书配置</button>
       <%= button_to "测试推送", test_feishu_admin_settings_path, method: :post,
           class: "text-sm px-3 py-1.5 rounded bg-indigo-600 text-white hover:bg-indigo-700 transition" %>
       <p class="text-xs text-gray-500">保存配置后点击测试，检查飞书是否收到消息</p>

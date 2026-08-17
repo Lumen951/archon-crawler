@@ -92,7 +92,7 @@ class CrawlTasksController < ApplicationController
       redirect_to crawl_tasks_path and return
     end
 
-    account_ids = Account.due_for_crawl_ids(limit: Option.daily_crawl_budget)
+    account_ids = Account.due_for_crawl_ids_by_platform
     if account_ids.empty?
       flash[:warning] = "没有到期的帐号需要抓取"
       redirect_to crawl_tasks_path and return

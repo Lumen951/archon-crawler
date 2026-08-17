@@ -6,7 +6,7 @@ class CrawlJob < ApplicationJob
     if crawl_task_id.nil?
       # Scheduled run: only crawl accounts due per their activity tier, capped
       # by the daily budget. Manual "crawl all" runs still pass a task id.
-      account_ids = Account.due_for_crawl_ids(limit: Option.daily_crawl_budget)
+      account_ids = Account.due_for_crawl_ids_by_platform
       if account_ids.empty?
         Rails.logger.info("CrawlJob: no accounts due for crawl, skipping")
         return

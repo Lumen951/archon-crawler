@@ -164,7 +164,7 @@ Option (系统配置 - key-value 存储)
 - twitter_ct0 / twitter_auth_token (Twitter cookie 认证)
 - default_article_concurrency / default_account_concurrency
 - max_crawl_pages / crawler_verbose_mode
-- daily_crawl_budget (定时抓取单次最多处理的帐号数，默认 200)
+- daily_crawl_budget_wechat / daily_crawl_budget_rednote / daily_crawl_budget_twitter (各平台每日抓取配额，默认 200)
 - wechat_download_rate_limit / wechat_download_rate_window (微信正文下载限流，默认 5 次/60 秒)
 - crawl_wechat_enabled / crawl_rednote_enabled / crawl_twitter_enabled (各平台抓取开关)
 
@@ -402,7 +402,7 @@ end
 - 不再关心帐号平台类型，也不再按平台顺序调用不同 Crawler
 - 两种调用方式：
   - 传入 `crawl_task_id`：执行指定任务（手动抓取 / 失败重试）
-  - 不传参数（定时任务）：仅抓取「到期」帐号（`Account.due_for_crawl_ids`，受 `daily_crawl_budget` 上限约束）
+  - 不传参数（定时任务）：仅抓取「到期」帐号（`Account.due_for_crawl_ids_by_platform`，各平台受各自 `daily_crawl_budget_<platform>` 上限约束）
 
 **CleanupOldTasksJob** (`app/jobs/cleanup_old_tasks_job.rb`)
 - 定时清理一周前的终态抓取任务（completed/failed）
@@ -672,7 +672,7 @@ https://your-domain.com/rss/accounts/active           # 活跃帐号列表
 
 ### 定时任务
 
-`config/recurring.yml` 每天定时触发 `CrawlJob`（不传 `crawl_task_id`），只抓取到期帐号，单次数量受 `daily_crawl_budget` 上限约束（默认 200），超出部分顺延到下次。此外每天定时触发 `WechatContentDownloadJob` 下载缺失正文的微信文章。
+`config/recurring.yml` 每天定时触发 `CrawlJob`（不传 `crawl_task_id`），只抓取到期帐号，单次数量按平台分别受 `daily_crawl_budget_<platform>` 上限约束（默认 200），超出部分顺延到下次。此外每天定时触发 `WechatContentDownloadJob` 下载缺失正文的微信文章。
 
 ### 手动触发
 

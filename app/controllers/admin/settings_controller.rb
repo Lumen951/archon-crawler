@@ -6,7 +6,9 @@ class Admin::SettingsController < Admin::BaseController
     @default_article_concurrency = Option.default_article_concurrency
     @default_account_concurrency = Option.default_account_concurrency
     @max_crawl_pages = Option.max_crawl_pages
-    @daily_crawl_budget = Option.daily_crawl_budget
+    @daily_crawl_budget_wechat = Option.daily_crawl_budget_for('wechat')
+    @daily_crawl_budget_rednote = Option.daily_crawl_budget_for('rednote')
+    @daily_crawl_budget_twitter = Option.daily_crawl_budget_for('twitter')
     @verbose_mode = Option[:crawler_verbose_mode]
     @log_retention_days = Option[:crawler_log_retention_days]
     @twitter_ct0 = Option.get('twitter_ct0')
@@ -105,8 +107,18 @@ class Admin::SettingsController < Admin::BaseController
       message = "最大抓取页数更新成功"
     end
 
-    if params[:daily_crawl_budget].present?
-      Option.set('daily_crawl_budget', params[:daily_crawl_budget])
+    if params[:daily_crawl_budget_wechat].present?
+      Option.set('daily_crawl_budget_wechat', params[:daily_crawl_budget_wechat])
+      message = "每日抓取配额更新成功"
+    end
+
+    if params[:daily_crawl_budget_rednote].present?
+      Option.set('daily_crawl_budget_rednote', params[:daily_crawl_budget_rednote])
+      message = "每日抓取配额更新成功"
+    end
+
+    if params[:daily_crawl_budget_twitter].present?
+      Option.set('daily_crawl_budget_twitter', params[:daily_crawl_budget_twitter])
       message = "每日抓取配额更新成功"
     end
 

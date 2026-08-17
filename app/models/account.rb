@@ -189,6 +189,18 @@ class Account < ApplicationRecord
       .pluck(:id)
   end
 
+  # IDs of active accounts due for crawling across all enabled platforms,
+  # each platform capped by its own daily budget. Returns a flat array with
+  # no guaranteed cross-platform order.
+  def self.due_for_crawl_ids_by_platform
+    platform_classes.flat_map do |klass|
+      next [] unless klass.crawl_enabled?
+      budget = Option.daily_crawl_budget_for(klass.platform_key)
+      next [] if budget <= 0
+      klass.due_for_crawl_ids(limit: budget)
+    end
+  end
+
   def self.activity_summary
     puts "=" * 80
     puts "Account Activity Summary — #{Time.current.strftime('%Y-%m-%d %H:%M')}"
@@ -269,8 +281,14 @@ class Account < ApplicationRecord
   # Checks the "crawl_<platform>_enabled" option (default true).
   def self.crawl_enabled?
     return true if self == Account
-    platform_key = name.sub("Account", "").underscore
     Option.get("crawl_#{platform_key}_enabled") != "false"
+  end
+
+  # Stable key identifying this platform (e.g. "wechat" / "rednote" /
+  # "twitter"), used to read per-platform options like crawl toggles and
+  # daily budgets.
+  def self.platform_key
+    name.sub("Account", "").underscore
   end
 
   scope :with_tag_id, ->(tag_id) {
