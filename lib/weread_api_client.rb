@@ -150,6 +150,7 @@ class WereadApiClient
       Rails.logger.error("[WeRead] 账号（#{request_vid}）请求频繁，打入小黑屋")
       raise WeReadRateLimitError, "微信读书请求频繁 (429)"
     elsif body.include?("WeReadError400")
+      block_account!(request_vid) if request_vid
       Rails.logger.error("[WeRead] 账号（#{request_vid}）处理请求参数出错: #{body[0..200]}")
       sleep 10
       raise WeReadBadRequestError, "微信读书请求参数错误 (400)"

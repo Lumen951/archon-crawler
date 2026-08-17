@@ -40,11 +40,6 @@ module Retryable
         raise e
       end
 
-      if e.is_a?(WereadApiClient::WeReadBadRequestError)
-        crawl_task.log(:error, "#{context}: WeRead 请求错误，不重试: #{e.message}")
-        raise e
-      end
-
       # For HTTP errors, check status code before retrying
       if e.respond_to?(:status_code) && e.status_code.present?
         unless retryable_codes.include?(e.status_code)
