@@ -56,6 +56,19 @@ class WereadApiClient
     end
   end
 
+  # 登录流程专用连接：不应用文章列表的 2 次/分钟限流，也不做响应缓存
+  # （登录状态需要较频繁轮询，且不应缓存 "waiting" 结果）
+  def self.login_connection
+    @login_connection ||= Faraday.new(url: platform_url) do |f|
+      f.request :url_encoded
+      f.request :retry, max: 2, interval: 1, backoff_factor: 2,
+                exceptions: [Faraday::TimeoutError, Faraday::ConnectionFailed]
+      f.options.timeout = 30
+      f.options.open_timeout = 10
+      f.adapter Faraday.default_adapter
+    end
+  end
+
   # ── Platform URL ──────────────────────────────────────
 
   def self.platform_url
@@ -258,7 +271,7 @@ class WereadApiClient
   # 发起微信读书登录，获取二维码
   # @return [Hash] {uuid, scanUrl}
   def self.create_login_url
-    resp = platform_connection.get(
+    resp = login_connection.get(
       "/api/v2/login/platform",
       {},
       { "User-Agent" => "MPCrawler/1.0" }
@@ -277,7 +290,7 @@ class WereadApiClient
   # @param uuid [String] 登录会话 ID
   # @return [Hash] {vid, token, username, message}
   def self.get_login_result(uuid)
-    resp = platform_connection.get(
+    resp = login_connection.get(
       "/api/v2/login/platform/#{uuid}",
       {},
       { "User-Agent" => "MPCrawler/1.0" }
@@ -289,6 +302,34 @@ class WereadApiClient
     data
   rescue Faraday::Error => e
     raise ApiError, "检查登录状态失败: #{e.message}"
+  end
+
+  # 保存登录结果到账号池（控制器 weread_qrcode_status 与每日 Job 共用）
+  def self.save_login_result(data)
+    vid = data["vid"].to_s
+    token = data["token"].to_s
+    username = data["username"].present? ? data["username"] : "wechat_user"
+
+    accounts = Option.weread_accounts
+    existing = accounts.find { |a| a["vid"].to_s == vid }
+
+    if existing
+      existing["token"] = token
+      existing["name"] = username
+      existing["status"] = 1
+    else
+      accounts << {
+        "vid" => vid,
+        "token" => token,
+        "name" => username,
+        "status" => 1
+      }
+    end
+
+    Option.weread_accounts = accounts
+    remove_blocked_account(vid)
+
+    username
   end
 
   # ── Key Validation ─────────────────────────────────────

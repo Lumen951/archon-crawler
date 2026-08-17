@@ -126,6 +126,8 @@ Rails.application.routes.draw do
       post :weread_enable_account
       post :weread_disable_account
       post :weread_remove_account
+      # Feishu push
+      post :test_feishu
     end
 
     resource :analytics, only: [:show] do

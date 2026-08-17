@@ -22,6 +22,10 @@ development:
     class: CleanupOldTasksJob
     queue: default
     schedule: every day at 3am
+  weread_login_reminder:
+    class: WereadLoginReminderJob
+    queue: default
+    schedule: every day at 9:30am
 
 production:
   refresh_activity_counters:
@@ -47,3 +51,7 @@ production:
     class: CleanupOldTasksJob
     queue: default
     schedule: every day at 3am
+  weread_login_reminder:
+    class: WereadLoginReminderJob
+    queue: default
+    schedule: every day at 9:30am

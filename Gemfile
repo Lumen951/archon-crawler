@@ -69,6 +69,7 @@ end
 gem "async", "~> 2.41"
 gem "faraday", "~> 2.14"
 gem "faraday-retry", "~> 2.4"
+gem "faraday-multipart", "~> 1.0"
 
 gem "kaminari", "~> 1.2"
 gem "ransack", "~> 4.3"
@@ -76,3 +77,5 @@ gem "mission_control-jobs"
 gem "roo", "~> 3.0"
 gem "oauth2", "~> 2.0"
 gem "html2text", "~> 0.5.0"
+gem "rqrcode", "~> 2.2"
+gem "rqrcode_png", "~> 0.1.5"

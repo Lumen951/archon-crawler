@@ -4,8 +4,23 @@
     <p class="text-gray-600 mt-1">配置您的 API 密钥和系统设置</p>
   </div>
 
+  <!-- Table of Contents -->
+  <nav class="card">
+    <h2 class="text-sm font-semibold text-gray-700 mb-3">目录</h2>
+    <div class="flex flex-wrap gap-2">
+      <a href="#wechat" class="px-3 py-1.5 text-sm rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition">微信 API</a>
+      <a href="#rednote" class="px-3 py-1.5 text-sm rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition">小红书</a>
+      <a href="#twitter" class="px-3 py-1.5 text-sm rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition">Twitter</a>
+      <a href="#tikhub" class="px-3 py-1.5 text-sm rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition">TikHub</a>
+      <a href="#crawl" class="px-3 py-1.5 text-sm rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition">抓取设置</a>
+      <a href="#logging" class="px-3 py-1.5 text-sm rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition">日志设置</a>
+      <a href="#platform-toggles" class="px-3 py-1.5 text-sm rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition">平台开关</a>
+      <a href="#feishu" class="px-3 py-1.5 text-sm rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition">飞书推送</a>
+    </div>
+  </nav>
+
   <!-- WeChat API Provider Section -->
-  <div class="card">
+  <div class="card" id="wechat">
     <h2 class="text-xl font-bold text-gray-900 mb-4">微信 API 设置</h2>
 
     <!-- Provider Selector -->
@@ -210,7 +225,7 @@
     </div>
 
     <!-- WeRead Panel -->
-    <div class="wechat-panel <%= 'hidden' unless active_tab == 'weread' %>" data-tab-panel="weread" role="tabpanel">
+    <div id="weread" class="wechat-panel <%= 'hidden' unless active_tab == 'weread' %>" data-tab-panel="weread" role="tabpanel">
       <p class="text-sm text-gray-500 mb-4">
         管理微信读书转发服务的登录账号。登录后可抓取微信公众号文章。
       </p>
@@ -329,7 +344,7 @@
   </div>
 
   <!-- RedNote API Key -->
-  <div class="card">
+  <div class="card" id="rednote">
     <h2 class="text-xl font-bold text-gray-900 mb-4">小红书 API 密钥</h2>
 
     <% if @rednote_api_key.present? %>
@@ -373,7 +388,7 @@
   </div>
 
   <!-- Twitter Cookies -->
-  <div class="card">
+  <div class="card" id="twitter">
     <h2 class="text-xl font-bold text-gray-900 mb-4">Twitter Cookies</h2>
 
     <% if @twitter_ct0.present? && @twitter_auth_token.present? %>
@@ -443,7 +458,7 @@
   </div>
 
   <!-- TikHub API Key -->
-  <div class="card">
+  <div class="card" id="tikhub">
     <h2 class="text-xl font-bold text-gray-900 mb-4">TikHub API 密钥</h2>
     <p class="text-sm text-gray-600 mb-4">用于小红书用户搜索功能（按名称搜索帐号）</p>
 
@@ -496,7 +511,7 @@
   </div>
 
   <!-- Crawl Settings -->
-  <div class="card">
+  <div class="card" id="crawl">
     <h2 class="text-xl font-bold text-gray-900 mb-4">抓取设置</h2>
 
     <%= form_with url: admin_settings_path, method: :patch, class: "space-y-4" do |f| %>
@@ -541,7 +556,7 @@
   </div>
 
   <!-- Logging Settings -->
-  <div class="card">
+  <div class="card" id="logging">
     <h2 class="text-xl font-bold text-gray-900 mb-4">日志设置</h2>
 
     <%= form_with url: admin_settings_path, method: :patch, class: "space-y-4" do |f| %>
@@ -571,7 +586,7 @@
   </div>
 
   <!-- Platform Crawl Toggle Section -->
-  <div class="card">
+  <div class="card" id="platform-toggles">
     <h2 class="text-xl font-bold text-gray-900 mb-4">平台抓取开关</h2>
     <p class="text-sm text-gray-500 mb-4">启用或禁用特定平台的帐号抓取。禁用的平台将在抓取任务中被跳过。</p>
 
@@ -616,8 +631,80 @@
     <% end %>
   </div>
 
+  <!-- Feishu Push -->
+  <div class="card" id="feishu">
+    <h2 class="text-xl font-bold text-gray-900 mb-4">飞书推送</h2>
+    <p class="text-sm text-gray-600 mb-4">每天定时把微信读书登录二维码推送到飞书，扫码即可完成登录。</p>
+
+    <% if @feishu_enabled && @feishu_app_id.present? && @feishu_receive_id.present? %>
+      <div class="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+        <p class="text-sm font-medium text-green-900">✓ 已启用</p>
+        <p class="text-sm mt-1 text-gray-600">目标：<span class="font-mono"><%= @feishu_receive_id_type %></span> / <%= @feishu_receive_id %></p>
+      </div>
+    <% else %>
+      <div class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+        <p class="text-sm text-yellow-800">未配置飞书推送。配置完成后，每天将自动推送微信读书登录二维码。</p>
+      </div>
+    <% end %>
+
+    <%= form_with url: admin_settings_path, method: :patch, class: "space-y-4" do |f| %>
+      <div>
+        <label class="flex items-center space-x-3 cursor-pointer">
+          <input type="hidden" name="feishu_enabled" value="0">
+          <input type="checkbox" name="feishu_enabled" value="1" <%= 'checked' if @feishu_enabled %>
+                 class="w-5 h-5 text-primary border-gray-300 rounded focus:ring-2 focus:ring-primary">
+          <span class="text-sm font-medium text-gray-700">启用飞书推送</span>
+        </label>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">App ID</label>
+        <input type="text" name="feishu_app_id" value="<%= @feishu_app_id %>"
+               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+               placeholder="cli_xxxxxxxxxxxxxxxx">
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">App Secret</label>
+        <input type="password" name="feishu_app_secret" value="<%= @feishu_app_secret %>" autocomplete="off"
+               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+               placeholder="留空则保持不变">
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">推送目标 ID</label>
+        <input type="text" name="feishu_receive_id" value="<%= @feishu_receive_id %>"
+               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+               placeholder="私聊填 open_id，群填 chat_id">
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">目标类型</label>
+        <select name="feishu_receive_id_type"
+                class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+          <option value="open_id" <%= 'selected' if @feishu_receive_id_type == 'open_id' %>>私聊（open_id）</option>
+          <option value="chat_id" <%= 'selected' if @feishu_receive_id_type == 'chat_id' %>>群聊（chat_id）</option>
+        </select>
+      </div>
+
+      <button type="submit" class="btn btn-primary">保存飞书配置</button>
+    <% end %>
+
+    <div class="flex items-center gap-3">
+      <%= button_to "测试推送", test_feishu_admin_settings_path, method: :post,
+          class: "text-sm px-3 py-1.5 rounded bg-indigo-600 text-white hover:bg-indigo-700 transition" %>
+      <p class="text-xs text-gray-500">保存配置后点击测试，检查飞书是否收到消息</p>
+    </div>
+
+    <div class="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-600 space-y-1">
+      <p>• 需在 <a href="https://open.feishu.cn" target="_blank" class="text-primary hover:underline">飞书开放平台</a> 创建自建应用，开通「机器人」能力与「获取与上传图片资源」权限，并发布应用版本。</p>
+      <p>• 私聊推送需获取你的 open_id（应用需具备获取用户 ID 权限）。</p>
+      <p>• 群推送需将目标类型改为 chat_id，并填入群的 chat_id。</p>
+    </div>
+  </div>
+
   <!-- Info Section -->
-  <div class="card bg-gray-50">
+  <div class="card bg-gray-50" id="info">
     <h3 class="font-semibold text-gray-900 mb-2">重要说明</h3>
     <ul class="space-y-2 text-sm text-gray-600">
       <li>• <strong>MP 原生</strong>：扫码登录微信公众号平台后台，Cookie/Token 有效期约 2 小时，过期需重新扫码</li>
@@ -901,4 +988,30 @@
       if (btn) btn.disabled = false;
     }
   };
+</script>
+
+<script>
+  // Hash → WeChat tab 切换：支持 /admin/settings#weread 等锚点直达
+  // 微信读书推送里的 settings 链接会带 #weread，加载后自动切到 WeRead Tab 并滚动过去。
+  (function() {
+    function activateTabFromHash() {
+      const hash = window.location.hash;
+      if (!hash || hash === '#') return;
+
+      const tabName = hash.replace('#', '');
+      const tab = document.querySelector(`.wechat-tab[data-tab="${tabName}"]`);
+      if (!tab) return; // 非 wechat tab 的锚点（如 #feishu）交给浏览器原生滚动
+
+      tab.click();
+
+      const target = document.querySelector(`[data-tab-panel="${tabName}"]`) ||
+                     document.getElementById(tabName);
+      if (target) {
+        setTimeout(() => target.scrollIntoView({ block: 'start' }), 0);
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', activateTabFromHash);
+    document.addEventListener('turbo:load', activateTabFromHash);
+  })();
 </script>

@@ -39,6 +39,12 @@ class Admin::SettingsController < Admin::BaseController
     @weread_blocked_accounts = Option.weread_blocked_accounts
     @weread_today_blocked = (@weread_blocked_accounts[WereadApiClient.today_shanghai] || [])
     @weread_key_check = Rails.cache.read('api_key_check:weread')
+    # Feishu
+    @feishu_enabled = Option.feishu_enabled?
+    @feishu_app_id = Option.feishu_app_id
+    @feishu_app_secret = Option.feishu_app_secret
+    @feishu_receive_id = Option.feishu_receive_id
+    @feishu_receive_id_type = Option.feishu_receive_id_type
   end
 
   def update
@@ -140,6 +146,31 @@ class Admin::SettingsController < Admin::BaseController
       rescue JSON::ParserError
         message = "凭证 JSON 格式无效，请检查后重新提交"
       end
+    end
+
+    if params.key?(:feishu_enabled)
+      Option.set("feishu_enabled", params[:feishu_enabled] == "1")
+    end
+
+    # 密钥类字段留空表示保持不变，避免重复提交时被清空
+    if params[:feishu_app_id].present?
+      Option.feishu_app_id = params[:feishu_app_id].to_s.strip
+      message = "飞书推送配置更新成功"
+    end
+
+    if params[:feishu_app_secret].present?
+      Option.feishu_app_secret = params[:feishu_app_secret].to_s.strip
+      message = "飞书推送配置更新成功"
+    end
+
+    if params[:feishu_receive_id].present?
+      Option.feishu_receive_id = params[:feishu_receive_id].to_s.strip
+      message = "飞书推送配置更新成功"
+    end
+
+    if params.key?(:feishu_receive_id_type)
+      Option.feishu_receive_id_type = params[:feishu_receive_id_type]
+      message = "飞书推送配置更新成功"
     end
 
     respond_to do |format|
@@ -354,29 +385,7 @@ class Admin::SettingsController < Admin::BaseController
     data = WereadApiClient.get_login_result(uuid)
 
     if data["vid"] && data["token"]
-      vid = data["vid"].to_s
-      token = data["token"].to_s
-      username = data["username"] || "wechat_user"
-
-      # Save to Option (mirrors rake task logic)
-      accounts = Option.weread_accounts
-      existing = accounts.find { |a| a["vid"].to_s == vid }
-
-      if existing
-        existing["token"] = token
-        existing["name"] = username
-        existing["status"] = 1
-      else
-        accounts << {
-          "vid" => vid,
-          "token" => token,
-          "name" => username,
-          "status" => 1
-        }
-      end
-
-      Option.weread_accounts = accounts
-      WereadApiClient.remove_blocked_account(vid)
+      username = WereadApiClient.save_login_result(data)
       session.delete(:weread_login_uuid)
 
       render json: { status: "success", message: "登录成功！账号: #{username}" }
@@ -455,5 +464,30 @@ class Admin::SettingsController < Admin::BaseController
     Option.weread_accounts = accounts
     WereadApiClient.remove_blocked_account(vid)
     redirect_to admin_settings_path, notice: "WeRead 账号已移除"
+  end
+
+  # ── Feishu 推送 ──────────────────────────────────────
+
+  def test_feishu
+    unless FeishuNotifier.enabled?
+      message = "飞书推送未启用或配置不完整（app_id / app_secret / receive_id）"
+      return respond_to do |format|
+        format.turbo_stream { render turbo_stream: helpers.toast_stream(message, type: :error) }
+        format.html { flash[:error] = message; redirect_to admin_settings_path }
+      end
+    end
+
+    FeishuNotifier.send_text("✅ 飞书推送配置成功，这是一条测试消息。")
+    message = "✓ 已发送测试消息到飞书，请检查"
+    respond_to do |format|
+      format.turbo_stream { render turbo_stream: helpers.toast_stream(message, type: :success) }
+      format.html { flash[:success] = message; redirect_to admin_settings_path }
+    end
+  rescue FeishuNotifier::Error => e
+    Rails.logger.error("[Feishu] test message error: #{e.message}")
+    respond_to do |format|
+      format.turbo_stream { render turbo_stream: helpers.toast_stream("测试推送失败：#{e.message[0..200]}", type: :error) }
+      format.html { flash[:error] = "测试推送失败：#{e.message[0..200]}"; redirect_to admin_settings_path }
+    end
   end
 end

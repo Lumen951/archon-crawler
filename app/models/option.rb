@@ -252,6 +252,47 @@ class Option < ApplicationRecord
       weread_accounts.any? { |a| a["status"].to_i == 1 }
     end
 
+    # ── Feishu (飞书) 推送配置 ──────────────────────────
+    # 用于每日推送微信读书登录二维码到飞书（私聊/群）。
+
+    def feishu_enabled?
+      get("feishu_enabled") != "false"
+    end
+
+    def feishu_app_id
+      get("feishu_app_id")
+    end
+
+    def feishu_app_id=(val)
+      set("feishu_app_id", val)
+    end
+
+    def feishu_app_secret
+      get("feishu_app_secret")
+    end
+
+    def feishu_app_secret=(val)
+      set("feishu_app_secret", val)
+    end
+
+    # 推送目标 ID：私聊为 open_id，群为 chat_id
+    def feishu_receive_id
+      get("feishu_receive_id")
+    end
+
+    def feishu_receive_id=(val)
+      set("feishu_receive_id", val)
+    end
+
+    # "open_id"（私聊）或 "chat_id"（群），默认 open_id
+    def feishu_receive_id_type
+      get("feishu_receive_id_type") || "open_id"
+    end
+
+    def feishu_receive_id_type=(val)
+      set("feishu_receive_id_type", val)
+    end
+
     def profile_ext_credentials_age_minutes
       # 优先用 credentials.json 内部的 timestamp（毫秒时间戳）
       raw = profile_ext_credentials
