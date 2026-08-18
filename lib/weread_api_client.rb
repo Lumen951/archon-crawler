@@ -335,8 +335,22 @@ class WereadApiClient
 
   # ── Key Validation ─────────────────────────────────────
 
+  # 真实调用 get_mp_info 测试 API gateway，而非仅检查账号池里是否有 status=1
+  # 的账号。优先取库里最近一篇微信文章 URL（曾抓取成功，链接大概率仍有效）作为
+  # 测试素材；库里还没有微信文章时退回到仅检查账号池（此时无法做真实网关测试）。
   def self.validate_key
-    Option.weread_accounts_valid?
+    test_url = Article.joins(:account)
+                      .where(accounts: { type: "WechatAccount" })
+                      .where.not(url: nil)
+                      .order(published_at: :desc)
+                      .pick(:url)
+
+    return Option.weread_accounts_valid? if test_url.blank?
+
+    get_mp_info(test_url)
+    true
+  rescue NoAvailableAccountError, WeReadAccountExpiredError
+    false
   end
 
   # ── Helpers ───────────────────────────────────────────
