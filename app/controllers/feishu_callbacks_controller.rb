@@ -56,14 +56,15 @@ class FeishuCallbacksController < ApplicationController
     end
     Rails.logger.info("[Feishu] 验签通过")
 
-    # 4. 解析点击者与按钮动作
-    open_id = payload.dig("operator", "open_id").presence || payload["open_id"]
-    action = extract_action(payload.dig("action", "value") || payload["value"])
+    # 4. 解析点击者与按钮动作（飞书事件回调 v2.0 将数据包裹在 event 下，v1.0 为扁平结构）
+    event = payload["event"].is_a?(Hash) ? payload["event"] : payload
+    open_id = event.dig("operator", "open_id").presence || payload["open_id"]
+    action_value = event.dig("action", "value") || payload["value"]
+    action = extract_action(action_value)
     Rails.logger.info(
-      "[Feishu] 解析结果 operator_open_id=#{payload.dig('operator', 'open_id').inspect} " \
+      "[Feishu] 解析结果 operator_open_id=#{event.dig('operator', 'open_id').inspect} " \
       "open_id=#{payload['open_id'].inspect} 最终 open_id=#{open_id.inspect} " \
-      "action_value=#{(payload.dig('action', 'value') || payload['value']).inspect} " \
-      "最终 action=#{action.inspect}"
+      "action_value=#{action_value.inspect} 最终 action=#{action.inspect}"
     )
 
     # 5. 分发：命中登录按钮且能拿到点击者 open_id 时，异步生成专属二维码
