@@ -12,37 +12,76 @@ class FeishuCallbacksController < ApplicationController
 
   def card
     raw_body = request.raw_post.to_s
+    Rails.logger.info(
+      "[Feishu] 收到卡片回调 method=#{request.method} path=#{request.fullpath} " \
+      "content_type=#{request.headers['Content-Type']} " \
+      "timestamp=#{request.headers['X-Lark-Request-Timestamp'].inspect} " \
+      "nonce=#{request.headers['X-Lark-Request-Nonce'].inspect} " \
+      "signature=#{request.headers['X-Lark-Signature'].inspect}"
+    )
+    Rails.logger.info("[Feishu] 原始 body: #{raw_body}")
+    Rails.logger.info("[Feishu] query 参数: #{request.query_parameters.inspect}")
+
     payload = parse_json(raw_body)
+    Rails.logger.info("[Feishu] 解析后 payload: #{payload.inspect}")
 
     # 1. 解密（飞书开启加密时，body 为 {"encrypt": "..."}）
-    payload = parse_json(FeishuNotifier.decrypt_callback(payload["encrypt"])) if payload["encrypt"].present?
+    if payload["encrypt"].present?
+      Rails.logger.info("[Feishu] 检测到加密回调，开始解密 encrypt=#{payload['encrypt'][0, 32]}...")
+      decrypted = FeishuNotifier.decrypt_callback(payload["encrypt"])
+      Rails.logger.info("[Feishu] 解密后明文: #{decrypted.inspect}")
+      payload = parse_json(decrypted)
+      Rails.logger.info("[Feishu] 解密后 payload: #{payload.inspect}")
+    else
+      Rails.logger.info("[Feishu] 非加密回调，跳过解密")
+    end
 
     # 2. URL 校验：后台保存回调地址时，飞书发送 type=url_verification + challenge
     if url_verification?(payload)
-      return render json: { challenge: payload["challenge"].presence || request.query_parameters["challenge"] }
+      challenge = payload["challenge"].presence || request.query_parameters["challenge"]
+      Rails.logger.info("[Feishu] 命中 URL 校验，返回 challenge=#{challenge.inspect}")
+      return render json: { challenge: challenge }
     end
 
     # 3. 验签（对原始请求体，加密时即 {"encrypt": "..."} 密文本身）
-    unless FeishuNotifier.verify_signature?(
+    signature_valid = FeishuNotifier.verify_signature?(
       timestamp: request.headers["X-Lark-Request-Timestamp"],
       nonce: request.headers["X-Lark-Request-Nonce"],
       signature: request.headers["X-Lark-Signature"],
       body: raw_body
     )
+    unless signature_valid
+      Rails.logger.warn("[Feishu] 验签失败，返回 401")
       return render json: { code: 1, msg: "invalid signature" }, status: :unauthorized
     end
+    Rails.logger.info("[Feishu] 验签通过")
 
     # 4. 解析点击者与按钮动作
     open_id = payload.dig("operator", "open_id").presence || payload["open_id"]
     action = extract_action(payload.dig("action", "value") || payload["value"])
+    Rails.logger.info(
+      "[Feishu] 解析结果 operator_open_id=#{payload.dig('operator', 'open_id').inspect} " \
+      "open_id=#{payload['open_id'].inspect} 最终 open_id=#{open_id.inspect} " \
+      "action_value=#{(payload.dig('action', 'value') || payload['value']).inspect} " \
+      "最终 action=#{action.inspect}"
+    )
 
     # 5. 分发：命中登录按钮且能拿到点击者 open_id 时，异步生成专属二维码
-    WereadLoginForUserJob.perform_later(open_id) if action == "weread_login" && open_id.present?
+    if action == "weread_login" && open_id.present?
+      Rails.logger.info("[Feishu] 命中登录按钮，入队 WereadLoginForUserJob open_id=#{open_id.inspect}")
+      WereadLoginForUserJob.perform_later(open_id)
+    else
+      Rails.logger.info("[Feishu] 未触发登录分发（action=#{action.inspect} open_id=#{open_id.inspect}）")
+    end
 
     # 6. 3 秒内返回，避免飞书交互超时
+    Rails.logger.info("[Feishu] 处理完成，返回成功 toast")
     render json: { toast: { type: "success", content: "已开始为你生成登录二维码，请查看与机器人的私聊" } }
   rescue FeishuNotifier::Error => e
-    Rails.logger.error("[Feishu] 回调处理失败: #{e.message}")
+    Rails.logger.error("[Feishu] 回调处理失败: #{e.class}: #{e.message}\n#{e.backtrace.first(10).join("\n")}")
+    render json: { code: 1, msg: "invalid request" }, status: :bad_request
+  rescue => e
+    Rails.logger.error("[Feishu] 未预期异常: #{e.class}: #{e.message}\n#{e.backtrace.first(10).join("\n")}")
     render json: { code: 1, msg: "invalid request" }, status: :bad_request
   end
 
