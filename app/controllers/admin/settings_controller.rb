@@ -47,6 +47,9 @@ class Admin::SettingsController < Admin::BaseController
     @feishu_app_secret = Option.feishu_app_secret
     @feishu_receive_id = Option.feishu_receive_id
     @feishu_receive_id_type = Option.feishu_receive_id_type
+    @feishu_encrypt_key = Option.feishu_encrypt_key
+    @feishu_weread_login_mode = Option.feishu_weread_login_mode
+    @feishu_callback_url = build_feishu_callback_url
   end
 
   def update
@@ -183,6 +186,16 @@ class Admin::SettingsController < Admin::BaseController
     if params.key?(:feishu_receive_id_type)
       Option.feishu_receive_id_type = params[:feishu_receive_id_type]
       message = "飞书推送配置更新成功"
+    end
+
+    if params[:feishu_encrypt_key].present?
+      Option.feishu_encrypt_key = params[:feishu_encrypt_key].to_s.strip
+      message = "飞书推送配置更新成功"
+    end
+
+    if params.key?(:feishu_weread_login_mode)
+      Option.feishu_weread_login_mode = params[:feishu_weread_login_mode] == "card" ? "card" : "qr"
+      message = "飞书微信读书登录方式已更新"
     end
 
     respond_to do |format|
@@ -500,6 +513,18 @@ class Admin::SettingsController < Admin::BaseController
     respond_to do |format|
       format.turbo_stream { render turbo_stream: helpers.toast_stream("测试推送失败：#{e.message[0..200]}", type: :error) }
       format.html { flash[:error] = "测试推送失败：#{e.message[0..200]}"; redirect_to admin_settings_path }
+    end
+  end
+
+  private
+
+  # 生成飞书卡片回调地址（与 WereadLoginReminderJob#settings_anchor_url 相同的 host 规则）
+  def build_feishu_callback_url
+    host = ENV["APP_HOST"].presence || "localhost"
+    if Rails.env.production?
+      "https://#{host}#{Rails.application.routes.url_helpers.feishu_callback_path}"
+    else
+      "http://#{host}:3000#{Rails.application.routes.url_helpers.feishu_callback_path}"
     end
   end
 end

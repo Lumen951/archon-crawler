@@ -299,6 +299,23 @@ class Option < ApplicationRecord
       set("feishu_receive_id_type", val)
     end
 
+    def feishu_encrypt_key
+      get("feishu_encrypt_key")
+    end
+
+    def feishu_encrypt_key=(val)
+      set("feishu_encrypt_key", val)
+    end
+
+    # 飞书微信读书登录方式：qr（推一张二维码到群，默认）/ card（发交互卡片，成员点击后私聊各自二维码）
+    def feishu_weread_login_mode
+      get("feishu_weread_login_mode") || "qr"
+    end
+
+    def feishu_weread_login_mode=(val)
+      set("feishu_weread_login_mode", val)
+    end
+
     def profile_ext_credentials_age_minutes
       # 优先用 credentials.json 内部的 timestamp（毫秒时间戳）
       raw = profile_ext_credentials

@@ -2,6 +2,7 @@ require "faraday"
 require "faraday/multipart"
 require "stringio"
 require "json"
+require "digest"
 
 # 飞书（Feishu）推送客户端。
 #
@@ -68,25 +69,35 @@ class FeishuNotifier
   end
 
   # 发送一条二维码图片 + 一条文字说明
-  def self.send_qr_login(png_bytes:, text:)
+  def self.send_qr_login(png_bytes:, text:, receive_id: nil, receive_id_type: nil)
     image_key = upload_image(png_bytes)
-    send_image(image_key)
-    send_text(text)
+    send_image(image_key, receive_id: receive_id, receive_id_type: receive_id_type)
+    send_text(text, receive_id: receive_id, receive_id_type: receive_id_type)
+  end
+
+  # 私聊发送二维码 + 文字给指定 open_id
+  def self.send_qr_login_to(open_id:, png_bytes:, text:)
+    send_qr_login(png_bytes: png_bytes, text: text, receive_id: open_id, receive_id_type: "open_id")
   end
 
   # 发送图片消息
-  def self.send_image(image_key)
-    send_message(msg_type: "image", content: { image_key: image_key }.to_json)
+  def self.send_image(image_key, receive_id: nil, receive_id_type: nil)
+    send_message(msg_type: "image", content: { image_key: image_key }.to_json, receive_id: receive_id, receive_id_type: receive_id_type)
   end
 
   # 发送文字消息
-  def self.send_text(text)
-    send_message(msg_type: "text", content: { text: text }.to_json)
+  def self.send_text(text, receive_id: nil, receive_id_type: nil)
+    send_message(msg_type: "text", content: { text: text }.to_json, receive_id: receive_id, receive_id_type: receive_id_type)
   end
 
-  def self.send_message(msg_type:, content:)
-    receive_id_type = Option.feishu_receive_id_type.presence || "open_id"
-    receive_id = Option.feishu_receive_id
+  # 发送交互式消息卡片（msg_type = interactive，content 为卡片 JSON）
+  def self.send_card(card, receive_id: nil, receive_id_type: nil)
+    send_message(msg_type: "interactive", content: card.to_json, receive_id: receive_id, receive_id_type: receive_id_type)
+  end
+
+  def self.send_message(msg_type:, content:, receive_id: nil, receive_id_type: nil)
+    receive_id_type = receive_id_type.presence || Option.feishu_receive_id_type.presence || "open_id"
+    receive_id = receive_id.presence || Option.feishu_receive_id
 
     # receive_id_type 是必填的 query 参数（不是 body），必须拼到 URL 上
     resp = connection.post("/open-apis/im/v1/messages?receive_id_type=#{receive_id_type}") do |req|
@@ -102,6 +113,25 @@ class FeishuNotifier
     parse_body(resp)
   rescue Faraday::Error => e
     raise Error, "飞书连接失败: #{e.message}"
+  end
+
+  # 校验飞书卡片回调签名。
+  #
+  # 算法（官方文档）：signature = sha256(timestamp + nonce + encrypt_key + 请求体) 的 hexdigest，
+  # 与请求头 X-Lark-Signature 比对。encrypt_key 未配置时跳过验签（仅记录告警日志）。
+  def self.verify_signature?(timestamp:, nonce:, signature:, body:)
+    encrypt_key = Option.feishu_encrypt_key.to_s
+    if encrypt_key.empty?
+      Rails.logger.warn("[Feishu] 未配置 encrypt_key，跳过回调验签")
+      return true
+    end
+
+    # 对原始字节做拼接与摘要，避免编码不兼容（body 可能含中文）
+    expected = Digest::SHA256.hexdigest("#{timestamp}#{nonce}#{encrypt_key}".b + body.to_s.b)
+    return true if expected == signature.to_s
+
+    Rails.logger.warn("[Feishu] 回调签名不匹配")
+    false
   end
 
   def self.connection

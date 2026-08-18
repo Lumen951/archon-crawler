@@ -1,8 +1,12 @@
 require "rqrcode"
 require "rqrcode_png"
 
-# 每日定时任务：为微信读书（WeRead）转发服务生成登录二维码，推送到飞书，
-# 并后台轮询登录结果，扫码成功后自动把账号写回 Option.weread_accounts。
+# 每日定时任务：提醒微信读书（WeRead）账号登录。
+#
+# 支持两种推送方式（由 Option.feishu_weread_login_mode 切换）：
+#   - "qr"（默认）：生成一张登录二维码推到飞书，后台轮询登录结果，扫码成功后写回账号池。
+#   - "card"：发送一张带「我要登录」按钮的交互卡片，成员点击后由 FeishuCallbacksController
+#     入队 WereadLoginForUserJob，各自私聊收到专属二维码，从而支持多人形成账号池。
 #
 # 未配置飞书（FeishuNotifier.enabled? 为 false）时直接跳过，不报错。
 class WereadLoginReminderJob < ApplicationJob
@@ -17,6 +21,18 @@ class WereadLoginReminderJob < ApplicationJob
       return
     end
 
+    if Option.feishu_weread_login_mode == "card"
+      send_login_card
+    else
+      send_single_qr
+    end
+  end
+
+  private
+
+  # ── 模式一：单二维码推送（默认，保留原有行为）─────────────
+
+  def send_single_qr
     result = WereadApiClient.create_login_url
     uuid = result["uuid"]
     scan_url = result["scanUrl"]
@@ -36,7 +52,43 @@ class WereadLoginReminderJob < ApplicationJob
     Option.delete("weread_pending_login_uuid")
   end
 
-  private
+  # ── 模式二：交互卡片（多人各自扫码登录）─────────────
+
+  def send_login_card
+    FeishuNotifier.send_card(login_card)
+  rescue FeishuNotifier::Error => e
+    Rails.logger.error("[WereadLoginReminderJob] 飞书推送卡片失败: #{e.message}")
+  end
+
+  def login_card
+    {
+      config: { wide_screen_mode: true },
+      header: {
+        template: "blue",
+        title: { tag: "plain_text", content: "微信读书账号登录" }
+      },
+      elements: [
+        {
+          tag: "div",
+          text: {
+            tag: "lark_md",
+            content: "微信读书账号已过期或需要扩充账号池。点击下方按钮，将私聊收到专属二维码，请用微信扫码登录。"
+          }
+        },
+        {
+          tag: "action",
+          actions: [
+            {
+              tag: "button",
+              text: { tag: "plain_text", content: "我要登录" },
+              type: "primary",
+              value: { action: "weread_login" }
+            }
+          ]
+        }
+      ]
+    }
+  end
 
   def poll_login(uuid)
     deadline = Time.current + POLL_TIMEOUT

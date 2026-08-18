@@ -8,6 +8,10 @@ Rails.application.routes.draw do
   get '/auth/:provider', to: 'sessions#oauth_login', as: :oauth_login
   get '/oauth/:provider/callback', to: 'sessions#oauth_callback', as: :oauth_callback
 
+  # Feishu message-card callback (public, verified by signature)
+  post '/feishu/card_callback', to: 'feishu_callbacks#card', as: :feishu_callback
+  get  '/feishu/card_callback', to: 'feishu_callbacks#card'
+
   root "dashboard#index"
 
   # Authenticated user routes (no admin required)
