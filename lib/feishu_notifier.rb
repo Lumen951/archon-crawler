@@ -3,6 +3,8 @@ require "faraday/multipart"
 require "stringio"
 require "json"
 require "digest"
+require "openssl"
+require "base64"
 
 # 飞书（Feishu）推送客户端。
 #
@@ -130,8 +132,39 @@ class FeishuNotifier
     expected = Digest::SHA256.hexdigest("#{timestamp}#{nonce}#{encrypt_key}".b + body.to_s.b)
     return true if expected == signature.to_s
 
-    Rails.logger.warn("[Feishu] 回调签名不匹配")
+    Rails.logger.warn(
+      "[Feishu] 回调签名不匹配（timestamp=#{timestamp.present?}, nonce=#{nonce.present?}, " \
+      "signature=#{signature.present?}）。请确认 feishu_encrypt_key 是飞书后台「事件与回调 → 加密策略」" \
+      "里的 Encrypt Key，而非验证令牌（Verification Token）。"
+    )
     false
+  end
+
+  # 解密飞书加密回调。
+  #
+  # 飞书开启加密策略后，回调 body 形如 {"encrypt": "<base64>"}。encrypt 字段为
+  # base64(AES-256-CBC(iv(16 字节) + 密文))，key = SHA256(encrypt_key)，iv 取解码后前 16 字节，
+  # PKCS7 填充。返回解密后的明文字符串（通常为 JSON）。
+  def self.decrypt_callback(encrypt)
+    encrypt_key = Option.feishu_encrypt_key.to_s
+    raise Error, "已收到加密回调但未配置 feishu_encrypt_key" if encrypt_key.empty?
+
+    data = Base64.decode64(encrypt)
+    raise Error, "非法密文长度" if data.bytesize <= 16 || data.bytesize % 16 != 0
+
+    key = Digest::SHA256.digest(encrypt_key)
+    iv = data.byteslice(0, 16)
+    ciphertext = data.byteslice(16, data.bytesize - 16)
+
+    decipher = OpenSSL::Cipher.new("AES-256-CBC")
+    decipher.decrypt
+    decipher.key = key
+    decipher.iv = iv
+    plain = decipher.update(ciphertext) + decipher.final
+
+    plain.force_encoding(Encoding::UTF_8)
+  rescue OpenSSL::Cipher::CipherError => e
+    raise Error, "回调解密失败（feishu_encrypt_key 可能不正确）: #{e.message}"
   end
 
   def self.connection
