@@ -1,7 +1,78 @@
 module Api
   module V1
     class ArticlesController < Api::BaseController
+      # GET /api/v1/articles
+      # Supports two modes:
+      #   1. By groups: ?group_ref_keys[]=key1&group_ref_keys[]=key2&range[]=start&range[]=end
+      #   2. By account: ?account_id=123&start_date=2026-08-01&end_date=2026-08-19
       def index
+        if params[:account_id].present?
+          index_by_account
+        else
+          index_by_group
+        end
+      end
+
+      private
+
+      # Mode 2: Query articles by account_id with date range
+      def index_by_account
+        account = Account.find(params[:account_id])
+
+        page = [params[:page].to_i, 1].max
+        per_page = [[params[:per_page].to_i, 25].max, 100].min
+
+        scope = account.articles.order(published_at: :desc)
+
+        # Date range filter
+        if params[:start_date].present?
+          begin
+            scope = scope.where("published_at >= ?", Date.parse(params[:start_date]).beginning_of_day)
+          rescue Date::Error
+            render json: { error: "start_date 格式无效，请使用 YYYY-MM-DD" }, status: :bad_request
+            return
+          end
+        end
+
+        if params[:end_date].present?
+          begin
+            scope = scope.where("published_at <= ?", Date.parse(params[:end_date]).end_of_day)
+          rescue Date::Error
+            render json: { error: "end_date 格式无效，请使用 YYYY-MM-DD" }, status: :bad_request
+            return
+          end
+        end
+
+        articles = scope.page(page).per(per_page)
+
+        render json: {
+          account: {
+            id: account.id,
+            fakeid: account.fakeid,
+            nickname: account.nickname,
+            platform: account.type.sub("Account", "").downcase
+          },
+          articles: articles.map { |article|
+            {
+              id: article.id,
+              title: article.title,
+              url: article.url,
+              digest: article.best_digest,
+              content: article.clean_content_markdown,
+              published_at: article.published_at&.iso8601
+            }
+          },
+          pagination: {
+            page: articles.current_page,
+            per_page: articles.limit_value,
+            total_count: articles.total_count,
+            total_pages: articles.total_pages
+          }
+        }
+      end
+
+      # Mode 1: Original group-based query (unchanged)
+      def index_by_group
         group_ref_keys = params[:group_ref_keys] || []
         range = params[:range] || []
         source = params[:source].to_s.strip.presence
@@ -10,7 +81,7 @@ module Api
 
         # Validate parameters
         if group_ref_keys.empty?
-          render json: { error: "group_ref_keys 不能为空" }, status: :bad_request
+          render json: { error: "group_ref_keys 不能为空（或使用 account_id 模式）" }, status: :bad_request
           return
         end
 
@@ -36,8 +107,6 @@ module Api
         end
 
         # Build query
-        # Avoid `articles.*` — it pulls in large columns (e.g. raw_data) that
-        # aren't needed in the response, so list only the columns we use.
         articles = Article.joins("INNER JOIN group_accounts ON group_accounts.account_id = articles.account_id")
                           .joins("INNER JOIN groups ON groups.id = group_accounts.group_id")
                           .where(groups: { id: groups })
@@ -78,7 +147,6 @@ module Api
               url: article.url,
               digest: article.best_digest,
               content: article.clean_content_markdown,
-              # content_html: article.clean_content_html,
               published_at: article.published_at,
               group_ref_key: article.group_ref_key,
               account: {

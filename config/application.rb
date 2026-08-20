@@ -16,6 +16,9 @@ module MpCrawler
     # Common ones are `templates`, `generators`, or `middleware`, for example.
     config.autoload_lib(ignore: %w[assets tasks])
 
+    # MCP server tools
+    config.autoload_paths << Rails.root.join("app/mcp_server")
+
     # Serve .md files with charset=utf-8 so non-ASCII content renders correctly
     require_relative "../lib/markdown_charset_middleware"
     config.middleware.insert_before ActionDispatch::Static, MarkdownCharsetMiddleware

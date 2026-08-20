@@ -151,8 +151,36 @@ Rails.application.routes.draw do
     namespace :v1 do
       resources :groups, only: [:index, :show, :create, :update, :destroy]
       resources :articles, only: [:index]
-      resources :accounts, only: [:index]
+      resources :accounts, only: [:index, :show, :update] do
+        collection do
+          post :bulk_update
+          get :lookup
+        end
+      end
+      resources :tags, only: [:index, :show, :create]
     end
+  end
+
+  # MCP endpoint
+  post   "mcp/endpoint", to: "mcp#endpoint"
+  get    "mcp/endpoint", to: "mcp#endpoint"
+  delete "mcp/endpoint", to: "mcp#endpoint"
+
+  # MCP guide page
+  get "mcp", to: "mcp_guide#show", as: :mcp_guide
+  post "mcp/tokens", to: "mcp_guide#create_token", as: :create_token_mcp_guide
+  delete "mcp/tokens/:id", to: "mcp_guide#revoke_token", as: :revoke_token_mcp_guide
+
+  # API docs
+  get "api-docs", to: "api_docs#show", as: :api_docs
+  get "api-docs/openapi.json", to: "api_docs#openapi", as: :api_docs_openapi
+
+  # OAuth Device Code flow
+  namespace :oauth do
+    post "device", to: "device#create"
+    get  "device/authorize", to: "device#show"
+    post "device/authorize", to: "device#authorize"
+    post "token", to: "token#create"
   end
 
   # Health check

@@ -1,0 +1,85 @@
+module Tools
+  class ListArticlesTool < MCP::Tool
+    tool_name "list_articles"
+    description "查询某账号的文章列表，支持日期范围过滤和分页。用于分析账号发布内容。"
+    annotations(read_only_hint: true, destructive_hint: false)
+
+    input_schema(
+      properties: {
+        account_id: { type: "integer", description: "账号 ID" },
+        start_date: { type: "string", description: "起始日期（YYYY-MM-DD）" },
+        end_date: { type: "string", description: "结束日期（YYYY-MM-DD）" },
+        page: { type: "integer", description: "页码（默认 1）" },
+        per_page: { type: "integer", description: "每页数量（默认 25，最大 100）" },
+      },
+      required: ["account_id"]
+    )
+
+    def self.call(server_context:, account_id:, start_date: nil, end_date: nil, page: 1, per_page: 25)
+      account = Account.find_by(id: account_id)
+
+      if account.nil?
+        return MCP::Tool::Response.new(
+          [{ type: "text", text: "未找到 ID 为 #{account_id} 的账号" }],
+          error: true
+        )
+      end
+
+      scope = account.articles.order(published_at: :desc)
+
+      # Date range filter
+      if start_date.present?
+        begin
+          scope = scope.where("published_at >= ?", Date.parse(start_date).beginning_of_day)
+        rescue Date::Error
+          return MCP::Tool::Response.new(
+            [{ type: "text", text: "start_date 格式无效，请使用 YYYY-MM-DD" }],
+            error: true
+          )
+        end
+      end
+
+      if end_date.present?
+        begin
+          scope = scope.where("published_at <= ?", Date.parse(end_date).end_of_day)
+        rescue Date::Error
+          return MCP::Tool::Response.new(
+            [{ type: "text", text: "end_date 格式无效，请使用 YYYY-MM-DD" }],
+            error: true
+          )
+        end
+      end
+
+      # Pagination
+      page = [[page.to_i, 1].max].min
+      per_page = [[per_page.to_i, 25].max, 100].min
+
+      articles = scope.page(page).per(per_page)
+
+      result = {
+        account: {
+          id: account.id,
+          fakeid: account.fakeid,
+          nickname: account.nickname,
+          platform: account.type.sub("Account", "").downcase,
+        },
+        total_count: articles.total_count,
+        page: articles.current_page,
+        per_page: articles.limit_value,
+        total_pages: articles.total_pages,
+        articles: articles.map { |a|
+          {
+            id: a.id,
+            title: a.title,
+            url: a.url,
+            published_at: a.published_at&.iso8601,
+            digest: a.best_digest,
+            content_preview: a.clean_content_markdown&.truncate(500),
+          }
+        }
+      }
+
+      MCP::Tool::Response.new([{ type: "text", text: result.to_json }])
+    end
+  end
+end

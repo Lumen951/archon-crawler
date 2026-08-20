@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_16_000002) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_19_000002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -121,6 +121,24 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_16_000002) do
     t.index ["status"], name: "index_crawl_tasks_on_status"
   end
 
+  create_table "device_codes", force: :cascade do |t|
+    t.string "client_id", null: false
+    t.datetime "created_at", null: false
+    t.string "device_code", null: false
+    t.datetime "expires_at", null: false
+    t.integer "interval", default: 5, null: false
+    t.string "ip_address"
+    t.string "scope"
+    t.integer "status", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.string "user_code", null: false
+    t.bigint "user_id"
+    t.index ["device_code"], name: "index_device_codes_on_device_code", unique: true
+    t.index ["expires_at"], name: "index_device_codes_on_expires_at"
+    t.index ["user_code"], name: "index_device_codes_on_user_code", unique: true
+    t.index ["user_id"], name: "index_device_codes_on_user_id"
+  end
+
   create_table "group_accounts", force: :cascade do |t|
     t.bigint "account_id", null: false
     t.datetime "created_at", null: false
@@ -139,6 +157,25 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_16_000002) do
     t.bigint "user_id", null: false
     t.index ["user_id", "ref_key"], name: "index_groups_on_user_id_and_ref_key", unique: true
     t.index ["user_id"], name: "index_groups_on_user_id"
+  end
+
+  create_table "mcp_tool_calls", force: :cascade do |t|
+    t.bigint "api_key_id"
+    t.jsonb "arguments", default: {}
+    t.datetime "created_at", null: false
+    t.integer "duration_ms"
+    t.string "error_type"
+    t.string "ip_address"
+    t.string "method", null: false
+    t.integer "status", default: 0, null: false
+    t.string "tool_name"
+    t.datetime "updated_at", null: false
+    t.bigint "user_id"
+    t.index ["api_key_id"], name: "index_mcp_tool_calls_on_api_key_id"
+    t.index ["created_at"], name: "index_mcp_tool_calls_on_created_at"
+    t.index ["method"], name: "index_mcp_tool_calls_on_method"
+    t.index ["tool_name"], name: "index_mcp_tool_calls_on_tool_name"
+    t.index ["user_id"], name: "index_mcp_tool_calls_on_user_id"
   end
 
   create_table "options", force: :cascade do |t|
@@ -227,9 +264,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_16_000002) do
   add_foreign_key "articles", "crawl_tasks"
   add_foreign_key "crawl_task_accounts", "accounts"
   add_foreign_key "crawl_task_accounts", "crawl_tasks"
+  add_foreign_key "device_codes", "users"
   add_foreign_key "group_accounts", "accounts"
   add_foreign_key "group_accounts", "groups"
   add_foreign_key "groups", "users"
+  add_foreign_key "mcp_tool_calls", "api_keys"
+  add_foreign_key "mcp_tool_calls", "users"
   add_foreign_key "sessions", "users"
   add_foreign_key "tag_accounts", "accounts"
   add_foreign_key "tag_accounts", "tags"
