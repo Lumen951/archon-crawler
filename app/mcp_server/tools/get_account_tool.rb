@@ -29,8 +29,8 @@ module Tools
         )
       end
 
-      requested_fields = fields&.map(&:to_s)&.intersection(AVAILABLE_FIELDS)
-      want_articles = include_articles != false && (requested_fields.nil? || requested_fields.include?("recent_articles"))
+      requested_fields = fields&.map { |f| f.to_s.to_sym }
+      want_articles = include_articles != false && (requested_fields.nil? || requested_fields.include?(:recent_articles))
       articles_limit = [[articles_limit.to_i, 1].max, 20].min
 
       full = {

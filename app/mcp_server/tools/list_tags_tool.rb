@@ -20,7 +20,7 @@ module Tools
         scope = scope.search(keyword)
       end
 
-      requested_fields = fields&.map(&:to_s)&.intersection(AVAILABLE_FIELDS)
+      requested_fields = fields&.map { |f| f.to_s.to_sym }
 
       result = {
         tags: scope.map { |t|

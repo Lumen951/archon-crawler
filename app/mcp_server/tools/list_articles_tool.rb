@@ -57,9 +57,9 @@ module Tools
       page = [[page.to_i, 1].max].min
       per_page = [[per_page.to_i, 25].max, 100].min
 
-      requested_fields = fields&.map(&:to_s)&.intersection(ARTICLE_FIELDS)
+      requested_fields = fields&.map { |f| f.to_s.to_sym }
       # By default exclude content_preview to save tokens; only include when explicitly requested
-      want_content_preview = requested_fields&.include?("content_preview")
+      want_content_preview = requested_fields&.include?(:content_preview)
 
       articles = scope.page(page).per(per_page)
 

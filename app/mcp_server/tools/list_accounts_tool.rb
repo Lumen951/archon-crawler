@@ -76,9 +76,9 @@ module Tools
       per_page = [[per_page.to_i, 25].max, 100].min
 
       # Validate fields
-      requested_fields = fields&.map(&:to_s)&.intersection(AVAILABLE_FIELDS)
+      requested_fields = fields&.map { |f| f.to_s.to_sym }
       # Skip tags eager loading when not needed
-      need_tags = requested_fields.nil? || requested_fields.include?("tags")
+      need_tags = requested_fields.nil? || requested_fields.include?(:tags)
 
       accounts = scope
       accounts = accounts.includes(:tags) if need_tags
