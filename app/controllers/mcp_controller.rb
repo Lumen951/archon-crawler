@@ -20,7 +20,11 @@ class McpController < ActionController::API
       server_context: { user: @current_user, api_key: @current_api_key },
     )
 
-    transport = MCP::Server::Transports::StreamableHTTPTransport.new(server, stateless: true)
+    transport = MCP::Server::Transports::StreamableHTTPTransport.new(
+      server,
+      stateless: true,
+      dns_rebinding_protection: false,
+    )
     status, headers, body = transport.handle_request(request)
 
     response.headers.merge!(headers)
