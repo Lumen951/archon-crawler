@@ -118,24 +118,37 @@
           ["activity_level", "可选", "active / slow / dormant / dead / never / uncrawled"],
           ["tag_id", "可选", "按标签 ID 过滤"],
           ["keyword", "可选", "按账号名称搜索"],
-          ["page / per_page", "可选", "分页（默认 1 / 25）"],
+          ["fields", "可选", "只返回指定字段（如 id、nickname、tags），减少数据量"],
+          ["page / per_page", "可选", "分页（默认 1 / 25，最大 100）"],
         ]},
-        { name: "get_account", badge: "详情", desc: "获取单个账号详细信息，含活动统计、标签、最近 10 篇文章", params: [
+        { name: "get_account", badge: "详情", desc: "获取单个账号详细信息，含活动统计、标签、最近文章", params: [
           ["account_id", "必填", "账号 ID"],
+          ["fields", "可选", "只返回指定字段，减少数据量"],
+          ["include_articles", "可选", "是否包含最近文章（默认 true，设为 false 可大幅减少数据量）"],
+          ["articles_limit", "可选", "最近文章数量（默认 10，最大 20）"],
         ]},
         { name: "list_articles", badge: "查询", desc: "查询某账号的文章列表，支持日期范围过滤", params: [
           ["account_id", "必填", "账号 ID"],
           ["start_date / end_date", "可选", "日期范围 YYYY-MM-DD"],
-          ["page / per_page", "可选", "分页"],
+          ["fields", "可选", "只返回指定字段（如 id、title、url、published_at、digest、content_preview）"],
+          ["page / per_page", "可选", "分页（默认 1 / 25，最大 100）"],
         ]},
-        { name: "update_accounts", badge: "操作", desc: "批量启用/停用账号、添加/移除标签", params: [
+        { name: "update_accounts", badge: "操作", desc: "批量启用/停用账号、添加/移除标签（需提供账号 ID 列表）", params: [
           ["account_ids", "必填", "账号 ID 列表"],
           ["status", "可选", "active / inactive"],
           ["add_tag_ids / remove_tag_ids", "可选", "标签 ID 列表"],
           ["add_tag_names", "可选", "标签名称（不存在则自动创建）"],
         ]},
+        { name: "batch_update_accounts_by_filter", badge: "操作", desc: "按过滤条件批量更新账号（打标签/改状态），无需先列出再操作，支持 dry_run 预览", params: [
+          ["filter", "可选", "过滤条件（platform / status / activity_level / tag_id / keyword），为空则匹配全部"],
+          ["status", "可选", "设置状态 active / inactive"],
+          ["add_tag_ids / remove_tag_ids", "可选", "标签 ID 列表"],
+          ["add_tag_names", "可选", "标签名称（不存在则自动创建）"],
+          ["dry_run", "可选", "仅返回匹配数量，不实际执行（默认 false）"],
+        ]},
         { name: "list_tags", badge: "查询", desc: "列出所有标签及其关联账号数量", params: [
           ["keyword", "可选", "按标签名称搜索"],
+          ["fields", "可选", "只返回指定字段（如 id、name、color、accounts_count）"],
         ]},
         { name: "get_activity_stats", badge: "统计", desc: "获取各平台账号活跃度统计概览", params: [] },
       ] %>
@@ -186,6 +199,7 @@
         "给所有小红书账号打上「小红书」标签",
         "查看中山大学相关的公众号最近 7 天发了什么文章",
         "统计各平台账号数量和活跃度分布",
+        "把所有活跃的微信公众号标记为「重点」标签，先告诉我有多少个",
       ] %>
       <% prompts.each do |p| %>
         <div class="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
