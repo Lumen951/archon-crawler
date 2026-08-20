@@ -11,6 +11,9 @@ class McpController < ActionController::API
       Tools::BatchUpdateAccountsByFilterTool,
       Tools::ListTagsTool,
       Tools::GetActivityStatsTool,
+      Tools::WereadLoginStartTool,
+      Tools::WereadLoginStatusTool,
+      Tools::WereadAccountsTool,
     ]
 
     server = MCP::Server.new(

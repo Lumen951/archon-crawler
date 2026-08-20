@@ -20,14 +20,9 @@ namespace :weread do
       puts "  二维码 URL: #{scan_url}"
       puts "  会话 ID: #{uuid}"
       puts "\n请用微信扫描二维码，或在浏览器打开上述 URL 扫描"
-      puts "(qrencode 可用时，二维码会显示在终端中)"
 
-      # 尝试显示终端二维码
-      if system("which qrencode > /dev/null 2>&1")
-        system("qrencode -t ANSIUTF8 '#{scan_url}'")
-      else
-        puts "提示: 安装 qrencode 可在终端直接显示二维码: brew install qrencode"
-      end
+      # 终端显示二维码（半块字符画，深色终端默认极性）
+      puts QrAscii.render(scan_url)
 
       # Step 2: 轮询登录结果
       puts "\n等待扫码..."

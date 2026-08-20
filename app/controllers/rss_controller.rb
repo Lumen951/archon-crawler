@@ -93,7 +93,7 @@ class RssController < ApplicationController
       @articles = Article.includes(:account)
         .where(id: article_ids).recent.limit(100)
     else
-      @articles = Article.includes(:account).recent.limit(100)
+      @articles = []
     end
 
     @period_label = "个人订阅"

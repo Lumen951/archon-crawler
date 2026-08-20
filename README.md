@@ -85,7 +85,7 @@ MP-Crawler 是一个基于 Ruby on Rails 的应用，用于自动抓取微信公
 
 ### 8. API Key 管理
 - **微信公众号**（`mp_native`）：通过 QR 码扫码登录（在 `/admin/settings` 页面），Cookie/Token 有效期约 2 小时
-- **微信读书（WeRead）**：转发服务帐号池（支持多账号、QR 扫码登录、每日黑名单），在 `/admin/settings` 统一管理
+- **微信读书（WeRead）**：转发服务帐号池（支持多账号、QR 扫码登录、每日黑名单），在 `/admin/settings` 统一管理；支持通过 MCP 工具 `weread_login_start` / `weread_login_status` / `weread_accounts` 驱动扫码登录（终端 ASCII 二维码）
 - **大家拉（Dajiala）**：`dajiala_api_key`
 - **Profile Ext**：mitmproxy 抓取的凭证（`profile_ext_credentials`，约 25 分钟过期）
 - **小红书**：`rednote_api_key`，无过期机制

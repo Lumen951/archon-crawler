@@ -69,6 +69,17 @@ class WereadApiClient
     end
   end
 
+  # 登录结果短轮询专用连接：无 retry，供 MCP 短超时轮询使用。
+  # （带 retry 的连接在短超时时会把墙钟时间放大 retry 次数倍，不适合有界轮询）
+  def self.login_poll_connection
+    @login_poll_connection ||= Faraday.new(url: platform_url) do |f|
+      f.request :url_encoded
+      f.options.timeout = 5
+      f.options.open_timeout = 5
+      f.adapter Faraday.default_adapter
+    end
+  end
+
   # ── Platform URL ──────────────────────────────────────
 
   def self.platform_url
@@ -289,14 +300,18 @@ class WereadApiClient
 
   # 轮询登录结果
   # @param uuid [String] 登录会话 ID
+  # @param timeout [Numeric] 单次请求超时秒数（默认 120，转发服务会 long-poll）
+  # @param allow_retry [Boolean] 是否使用带 retry 的连接（默认 true）。短轮询时应传 false
+  #   （配合 login_poll_connection 使用，避免短超时 × retry 放大墙钟时间）
   # @return [Hash] {vid, token, username, message}
-  def self.get_login_result(uuid)
-    resp = login_connection.get(
+  def self.get_login_result(uuid, timeout: 120, allow_retry: true)
+    conn = allow_retry ? login_connection : login_poll_connection
+    resp = conn.get(
       "/api/v2/login/platform/#{uuid}",
       {},
       { "User-Agent" => "MPCrawler/1.0" }
     ) do |req|
-      req.options.timeout = 120
+      req.options.timeout = timeout
     end
 
     data = safe_json_parse(resp.body)
