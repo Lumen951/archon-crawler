@@ -4,18 +4,21 @@ module Tools
     description "查询某账号的文章列表，支持日期范围过滤和分页。用于分析账号发布内容。"
     annotations(read_only_hint: true, destructive_hint: false)
 
+    ARTICLE_FIELDS = %w[id title url published_at digest content_preview].freeze
+
     input_schema(
       properties: {
         account_id: { type: "integer", description: "账号 ID" },
         start_date: { type: "string", description: "起始日期（YYYY-MM-DD）" },
         end_date: { type: "string", description: "结束日期（YYYY-MM-DD）" },
+        fields: { type: "array", items: { type: "string" }, description: "只返回指定文章字段（可选值：#{ARTICLE_FIELDS.join('、')}），不传则返回除 content_preview 外的全部字段。content_preview 较大（每篇最多 200 字），仅在需要时传入。" },
         page: { type: "integer", description: "页码（默认 1）" },
         per_page: { type: "integer", description: "每页数量（默认 25，最大 100）" },
       },
       required: ["account_id"]
     )
 
-    def self.call(server_context:, account_id:, start_date: nil, end_date: nil, page: 1, per_page: 25)
+    def self.call(server_context:, account_id:, start_date: nil, end_date: nil, fields: nil, page: 1, per_page: 25)
       account = Account.find_by(id: account_id)
 
       if account.nil?
@@ -54,6 +57,10 @@ module Tools
       page = [[page.to_i, 1].max].min
       per_page = [[per_page.to_i, 25].max, 100].min
 
+      requested_fields = fields&.map(&:to_s)&.intersection(ARTICLE_FIELDS)
+      # By default exclude content_preview to save tokens; only include when explicitly requested
+      want_content_preview = requested_fields&.include?("content_preview")
+
       articles = scope.page(page).per(per_page)
 
       result = {
@@ -68,14 +75,15 @@ module Tools
         per_page: articles.limit_value,
         total_pages: articles.total_pages,
         articles: articles.map { |a|
-          {
+          full = {
             id: a.id,
             title: a.title,
             url: a.url,
             published_at: a.published_at&.iso8601,
             digest: a.best_digest,
-            content_preview: a.clean_content_markdown&.truncate(500),
+            content_preview: want_content_preview ? a.clean_content_markdown&.truncate(200) : nil,
           }
+          requested_fields ? full.slice(*requested_fields) : full.except(:content_preview)
         }
       }
 

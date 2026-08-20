@@ -8,6 +8,7 @@ class McpController < ActionController::API
       Tools::GetAccountTool,
       Tools::ListArticlesTool,
       Tools::UpdateAccountsTool,
+      Tools::BatchUpdateAccountsByFilterTool,
       Tools::ListTagsTool,
       Tools::GetActivityStatsTool,
     ]
