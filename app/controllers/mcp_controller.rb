@@ -1,6 +1,5 @@
 class McpController < ActionController::API
   before_action :authenticate_mcp_token!
-  after_action :record_response_size
 
   # POST/GET/DELETE /mcp/endpoint
   def endpoint
@@ -60,9 +59,5 @@ class McpController < ActionController::API
   def extract_bearer_token
     header = request.headers["Authorization"]
     header&.match(/\ABearer (.+)\z/)&.captures&.first
-  end
-
-  def record_response_size
-    Current.mcp_response_size = response.body&.bytesize
   end
 end
