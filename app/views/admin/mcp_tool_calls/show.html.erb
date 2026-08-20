@@ -49,6 +49,10 @@
         <dd class="text-sm text-text-primary"><%= @mcp_tool_call.duration_ms ? "#{@mcp_tool_call.duration_ms}ms" : "—" %></dd>
       </div>
       <div>
+        <dt class="text-xs font-semibold text-text-secondary mb-1">响应大小</dt>
+        <dd class="text-sm text-text-primary"><%= @mcp_tool_call.response_size ? "#{number_to_human_size(@mcp_tool_call.response_size)} (#{@mcp_tool_call.response_size} bytes)" : "—" %></dd>
+      </div>
+      <div>
         <dt class="text-xs font-semibold text-text-secondary mb-1">IP</dt>
         <dd class="text-sm text-text-primary"><%= @mcp_tool_call.ip_address.presence || "—" %></dd>
       </div>

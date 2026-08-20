@@ -25,7 +25,8 @@ class McpToolCall < ApplicationRecord
       status:    data[:error].present? ? :error : :success,
       error_type: data[:error].present? ? data[:error].to_s : nil,
       duration_ms: data[:duration] ? (data[:duration] * 1000).round : nil,
-      ip_address: Current.mcp_ip
+      ip_address: Current.mcp_ip,
+      response_size: Current.mcp_response_size
     )
   rescue => e
     Rails.logger.error("[MCP] failed to record tool call: #{e.class}: #{e.message}")
@@ -36,7 +37,7 @@ class McpToolCall < ApplicationRecord
   end
 
   def self.ransackable_attributes(auth_object = nil)
-    %w[created_at method tool_name status user_id api_key_id ip_address error_type duration_ms]
+    %w[created_at method tool_name status user_id api_key_id ip_address error_type duration_ms response_size]
   end
 
   def self.ransackable_associations(auth_object = nil)
