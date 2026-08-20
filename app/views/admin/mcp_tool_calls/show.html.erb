@@ -1,0 +1,62 @@
+<div class="space-y-6 max-w-3xl">
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <h2 class="text-3xl font-bold text-text-primary">MCP 调用详情</h2>
+    <%= link_to admin_mcp_tool_calls_path, class: "h-10 px-5 rounded-xl bg-bg-card border border-border-primary text-text-secondary hover:border-brand hover:text-brand font-semibold text-sm transition inline-flex items-center justify-center gap-2" do %>
+      返回列表
+    <% end %>
+  </div>
+
+  <div class="bg-bg-card border border-border-primary rounded-2xl shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)] p-6 space-y-4">
+    <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+      <div>
+        <dt class="text-xs font-semibold text-text-secondary mb-1">时间</dt>
+        <dd class="text-sm text-text-primary"><%= @mcp_tool_call.created_at.strftime("%Y-%m-%d %H:%M:%S") %></dd>
+      </div>
+      <div>
+        <dt class="text-xs font-semibold text-text-secondary mb-1">状态</dt>
+        <dd>
+          <% if @mcp_tool_call.error? %>
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">失败<%= " · #{@mcp_tool_call.error_type}" if @mcp_tool_call.error_type.present? %></span>
+          <% else %>
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-teal-100 text-teal-700">成功</span>
+          <% end %>
+        </dd>
+      </div>
+      <div>
+        <dt class="text-xs font-semibold text-text-secondary mb-1">用户</dt>
+        <dd class="text-sm text-text-primary">
+          <% if @mcp_tool_call.user %>
+            <%= link_to @mcp_tool_call.user.email_address, admin_user_path(@mcp_tool_call.user), class: "text-brand hover:underline" %>
+          <% else %>
+            <span class="text-text-muted">—</span>
+          <% end %>
+        </dd>
+      </div>
+      <div>
+        <dt class="text-xs font-semibold text-text-secondary mb-1">API Key</dt>
+        <dd class="text-sm text-text-primary"><%= @mcp_tool_call.api_key&.name || "—" %></dd>
+      </div>
+      <div>
+        <dt class="text-xs font-semibold text-text-secondary mb-1">方法</dt>
+        <dd class="text-sm text-text-primary font-mono"><%= @mcp_tool_call.method %></dd>
+      </div>
+      <div>
+        <dt class="text-xs font-semibold text-text-secondary mb-1">工具 / 目标</dt>
+        <dd class="text-sm text-text-primary"><%= @mcp_tool_call.target_label %></dd>
+      </div>
+      <div>
+        <dt class="text-xs font-semibold text-text-secondary mb-1">耗时</dt>
+        <dd class="text-sm text-text-primary"><%= @mcp_tool_call.duration_ms ? "#{@mcp_tool_call.duration_ms}ms" : "—" %></dd>
+      </div>
+      <div>
+        <dt class="text-xs font-semibold text-text-secondary mb-1">IP</dt>
+        <dd class="text-sm text-text-primary"><%= @mcp_tool_call.ip_address.presence || "—" %></dd>
+      </div>
+    </dl>
+
+    <div>
+      <dt class="text-xs font-semibold text-text-secondary mb-1">调用参数</dt>
+      <pre class="bg-slate-900 text-slate-100 rounded-xl p-4 text-xs overflow-x-auto"><%= JSON.pretty_generate(@mcp_tool_call.arguments) %></pre>
+    </div>
+  </div>
+</div>

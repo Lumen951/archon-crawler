@@ -137,6 +137,8 @@ Rails.application.routes.draw do
     resource :analytics, only: [:show] do
       post :bulk_disable_dormant
     end
+
+    resources :mcp_tool_calls, only: [:index, :show]
   end
 
   get "/rss", to: "rss#index", as: :all_accounts_rss, defaults: { format: 'rss' }

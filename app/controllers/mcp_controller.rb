@@ -49,6 +49,10 @@ class McpController < ActionController::API
     end
 
     @current_user = @current_api_key.user
+
+    Current.mcp_user   = @current_user
+    Current.mcp_api_key = @current_api_key
+    Current.mcp_ip      = request.remote_ip
   end
 
   def extract_bearer_token

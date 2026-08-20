@@ -11,24 +11,21 @@ class McpToolCall < ApplicationRecord
   LOGGED_METHODS = %w[tools/call resources/read prompts/get].freeze
 
   # Persist one tool call from the MCP gem's instrumentation data.
+  # Reads the authenticated user/api key/IP from Current (set by McpController).
+  # Rescue-guarded so a logging failure never breaks the MCP response itself.
   def self.record!(data)
     arguments = data[:tool_arguments].presence || {}
 
-    # Try to get user context from Current or server_context
-    user = defined?(Current) && Current.respond_to?(:mcp_user) ? Current.mcp_user : nil
-    api_key = defined?(Current) && Current.respond_to?(:mcp_api_key) ? Current.mcp_api_key : nil
-    ip = defined?(Current) && Current.respond_to?(:mcp_ip) ? Current.mcp_ip : nil
-
     create!(
-      user: user,
-      api_key: api_key,
-      method: data[:method],
+      user:      Current.mcp_user,
+      api_key:   Current.mcp_api_key,
+      method:    data[:method],
       tool_name: data[:tool_name],
       arguments: arguments,
-      status: data[:error].present? ? :error : :success,
+      status:    data[:error].present? ? :error : :success,
       error_type: data[:error].present? ? data[:error].to_s : nil,
       duration_ms: data[:duration] ? (data[:duration] * 1000).round : nil,
-      ip_address: ip
+      ip_address: Current.mcp_ip
     )
   rescue => e
     Rails.logger.error("[MCP] failed to record tool call: #{e.class}: #{e.message}")

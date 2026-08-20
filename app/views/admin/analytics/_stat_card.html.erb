@@ -1,0 +1,22 @@
+<%
+  color_map = {
+    "blue"   => { bg: "bg-blue-50",   icon: "text-blue-500",   val: "text-blue-700"   },
+    "green"  => { bg: "bg-green-50",  icon: "text-green-500",  val: "text-green-700"  },
+    "teal"   => { bg: "bg-teal-50",   icon: "text-teal-500",   val: "text-teal-700"   },
+    "indigo" => { bg: "bg-indigo-50", icon: "text-indigo-500", val: "text-indigo-700" },
+    "violet" => { bg: "bg-violet-50", icon: "text-violet-500", val: "text-violet-700" },
+    "amber"  => { bg: "bg-amber-50",  icon: "text-amber-500",  val: "text-amber-700"  },
+    "red"    => { bg: "bg-red-50",    icon: "text-red-500",    val: "text-red-700"    },
+    "slate"  => { bg: "bg-bg-secondary", icon: "text-text-secondary", val: "text-text-primary" },
+  }
+  c = color_map[color] || color_map["slate"]
+%>
+<div class="bg-bg-card border border-border-primary rounded-2xl p-5 flex items-center gap-4 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+  <div class="w-10 h-10 rounded-xl <%= c[:bg] %> flex items-center justify-center shrink-0">
+    <i class="fas <%= icon %> <%= c[:icon] %>"></i>
+  </div>
+  <div class="min-w-0">
+    <p class="text-xs text-text-secondary truncate"><%= label %></p>
+    <p class="text-2xl font-bold <%= c[:val] %> leading-tight"><%= value %></p>
+  </div>
+</div>

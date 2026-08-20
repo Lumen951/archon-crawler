@@ -91,4 +91,12 @@ class User < ApplicationRecord
   def oauth_only?
     password_digest.blank? && mp_id.present?
   end
+
+  def self.ransackable_attributes(auth_object = nil)
+    %w[email_address name role created_at last_login_at]
+  end
+
+  def self.ransackable_associations(auth_object = nil)
+    %w[]
+  end
 end
