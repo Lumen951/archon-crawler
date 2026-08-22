@@ -123,28 +123,46 @@ class AccountsController < ApplicationController
   end
 
   def import_wechat_by_url
-    url = params[:article_url].to_s.strip
+    urls = params[:article_urls].to_s.split(/\r?\n/).map(&:strip).reject(&:blank?).uniq
 
-    if url.blank?
-      flash[:error] = "请输入微信公众号文章链接"
+    if urls.empty?
+      flash[:error] = "请输入至少一个微信公众号文章链接（每行一个）"
       redirect_to import_wechat_page_accounts_path and return
     end
 
-    result = AccountResolver.resolve_wechat_by_url(url)
+    created = []
+    found = []
+    errors = []
 
-    case result.status
-    when "created"
-      account = result.accounts.first
-      flash[:success] = "成功导入公众号：#{account.nickname}（mpId: #{account.weread_mp_id}）"
-      redirect_to account_path(account)
-    when "found"
-      account = result.accounts.first
-      flash[:success] = "该公众号已存在：#{account.nickname}（已更新 WeRead mpId）"
-      redirect_to account_path(account)
-    else
-      flash[:error] = truncate_error(result.error || "导入失败")
-      redirect_to import_wechat_page_accounts_path
+    urls.each do |url|
+      result = AccountResolver.resolve_wechat_by_url(url)
+      case result.status
+      when "created"
+        account = result.account
+        created << "#{account.nickname}（mpId: #{account.weread_mp_id}）"
+      when "found"
+        account = result.account
+        found << account.nickname
+      else
+        errors << (result.error.presence || "导入失败")
+      end
     end
+
+    if created.any? || found.any?
+      parts = []
+      parts << "成功导入 #{created.size} 个公众号" if created.any?
+      parts << "#{found.size} 个公众号已存在" if found.any?
+      message = parts.join("，")
+      if errors.any?
+        flash[:warning] = truncate_error("#{message}；#{errors.size} 个链接解析失败（#{errors.first}）")
+      else
+        flash[:success] = message
+      end
+    else
+      flash[:error] = truncate_error(errors.first || "导入失败")
+    end
+
+    redirect_to accounts_path
   rescue ArgumentError => e
     flash[:error] = truncate_error(e.message)
     redirect_to import_wechat_page_accounts_path
