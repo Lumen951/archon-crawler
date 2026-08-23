@@ -68,26 +68,33 @@ class AccountTest < ActiveSupport::TestCase
     end
   end
 
-  def test_activity_crawl_progress_computes_coverage
+  def test_activity_crawl_progress_computes_due_backlog
     prefix = "progress_test_"
+    # uncrawled: never crawled → always due
     create_account(prefix, "uncrawled", last_crawled_at: nil, total_articles: 0, last_published_at: nil)
-    create_account(prefix, "never", last_crawled_at: 2.days.ago, total_articles: 0, last_published_at: nil)
-    create_account(prefix, "active", last_crawled_at: 1.day.ago, total_articles: 3, last_published_at: 1.day.ago)
+    # never: crawled but no articles, next crawl scheduled in the future → not due
+    never = create_account(prefix, "never", last_crawled_at: 2.days.ago, total_articles: 0, last_published_at: nil)
+    never.update_column(:next_crawl_at, 10.days.from_now)
+    # active: crawled, next crawl scheduled in the future → not due
+    active = create_account(prefix, "active", last_crawled_at: 1.day.ago, total_articles: 3, last_published_at: 1.day.ago)
+    active.update_column(:next_crawl_at, 1.hour.from_now)
 
     progress = Account.activity_crawl_progress(Account.where("fakeid LIKE ?", "#{prefix}%"))
                  .index_by { |row| row[:key] }
 
     assert_equal 1, progress[:uncrawled][:total]
     assert_equal 0, progress[:uncrawled][:crawled]
-    assert_equal 0, progress[:uncrawled][:pct]
     assert_equal 1, progress[:uncrawled][:due], "uncrawled active accounts are always due"
+    assert_equal 0, progress[:uncrawled][:pct], "all due → 0% caught up"
 
     assert_equal 1, progress[:never][:total]
     assert_equal 1, progress[:never][:crawled]
-    assert_equal 100, progress[:never][:pct]
+    assert_equal 0, progress[:never][:due]
+    assert_equal 100, progress[:never][:pct], "none due → 100% caught up"
 
     assert_equal 1, progress[:active][:total]
     assert_equal 1, progress[:active][:crawled]
+    assert_equal 0, progress[:active][:due]
     assert_equal 100, progress[:active][:pct]
   end
 

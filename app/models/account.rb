@@ -269,11 +269,11 @@ class Account < ApplicationRecord
     end
   end
 
-  # Per-tier crawl coverage for the activity analytics page. Each entry has:
+  # Per-tier crawl progress for the activity analytics page. Each entry has:
   #   total   — accounts in this activity tier
   #   crawled — accounts crawled at least once
   #   due     — active accounts currently due for crawl
-  #   pct     — crawled/total percentage (0 when the tier is empty)
+  #   pct     — share of accounts not due for crawl: (total - due)/total
   #
   # Accepts a base scope so callers can restrict the analysis (e.g. by platform).
   def self.activity_crawl_progress(base_scope = all)
@@ -287,7 +287,7 @@ class Account < ApplicationRecord
         total: total,
         crawled: crawled,
         due: due,
-        pct: total.zero? ? 0 : (crawled.to_f / total * 100).round,
+        pct: total.zero? ? 0 : ((total - due).to_f / total * 100).round,
       }
     end
   end
