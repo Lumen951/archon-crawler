@@ -1,0 +1,30 @@
+<div class="bg-bg-card border border-border-primary rounded-2xl p-5 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+  <h3 class="text-sm font-semibold text-text-primary mb-4">新增帐号（按平台）</h3>
+  <% platforms = @new_accounts.values.flat_map(&:keys).uniq %>
+  <% periods = { yesterday: "昨天", last_week: "最近一周", last_month: "最近一个月" } %>
+  <div class="overflow-x-auto">
+    <table class="min-w-full divide-y divide-border-primary">
+      <thead class="bg-bg-secondary">
+        <tr>
+          <th class="px-4 py-2 text-left text-xs font-semibold text-text-secondary uppercase">时间范围</th>
+          <% platforms.each do |platform| %>
+            <th class="px-4 py-2 text-right text-xs font-semibold text-text-secondary uppercase"><%= platform %></th>
+          <% end %>
+          <th class="px-4 py-2 text-right text-xs font-semibold text-text-secondary uppercase">合计</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-border-primary">
+        <% periods.each do |key, label| %>
+          <% data = @new_accounts[key] || {} %>
+          <tr class="hover:bg-bg-secondary transition">
+            <td class="px-4 py-2 text-sm font-medium text-text-primary whitespace-nowrap"><%= label %></td>
+            <% platforms.each do |platform| %>
+              <td class="px-4 py-2 text-sm text-right text-text-primary"><%= data[platform].to_i %></td>
+            <% end %>
+            <td class="px-4 py-2 text-sm text-right font-semibold text-text-primary"><%= data.values.sum %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+</div>

@@ -27,6 +27,12 @@ class Admin::AnalyticsController < Admin::BaseController
     @dormant_attention = Account.needs_attention
       .order(:last_published_at)
       .limit(30)
+    @new_accounts = {
+      yesterday: Account.new_accounts_by_platform(Date.yesterday.beginning_of_day),
+      last_week: Account.new_accounts_by_platform(7.days.ago),
+      last_month: Account.new_accounts_by_platform(30.days.ago),
+    }
+    @crawl_progress = Account.activity_crawl_progress
     @daily_articles = Article
       .where("published_at >= ?", 30.days.ago)
       .group("DATE(published_at)")

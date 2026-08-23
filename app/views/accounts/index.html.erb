@@ -79,13 +79,44 @@
     ["从未发布", "never"],
     ["从未抓取", "uncrawled"],
   ] %>
+  <% progress_by_level = @crawl_progress.index_by { |r| r[:key] } %>
+  <% overall = {
+       total: @crawl_progress.sum { |r| r[:total] },
+       crawled: @crawl_progress.sum { |r| r[:crawled] },
+       due: @crawl_progress.sum { |r| r[:due] },
+     } %>
+  <% overall[:pct] = overall[:total].zero? ? 0 : (overall[:crawled].to_f / overall[:total] * 100).round %>
   <div class="bg-bg-card border border-border-primary rounded-2xl p-4 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
     <div class="flex flex-wrap gap-2">
       <% activity_q = (params[:q] || {}).respond_to?(:to_unsafe_h) ? params[:q].to_unsafe_h.except("by_activity_level") : (params[:q] || {}).except("by_activity_level") %>
       <% @active_activity_level ||= params.dig(:q, :by_activity_level).to_s.presence %>
-      <% activity_levels.each do |label, level| %>
-        <%= link_to label, accounts_path(q: activity_q.merge(by_activity_level: level)),
-            class: "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition #{@active_activity_level == level.to_s ? 'bg-brand text-white' : 'bg-bg-secondary text-text-secondary hover:bg-brand hover:text-white'}" %>
+      <% activity_levels.each_with_index do |(label, level), i| %>
+        <% data = level == "all" ? overall : progress_by_level[level.to_sym] %>
+        <% tooltip_align = if i == 0
+             "left-0"
+           elsif i == activity_levels.length - 1
+             "right-0"
+           else
+             "left-1/2 -translate-x-1/2"
+           end %>
+        <div class="relative group">
+          <%= link_to label, accounts_path(q: activity_q.merge(by_activity_level: level)),
+              class: "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition #{@active_activity_level == level.to_s ? 'bg-brand text-white' : 'bg-bg-secondary text-text-secondary hover:bg-brand hover:text-white'}" %>
+          <% if data %>
+            <div class="pointer-events-none absolute top-full mt-2 z-50 w-44 bg-bg-card border border-border-primary rounded-xl shadow-lg p-2.5 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity duration-150 <%= tooltip_align %>">
+              <div class="flex items-center justify-between text-xs mb-1">
+                <span class="text-text-secondary">已抓取 <%= data[:crawled] %>/<%= data[:total] %></span>
+                <span class="font-semibold text-text-primary"><%= data[:pct] %>%</span>
+              </div>
+              <div class="bg-bg-secondary rounded-full h-1.5 overflow-hidden mb-1.5">
+                <% if data[:pct] > 0 %>
+                  <div class="h-full bg-brand rounded-full" style="width: <%= data[:pct] %>%"></div>
+                <% end %>
+              </div>
+              <div class="text-xs <%= data[:due] > 0 ? 'text-brand font-semibold' : 'text-text-muted' %>"><%= data[:due] %> 待抓取</div>
+            </div>
+          <% end %>
+        </div>
       <% end %>
     </div>
   </div>

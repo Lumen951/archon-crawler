@@ -260,6 +260,38 @@ class Account < ApplicationRecord
     end
   end
 
+  # === Analytics ===
+
+  # Newly-created accounts since `since`, keyed by platform display name.
+  def self.new_accounts_by_platform(since)
+    platform_classes.each_with_object({}) do |klass, hash|
+      hash[klass.new.platform_name] = klass.where("created_at >= ?", since).count
+    end
+  end
+
+  # Per-tier crawl coverage for the activity analytics page. Each entry has:
+  #   total   — accounts in this activity tier
+  #   crawled — accounts crawled at least once
+  #   due     — active accounts currently due for crawl
+  #   pct     — crawled/total percentage (0 when the tier is empty)
+  #
+  # Accepts a base scope so callers can restrict the analysis (e.g. by platform).
+  def self.activity_crawl_progress(base_scope = all)
+    %w[active slow dormant dead never uncrawled].map do |tier|
+      scope = base_scope.by_activity_level(tier)
+      total = scope.count
+      crawled = scope.where.not(last_crawled_at: nil).count
+      due = scope.active.due_for_crawl.count
+      {
+        key: tier.to_sym,
+        total: total,
+        crawled: crawled,
+        due: due,
+        pct: total.zero? ? 0 : (crawled.to_f / total * 100).round,
+      }
+    end
+  end
+
   def self.ransackable_attributes(auth_object = nil)
     %w[nickname fakeid status type last_published_at activity_score
        articles_last_7_days articles_last_30_days total_articles]

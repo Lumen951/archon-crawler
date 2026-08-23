@@ -55,6 +55,42 @@ class AccountTest < ActiveSupport::TestCase
     assert_equal scoped.count, expected.values.flatten.size
   end
 
+  def test_new_accounts_by_platform_counts_recent_creations
+    travel_to Time.zone.local(2026, 8, 23, 12, 0, 0) do
+      base = Account.new_accounts_by_platform(7.days.ago)
+
+      account = Account.create!(type: "WechatAccount", nickname: "growth test", fakeid: "growth_test_1", status: :active)
+      account.update_column(:created_at, 3.days.ago)
+
+      after = Account.new_accounts_by_platform(7.days.ago)
+      assert_equal base["微信公众号"] + 1, after["微信公众号"],
+                   "an account created 3 days ago should be counted in the last-7-days window"
+    end
+  end
+
+  def test_activity_crawl_progress_computes_coverage
+    prefix = "progress_test_"
+    create_account(prefix, "uncrawled", last_crawled_at: nil, total_articles: 0, last_published_at: nil)
+    create_account(prefix, "never", last_crawled_at: 2.days.ago, total_articles: 0, last_published_at: nil)
+    create_account(prefix, "active", last_crawled_at: 1.day.ago, total_articles: 3, last_published_at: 1.day.ago)
+
+    progress = Account.activity_crawl_progress(Account.where("fakeid LIKE ?", "#{prefix}%"))
+                 .index_by { |row| row[:key] }
+
+    assert_equal 1, progress[:uncrawled][:total]
+    assert_equal 0, progress[:uncrawled][:crawled]
+    assert_equal 0, progress[:uncrawled][:pct]
+    assert_equal 1, progress[:uncrawled][:due], "uncrawled active accounts are always due"
+
+    assert_equal 1, progress[:never][:total]
+    assert_equal 1, progress[:never][:crawled]
+    assert_equal 100, progress[:never][:pct]
+
+    assert_equal 1, progress[:active][:total]
+    assert_equal 1, progress[:active][:crawled]
+    assert_equal 100, progress[:active][:pct]
+  end
+
   private
 
   def create_account(prefix, slug, last_crawled_at:, total_articles:, last_published_at:)

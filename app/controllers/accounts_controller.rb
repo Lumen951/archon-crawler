@@ -16,6 +16,7 @@ class AccountsController < ApplicationController
     @active_tag = @active_tag_id.present? && @active_tag_id != "none" ? Tag.find_by(id: @active_tag_id) : nil
     @total_filtered_count = @accounts.total_count
     @due_for_crawl_count = @q.result.due_for_crawl.count
+    @crawl_progress = Account.activity_crawl_progress
   end
 
   def show
