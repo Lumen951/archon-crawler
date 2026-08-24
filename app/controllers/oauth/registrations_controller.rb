@@ -76,10 +76,17 @@ module Oauth
 
     # Ignore anything outside the scopes this server actually understands rather
     # than failing registration: clients routinely ask for a broader set.
+    #
+    # RFC 7591 §2 lets a client omit `scope` and leave the registered set to the
+    # server — ChatGPT's connector registration does exactly that. It then asks
+    # for everything in `scopes_supported` at /oauth/authorize, so registering
+    # only the read scope would strand it on invalid_scope. Doorkeeper treats the
+    # application's scopes as a ceiling, not a grant; the consent screen is where
+    # the user actually decides.
     def requested_scopes
       requested = params[:scope].to_s.split(/\s+/)
       allowed = requested & McpOauth::SCOPES
-      allowed.presence || [ McpOauth::READ_SCOPE ]
+      allowed.presence || McpOauth::SCOPES
     end
 
     def confidential?

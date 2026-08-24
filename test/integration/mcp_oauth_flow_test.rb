@@ -102,6 +102,27 @@ class McpOauthFlowTest < ActionDispatch::IntegrationTest
     assert_equal "client_secret_post", body["token_endpoint_auth_method"]
   end
 
+  # ChatGPT's connector registration omits `scope` entirely and then asks for
+  # every advertised scope at /oauth/authorize. Registering it read-only used to
+  # make that authorization request fail with invalid_scope.
+  test "a client that omits scope at registration is registered for every advertised scope" do
+    body = register_client(scope: nil)
+
+    assert_response :created
+    assert_equal "mcp:read mcp:write", body["scope"]
+  end
+
+  test "a client that omits scope at registration can still authorize for write" do
+    client = register_client(scope: nil)
+    verifier = SecureRandom.urlsafe_base64(64)
+    sign_in
+
+    get "/oauth/authorize", params: authorize_params(client, verifier)
+
+    assert_response :success
+    assert_match "授权 MCP 客户端", response.body
+  end
+
   test "dynamic client registration refuses plain http outside loopback" do
     register_client(redirect_uris: [ "http://evil.example.com/callback" ])
 
