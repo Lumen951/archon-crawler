@@ -112,11 +112,17 @@ class FeishuLoginReminderJobTest < ActiveSupport::TestCase
     assert_nothing_raised { FeishuLoginReminderJob.perform_now("nope") }
   end
 
-  test "recurring schedule wires both platforms to this job" do
+  # wechat_mp is deliberately left out of the daily schedule (8ec0da9); it stays
+  # commented out in recurring.yml rather than deleted. So don't pin the exact
+  # set of platforms here — what must hold is that every key we do schedule
+  # resolves to a real QrLogin provider, since a typo would only surface as a
+  # silent no-op at 9:30am.
+  test "recurring schedule only wires platform keys this job understands" do
     schedule = YAML.load_file(Rails.root.join("config/recurring.yml"))
     entries = schedule["production"].values.select { |e| e["class"] == "FeishuLoginReminderJob" }
+    platform_keys = entries.flat_map { |e| e["args"] }
 
-    assert_equal %w[weread wechat_mp].sort, entries.flat_map { |e| e["args"] }.sort
-    entries.each { |e| assert_nothing_raised { QrLogin.find(e["args"].first) } }
+    assert_includes platform_keys, "weread"
+    platform_keys.each { |key| assert_nothing_raised { QrLogin.find(key) } }
   end
 end
