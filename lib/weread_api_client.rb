@@ -320,7 +320,7 @@ class WereadApiClient
     raise ApiError, "检查登录状态失败: #{e.message}"
   end
 
-  # 保存登录结果到账号池（控制器 weread_qrcode_status 与每日 Job 共用）
+  # 保存登录结果到账号池（QrLogin::Weread / MCP 登录工具 / rake 任务共用）
   def self.save_login_result(data)
     vid = data["vid"].to_s
     token = data["token"].to_s

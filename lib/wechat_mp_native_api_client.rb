@@ -12,13 +12,14 @@ require 'crawler_api_key_error'
 #   download_content(url, ...) → html string
 #   validate_key → bool
 #
-# 额外提供 QR 码登录功能:
-#   request_qr_code → { qr_url:, uuid:, image_path: }
-#   check_qr_status(uuid) → { status:, ... }
+# 额外提供 QR 码登录功能（纯传输层，落库由 QrLogin::WechatMp 负责）:
+#   request_qr_code → { qr_url:, uuid:, image_path:, image_bytes:, cookie_jar: }
+#   check_qr_status(uuid, cookie_jar) → { status:, cookie_jar:, cookie_str:, token:, ... }
 #
 # 认证方式:
 #   1. 通过 QR 码扫码登录获取 Cookie + Token
-#   2. Cookie/Token 持久化在 Option 表中
+#   2. Cookie/Token 由 Option.wechat_mp_session_started! 持久化在 Option 表中
+#      （有效期见 Option::WECHAT_MP_SESSION_TTL）
 #   3. 每次请求携带 Cookie 和 Token
 #
 # 文章列表: 多端点降级 (free_publish → publish → appmsgpublish → appmsg)
@@ -120,34 +121,26 @@ class WechatMpNativeApiClient
   end
 
   # ── QR Code Login ──────────────────────────────────────
+  #
+  # 登录过程中累积的 cookie 放在调用方持有的 jar（普通 Hash）里，逐层显式传递。
+  # 不使用类级状态：设置页与飞书卡片可能同时有多个登录流程在跑，共享 ivar 会互相污染。
 
-  # Cookie jar for accumulating cookies during login flow
-  @login_cookie_jar = {}
-
-  class << self
-    attr_accessor :login_cookie_jar
-  end
-
-  # Accumulate Set-Cookie from a Faraday response into the cookie jar
-  def self.merge_response_cookies!(resp)
+  # Accumulate Set-Cookie from a Faraday response into the given cookie jar
+  def self.merge_response_cookies!(jar, resp)
     set_cookie = resp.headers["set-cookie"]
-    return unless set_cookie
-    cookies = parse_set_cookie(set_cookie)
-    @login_cookie_jar.merge!(cookies)
+    return jar unless set_cookie
+    jar.merge!(parse_set_cookie(set_cookie))
   end
 
-  # Build a Cookie header string from the current cookie jar
-  def self.build_cookie_header
-    @login_cookie_jar.map { |k, v| "#{k}=#{v}" }.join("; ")
+  # Build a Cookie header string from a cookie jar
+  def self.build_cookie_header(jar)
+    jar.map { |k, v| "#{k}=#{v}" }.join("; ")
   end
 
   # Step 1: Request a QR code for login
-  # Returns { qr_url:, uuid:, image_path:, cookie_jar: }
+  # Returns { qr_url:, uuid:, image_path:, png_bytes:, cookie_jar: }
   def self.request_qr_code
-    # Reset state
-    @login_connection = nil
-    @login_cookie_jar = {}
-
+    jar = {}
     conn = login_connection
 
     # Visit login page with browser-like headers to get proper cookies + QR info
@@ -159,12 +152,12 @@ class WechatMpNativeApiClient
 
     resp = conn.get("/", {}, login_headers)
     raise ApiError, "访问登录页面失败: HTTP #{resp.status}" unless resp.status == 200
-    merge_response_cookies!(resp)
+    merge_response_cookies!(jar, resp)
 
     html = resp.body.to_s.force_encoding("UTF-8")
 
     # Log a snippet for debugging
-    Rails.logger.info("[MP Native] Login page body length: #{html.length}, cookies so far: #{@login_cookie_jar.keys.join(', ')}")
+    Rails.logger.info("[MP Native] Login page body length: #{html.length}, cookies so far: #{jar.keys.join(', ')}")
 
     # Extract QR code URL and UUID from the login page
     # Pattern 1: Absolute URL in page source
@@ -183,9 +176,9 @@ class WechatMpNativeApiClient
 
       # Step 1: start_login — register UUID with the server
       uuid = SecureRandom.uuid.delete("-")
-      @login_cookie_jar["uuid"] = uuid  # Set uuid cookie
+      jar["uuid"] = uuid  # Set uuid cookie
       fingerprint = SecureRandom.uuid.delete("-")
-      token_str = @login_cookie_jar["token"] || ""
+      token_str = jar["token"] || ""
 
       startlogin_url = "#{BASE_URL}/cgi-bin/bizlogin?action=startlogin"
       startlogin_data = {
@@ -202,16 +195,16 @@ class WechatMpNativeApiClient
         "User-Agent" => USER_AGENTS.first,
         "Accept" => "application/json, text/plain, */*",
         "Referer" => "#{BASE_URL}/",
-        "Cookie" => build_cookie_header,
+        "Cookie" => build_cookie_header(jar),
         "X-Requested-With" => "XMLHttpRequest",
       }
 
       begin
         start_resp = conn.post(startlogin_url, startlogin_data, startlogin_headers)
-        merge_response_cookies!(start_resp)
+        merge_response_cookies!(jar, start_resp)
         Rails.logger.info("[MP Native] startlogin response: HTTP #{start_resp.status}, body=#{start_resp.body.to_s[0..200]}")
         # Server may return uuid in response cookies
-        server_uuid = @login_cookie_jar["uuid"]
+        server_uuid = jar["uuid"]
         uuid = server_uuid if server_uuid.present?
       rescue StandardError => e
         Rails.logger.warn("[MP Native] startlogin failed: #{e.message}")
@@ -223,7 +216,7 @@ class WechatMpNativeApiClient
     end
 
     # Download QR code image with browser-like headers
-    cookie_header = build_cookie_header
+    cookie_header = build_cookie_header(jar)
     qr_headers = {
       "User-Agent" => USER_AGENTS.first,
       "Accept" => "image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
@@ -252,7 +245,7 @@ class WechatMpNativeApiClient
     end
 
     raise ApiError, "下载二维码失败: HTTP #{qr_image_resp.status}" unless qr_image_resp.status == 200
-    merge_response_cookies!(qr_image_resp)
+    merge_response_cookies!(jar, qr_image_resp)
 
     # Verify the response is actually an image and detect format
     img_body = qr_image_resp.body.to_s
@@ -291,7 +284,9 @@ class WechatMpNativeApiClient
       qr_url: qr_url,
       uuid: uuid,
       image_path: "/wechat_qr/wx_qrcode_#{uuid}.#{ext}",
-      cookie_jar: @login_cookie_jar.dup
+      image_bytes: img_body,
+      image_ext: ext,
+      cookie_jar: jar
     }
   rescue StandardError => e
     Rails.logger.error("[MP Native] request_qr_code error: #{e.message}")
@@ -299,15 +294,20 @@ class WechatMpNativeApiClient
   end
 
   # Step 2: Check QR code scan status
-  # Returns { status:, cookies:, token:, message: }
+  #
+  # 纯传输层：只返回登录结果，不写 Option —— 落库由 QrLogin::WechatMp#save_success!
+  # 统一调 Option.wechat_mp_session_started! 完成（有效期只在 Option 里定义一份）。
+  #
+  # Returns { status:, message:, cookie_jar:（合并新 Set-Cookie 后的 jar，调用方须回存）,
+  #           cookie_str:, token:, account_info: }
   # status: "waiting" | "scanned" | "success" | "expired" | "error"
   def self.check_qr_status(uuid, saved_cookie_jar = nil)
     conn = login_connection
 
     # Restore cookie jar from saved state
-    @login_cookie_jar = (saved_cookie_jar || {}).dup
+    jar = (saved_cookie_jar || {}).dup
 
-    cookie_header = build_cookie_header
+    cookie_header = build_cookie_header(jar)
     check_url = "#{BASE_URL}/cgi-bin/scanloginqrcode"
     params = {
       action: "ask",
@@ -327,7 +327,7 @@ class WechatMpNativeApiClient
 
     resp = conn.get(check_url, params, check_headers)
     raise ApiError, "检查登录状态失败: HTTP #{resp.status}" unless resp.status == 200
-    merge_response_cookies!(resp)
+    merge_response_cookies!(jar, resp)
 
     data = begin
       JSON.parse(resp.body)
@@ -351,23 +351,16 @@ class WechatMpNativeApiClient
              else "waiting"
              end
 
-    result = { status: status, message: data["message"] || "" }
+    result = { status: status, message: data["message"] || "", cookie_jar: jar }
 
     if status == "success"
       redirect_url = data["userinfo"] || ""
-      login_result = complete_login(conn, redirect_url)
+      login_result = complete_login(conn, jar, redirect_url)
       if login_result && login_result[:token].present? && login_result[:cookie_str].present?
-        result[:cookies] = login_result[:cookies]
         result[:token] = login_result[:token]
         result[:cookie_str] = login_result[:cookie_str]
         result[:account_info] = login_result[:account_info]
-
-        # Persist session
-        Option.wechat_mp_cookie = result[:cookie_str]
-        Option.wechat_mp_token = result[:token]
-        Option.wechat_mp_login_state = "success"
-        Option.wechat_mp_expires_at = (Time.current + 4.days).iso8601
-        Option.wechat_mp_account_info = result[:account_info].to_json
+        result[:cookie_jar] = jar
 
         Rails.logger.info("[MP Native] Login successful, token=#{result[:token]&.slice(0, 8)}...")
       else
@@ -391,9 +384,9 @@ class WechatMpNativeApiClient
   end
 
   # Complete login after QR scan — call bizlogin?action=login
-  def self.complete_login(conn, redirect_url = "")
+  def self.complete_login(conn, jar, redirect_url = "")
     fingerprint = SecureRandom.uuid.delete("-")
-    cookie_header = build_cookie_header
+    cookie_header = build_cookie_header(jar)
 
     login_data = {
       userlang: "zh_CN",
@@ -419,15 +412,15 @@ class WechatMpNativeApiClient
 
     resp = conn.post("#{BASE_URL}/cgi-bin/bizlogin?action=login", login_data, login_headers)
     return nil unless resp.status == 200
-    merge_response_cookies!(resp)
+    merge_response_cookies!(jar, resp)
 
     # Extract token from response or cookies
     token_match = resp.body.to_s.match(/token=([^&\s"']+)/)
     token = token_match ? token_match[1] : nil
-    token ||= @login_cookie_jar["token"]
+    token ||= jar["token"]
 
     # Build final cookie string
-    cookie_str = build_cookie_header
+    cookie_str = build_cookie_header(jar)
 
     # Try to get account info
     account_info = {}
@@ -438,7 +431,7 @@ class WechatMpNativeApiClient
         "Cookie" => cookie_str,
       }
       home_resp = conn.get("#{BASE_URL}/cgi-bin/home?t=home/index&lang=zh_CN&token=#{token}", {}, home_headers)
-      merge_response_cookies!(home_resp) if home_resp.status == 200
+      merge_response_cookies!(jar, home_resp) if home_resp.status == 200
       name_match = home_resp.body.to_s.match(/nick_name\s*=\s*["']([^"']+)["']/)
       account_info[:nickname] = name_match[1] if name_match
     rescue StandardError => e
@@ -446,9 +439,9 @@ class WechatMpNativeApiClient
     end
 
     # Update cookie string with any new cookies from home page
-    cookie_str = build_cookie_header
+    cookie_str = build_cookie_header(jar)
 
-    { cookies: @login_cookie_jar.dup, cookie_str: cookie_str, token: token, account_info: account_info }
+    { cookie_str: cookie_str, token: token, account_info: account_info }
   rescue StandardError => e
     Rails.logger.error("[MP Native] complete_login error: #{e.message}")
     nil
@@ -779,11 +772,7 @@ class WechatMpNativeApiClient
   end
 
   def self.logout
-    Option.wechat_mp_cookie = nil
-    Option.wechat_mp_token = nil
-    Option.wechat_mp_expires_at = nil
-    Option.wechat_mp_login_state = nil
-    Option.wechat_mp_account_info = nil
+    Option.wechat_mp_session_cleared!
 
     # Clean up QR code images
     qr_dir = Rails.root.join("public", "wechat_qr")

@@ -1,6 +1,14 @@
 class Option < ApplicationRecord
   self.table_name = 'options'
 
+  # 微信公众号平台（mp_native）扫码登录会话的有效期。
+  #
+  # 这是「有效期」的唯一定义处：api_client 落库、设置页文案、README 均以此为准。
+  # 注意它只是本地时间戳启发式——微信可能提前作废会话，真正的权威是
+  # WechatMpNativeApiClient.validate_session 的实时探测（每日由
+  # FeishuLoginReminderJob 体检）。
+  WECHAT_MP_SESSION_TTL = 4.days
+
   validates :opt_key, presence: true, uniqueness: true
 
   class << self
@@ -166,6 +174,35 @@ class Option < ApplicationRecord
       set('wechat_mp_account_info', val)
     end
 
+    # 有效期的中文文案，视图与飞书文案共用，避免各处再硬编码一份数字
+    def wechat_mp_session_ttl_label
+      ttl = WECHAT_MP_SESSION_TTL
+      ttl < 1.day ? "约 #{(ttl / 1.hour).to_i} 小时" : "约 #{(ttl / 1.day).to_i} 天"
+    end
+
+    # 扫码登录成功后一次性写入整套会话字段（含按 WECHAT_MP_SESSION_TTL 计算的过期时间）。
+    # api_client 只负责拿到凭据，落库统一走这里。
+    def wechat_mp_session_started!(cookie:, token:, account_info: {})
+      transaction do
+        self.wechat_mp_cookie = cookie
+        self.wechat_mp_token = token
+        self.wechat_mp_login_state = "success"
+        self.wechat_mp_expires_at = (Time.current + WECHAT_MP_SESSION_TTL).iso8601
+        self.wechat_mp_account_info = account_info.to_json
+      end
+    end
+
+    # 退出登录 / 会话作废时清空整套字段
+    def wechat_mp_session_cleared!
+      transaction do
+        self.wechat_mp_cookie = nil
+        self.wechat_mp_token = nil
+        self.wechat_mp_login_state = nil
+        self.wechat_mp_expires_at = nil
+        self.wechat_mp_account_info = nil
+      end
+    end
+
     def wechat_mp_session_valid?
       cookie = wechat_mp_cookie
       token = wechat_mp_token
@@ -307,13 +344,19 @@ class Option < ApplicationRecord
       set("feishu_encrypt_key", val)
     end
 
-    # 飞书微信读书登录方式：qr（推一张二维码到群，默认）/ card（发交互卡片，成员点击后私聊各自二维码）
-    def feishu_weread_login_mode
-      get("feishu_weread_login_mode") || "qr"
+    # 飞书扫码登录推送方式，微信读书与微信公众号平台共用：
+    #   qr（推一张二维码到目标会话，默认）/ card（发交互卡片，成员点击后私聊各自二维码）
+    # 读取时回退到旧 key feishu_weread_login_mode，历史配置无需迁移。
+    def feishu_login_mode
+      get("feishu_login_mode") || get("feishu_weread_login_mode") || "qr"
     end
 
-    def feishu_weread_login_mode=(val)
-      set("feishu_weread_login_mode", val)
+    def feishu_login_mode=(val)
+      set("feishu_login_mode", val)
+    end
+
+    def feishu_login_card_mode?
+      feishu_login_mode == "card"
     end
 
     def profile_ext_credentials_age_minutes

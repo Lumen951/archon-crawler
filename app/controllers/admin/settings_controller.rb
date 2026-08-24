@@ -48,7 +48,7 @@ class Admin::SettingsController < Admin::BaseController
     @feishu_receive_id = Option.feishu_receive_id
     @feishu_receive_id_type = Option.feishu_receive_id_type
     @feishu_encrypt_key = Option.feishu_encrypt_key
-    @feishu_weread_login_mode = Option.feishu_weread_login_mode
+    @feishu_login_mode = Option.feishu_login_mode
     @feishu_callback_url = build_feishu_callback_url
   end
 
@@ -193,9 +193,9 @@ class Admin::SettingsController < Admin::BaseController
       message = "飞书推送配置更新成功"
     end
 
-    if params.key?(:feishu_weread_login_mode)
-      Option.feishu_weread_login_mode = params[:feishu_weread_login_mode] == "card" ? "card" : "qr"
-      message = "飞书微信读书登录方式已更新"
+    if params.key?(:feishu_login_mode)
+      Option.feishu_login_mode = params[:feishu_login_mode] == "card" ? "card" : "qr"
+      message = "飞书扫码登录推送方式已更新"
     end
 
     respond_to do |format|
@@ -311,50 +311,64 @@ class Admin::SettingsController < Admin::BaseController
     end
   end
 
-  # ── MP Native QR Code Login ──────────────────────────
+  # ── 扫码登录（微信读书 / 微信公众号平台共用）──────────
+  #
+  # 登录进行中的 handle（含微信那边累积的 cookie jar）存在 Rails.cache 里，
+  # 用一个随机 token 关联——不放 session：本项目用默认 CookieStore（上限 4KB），
+  # 而 cookie jar 可能有好几 KB。缓存模式与 MCP 的 WereadLoginSession 一致。
 
-  def wechat_mp_request_qrcode
-    result = WechatMpNativeApiClient.request_qr_code
-    # Store login cookies temporarily for polling
-    session[:wechat_mp_uuid] = result[:uuid]
-    session[:wechat_mp_cookie_jar] = (result[:cookie_jar] || {}).to_json
-    render json: { qr_url: result[:qr_url], uuid: result[:uuid], image_path: result[:image_path] }
+  QR_LOGIN_CACHE_TTL = 5.minutes
+
+  def qr_login_request
+    provider = QrLogin.find(params[:provider])
+    result = provider.start
+
+    token = SecureRandom.hex(16)
+    Rails.cache.write(qr_login_cache_key(token), { provider: provider.key, handle: result[:handle] },
+                      expires_in: QR_LOGIN_CACHE_TTL)
+
+    render json: {
+      token: token,
+      status: "waiting",
+      image_src: provider.image_data_uri(result[:image_bytes], result[:image_mime])
+    }
   rescue => e
-    Rails.logger.error("[MP Native] request_qrcode error: #{e.message}")
+    Rails.logger.error("[QrLogin] request error (#{params[:provider]}): #{e.message}")
     render json: { error: e.message }, status: :unprocessable_entity
   end
 
-  def wechat_mp_qrcode_status
-    uuid = session[:wechat_mp_uuid]
-    cookie_jar_json = session[:wechat_mp_cookie_jar]
-    cookie_jar = cookie_jar_json.present? ? JSON.parse(cookie_jar_json) : nil
+  def qr_login_status
+    cache_key = qr_login_cache_key(params[:token])
+    state = params[:token].present? ? Rails.cache.read(cache_key) : nil
 
-    unless uuid
+    unless state
       render json: { status: "expired", message: "二维码会话已过期，请重新获取" }
       return
     end
 
-    result = WechatMpNativeApiClient.check_qr_status(uuid, cookie_jar)
+    provider = QrLogin.find(state[:provider])
+    result = provider.poll(state[:handle], timeout: 10, allow_retry: false)
 
-    if result[:status] == "success"
-      session.delete(:wechat_mp_uuid)
-      session.delete(:wechat_mp_cookie_jar)
+    case result[:status]
+    when :success
+      identity = provider.save_success!(result[:result])
+      Rails.cache.delete(cache_key)
+      render json: { status: "success", message: "登录成功：#{identity}" }
+    when :expired, :error
+      Rails.cache.delete(cache_key)
+      render json: { status: result[:status].to_s, message: result[:message] }
+    else
+      # 轮询可能带回新 cookie，回存后下次轮询才不会丢会话
+      Rails.cache.write(cache_key, state.merge(handle: result[:handle]), expires_in: QR_LOGIN_CACHE_TTL)
+      render json: { status: result[:status].to_s, message: result[:message] }
     end
-
-    render json: {
-      status: result[:status],
-      message: result[:message],
-      account_info: result[:account_info]
-    }
   rescue => e
-    Rails.logger.error("[MP Native] qrcode_status error: #{e.message}")
+    Rails.logger.error("[QrLogin] status error: #{e.message}")
     render json: { status: "error", message: e.message }
   end
 
   def wechat_mp_logout
     WechatMpNativeApiClient.logout
-    session.delete(:wechat_mp_uuid)
-    session.delete(:wechat_mp_cookie_jar)
     message = "已退出微信公众号平台登录"
     respond_to do |format|
       format.turbo_stream { render turbo_stream: helpers.toast_stream(message, type: :success) }
@@ -389,49 +403,9 @@ class Admin::SettingsController < Admin::BaseController
     end
   end
 
-  # ── WeRead QR Code Login ──────────────────────────
-
-  def weread_request_qrcode
-    result = WereadApiClient.create_login_url
-    session[:weread_login_uuid] = result["uuid"]
-    render json: { uuid: result["uuid"], scan_url: result["scanUrl"] }
-  rescue => e
-    Rails.logger.error("[WeRead] request_qrcode error: #{e.message}")
-    render json: { error: e.message }, status: :unprocessable_entity
-  end
-
-  def weread_qrcode_status
-    uuid = session[:weread_login_uuid]
-    unless uuid
-      render json: { status: "expired", message: "二维码会话已过期，请重新获取" }
-      return
-    end
-
-    data = WereadApiClient.get_login_result(uuid)
-
-    if data["vid"] && data["token"]
-      username = WereadApiClient.save_login_result(data)
-      session.delete(:weread_login_uuid)
-
-      render json: { status: "success", message: "登录成功！账号: #{username}" }
-    elsif data["message"].present?
-      # Check if message indicates scanned or waiting
-      msg = data["message"]
-      if msg.include?("扫描") || msg.include?("scan") || msg.include?("已扫码")
-        render json: { status: "scanned", message: msg }
-      else
-        render json: { status: "waiting", message: msg }
-      end
-    else
-      render json: { status: "waiting", message: "等待扫码..." }
-    end
-  rescue => e
-    Rails.logger.error("[WeRead] qrcode_status error: #{e.message}")
-    render json: { status: "error", message: e.message }
-  end
+  # ── WeRead 账号管理 ──────────────────────────────────
 
   def weread_logout
-    session.delete(:weread_login_uuid)
     message = "已取消 WeRead 登录"
     respond_to do |format|
       format.turbo_stream { render turbo_stream: helpers.toast_stream(message, type: :success) }
@@ -518,7 +492,11 @@ class Admin::SettingsController < Admin::BaseController
 
   private
 
-  # 生成飞书卡片回调地址（与 WereadLoginReminderJob#settings_anchor_url 相同的 host 规则）
+  def qr_login_cache_key(token)
+    "qr_login:#{token}"
+  end
+
+  # 生成飞书卡片回调地址（与 QrLogin::Base#settings_url 相同的 host 规则）
   def build_feishu_callback_url
     host = ENV["APP_HOST"].presence || "localhost"
     if Rails.env.production?

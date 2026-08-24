@@ -1,0 +1,33 @@
+<%#
+  扫码登录区块（微信读书 / 微信公众号平台共用）。
+
+  locals:
+    provider     - QrLogin 平台 key（"weread" / "wechat_mp"）
+    button_label - 按钮文案，默认「获取登录二维码」
+%>
+<% button_label = local_assigns.fetch(:button_label, "获取登录二维码") %>
+
+<div data-controller="qr-login"
+     data-qr-login-provider-value="<%= provider %>"
+     data-qr-login-request-url-value="<%= qr_login_request_admin_settings_path %>"
+     data-qr-login-status-url-value="<%= qr_login_status_admin_settings_path %>"
+     data-qr-login-button-label-value="<%= button_label %>">
+
+  <div class="mb-4 hidden" data-qr-login-target="area">
+    <div class="flex flex-col items-center p-4 bg-white border border-gray-200 rounded-lg">
+      <p class="text-sm text-gray-600 mb-3">请使用微信扫描下方二维码</p>
+      <img src="" alt="扫码登录二维码" class="w-64 h-64 border border-gray-300 rounded"
+           data-qr-login-target="image">
+      <p class="text-sm mt-3 text-gray-500" data-qr-login-target="status">等待扫码...</p>
+      <div class="mt-2 hidden" data-qr-login-target="spinner">
+        <div class="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full mx-auto"></div>
+      </div>
+    </div>
+  </div>
+
+  <button type="button" class="btn btn-primary"
+          data-qr-login-target="button"
+          data-action="qr-login#requestQrCode">
+    <%= button_label %>
+  </button>
+</div>

@@ -2,7 +2,8 @@
 #
 # 飞书自建应用的「卡片回调地址」指向 /feishu/card_callback。用户点击卡片按钮后，
 # 飞书 POST 回调数据（含 operator.open_id 与 action.value），本控制器解密、验签、解析后
-# 入队 WereadLoginForUserJob，并在 3 秒内返回 toast 响应。
+# 按 action 值找到对应的扫码登录平台（QrLogin.find_by_card_action，如 "weread_login" /
+# "wechat_mp_login"）并入队 FeishuLoginForUserJob，最后在 3 秒内返回 toast 响应。
 #
 # 飞书开启加密策略时，body 为 {"encrypt": "<base64>"}，需先 AES 解密得到明文回调。
 class FeishuCallbacksController < ApplicationController
@@ -67,10 +68,11 @@ class FeishuCallbacksController < ApplicationController
       "action_value=#{action_value.inspect} 最终 action=#{action.inspect}"
     )
 
-    # 5. 分发：命中登录按钮且能拿到点击者 open_id 时，异步生成专属二维码
-    if action == "weread_login" && open_id.present?
-      Rails.logger.info("[Feishu] 命中登录按钮，入队 WereadLoginForUserJob open_id=#{open_id.inspect}")
-      WereadLoginForUserJob.perform_later(open_id)
+    # 5. 分发：命中某个平台的登录按钮且能拿到点击者 open_id 时，异步生成专属二维码
+    provider = QrLogin.find_by_card_action(action)
+    if provider && open_id.present?
+      Rails.logger.info("[Feishu] 命中 #{provider.label} 登录按钮，入队 FeishuLoginForUserJob open_id=#{open_id.inspect}")
+      FeishuLoginForUserJob.perform_later(provider.key, open_id)
     else
       Rails.logger.info("[Feishu] 未触发登录分发（action=#{action.inspect} open_id=#{open_id.inspect}）")
     end

@@ -116,14 +116,13 @@ Rails.application.routes.draw do
       post :validate_twitter_key
       post :validate_tikhub_key
       post :validate_profile_ext_key
-      # MP Native QR code login
-      post :wechat_mp_request_qrcode
-      get  :wechat_mp_qrcode_status
+      # 扫码登录（provider=weread / wechat_mp，见 QrLogin）
+      post :qr_login_request
+      get  :qr_login_status
+      # MP Native
       post :wechat_mp_logout
       post :validate_mp_native_key
-      # WeRead QR code login
-      post :weread_request_qrcode
-      get  :weread_qrcode_status
+      # WeRead
       post :weread_logout
       post :validate_weread_key
       # WeRead account management

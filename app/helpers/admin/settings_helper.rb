@@ -8,5 +8,10 @@ module Admin
 
       "#{key[0..3]}****#{key[-4..]}"
     end
+
+    # 微信公众号平台会话有效期文案（唯一来源是 Option::WECHAT_MP_SESSION_TTL）
+    def wechat_mp_session_ttl_label
+      Option.wechat_mp_session_ttl_label
+    end
   end
 end

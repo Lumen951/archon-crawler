@@ -157,7 +157,7 @@
     <!-- MP Native Panel -->
     <div class="wechat-panel <%= 'hidden' unless active_tab == 'mp_native' %>" data-tab-panel="mp_native" role="tabpanel">
       <p class="text-sm text-gray-500 mb-4">
-        通过扫描二维码登录微信公众号平台（mp.weixin.qq.com），登录后可使用原生 API 抓取文章。Cookie/Token 有效期约 2 小时。
+        通过扫描二维码登录微信公众号平台（mp.weixin.qq.com），登录后可使用原生 API 抓取文章。Cookie/Token 有效期<%= wechat_mp_session_ttl_label %>，失效时会通过飞书推送提醒。
       </p>
 
       <% if @wechat_mp_session_valid %>
@@ -205,22 +205,7 @@
           <p class="text-sm text-yellow-800">未登录微信公众号平台。请点击下方按钮获取二维码，然后使用微信扫码登录。</p>
         </div>
 
-        <div id="mp_native_qr_area" class="mb-4" style="display: none;">
-          <div class="flex flex-col items-center p-4 bg-white border border-gray-200 rounded-lg">
-            <p class="text-sm text-gray-600 mb-3">请使用微信扫描下方二维码</p>
-            <img id="mp_native_qr_image" src="" alt="微信扫码登录二维码" class="w-64 h-64 border border-gray-300 rounded" />
-            <p id="mp_native_qr_status" class="text-sm mt-3 text-gray-500">等待扫码...</p>
-            <div id="mp_native_qr_spinner" class="mt-2 hidden">
-              <div class="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full mx-auto"></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="flex items-center gap-3">
-          <button id="mp_native_get_qr_btn" class="btn btn-primary" onclick="WechatMpQrPoller.requestQrCode()">
-            获取登录二维码
-          </button>
-        </div>
+        <%= render "admin/settings/qr_login", provider: "wechat_mp" %>
       <% end %>
     </div>
 
@@ -329,17 +314,7 @@
       <hr class="my-4 border-gray-200">
       <h3 class="text-lg font-semibold text-gray-800 mb-3">添加新账号（扫码登录）</h3>
 
-      <div id="weread_qr_area" class="mb-4" style="display: none;">
-        <div class="flex flex-col items-center p-4 bg-white border border-gray-200 rounded-lg">
-          <p class="text-sm text-gray-600 mb-3">请使用微信扫描下方二维码</p>
-          <img id="weread_qr_image" src="" alt="微信读书登录二维码" class="w-64 h-64 border border-gray-300 rounded" />
-          <p id="weread_qr_status" class="text-sm mt-3 text-gray-500">等待扫码...</p>
-        </div>
-      </div>
-
-      <button id="weread_get_qr_btn" class="btn btn-primary" onclick="WereadQrPoller.requestQrCode()">
-        获取登录二维码
-      </button>
+      <%= render "admin/settings/qr_login", provider: "weread" %>
     </div>
   </div>
 
@@ -649,7 +624,10 @@
   <!-- Feishu Push -->
   <div class="card" id="feishu">
     <h2 class="text-xl font-bold text-gray-900 mb-4">飞书推送</h2>
-    <p class="text-sm text-gray-600 mb-4">每天定时提醒登录微信读书账号：单二维码（推一张码）或交互卡片（多人各自扫码，形成账号池）。</p>
+    <p class="text-sm text-gray-600 mb-4">
+      每天定时提醒扫码登录：微信读书（无条件推送，用于扩充账号池）与微信公众号平台（仅在会话失效时推送）。
+      推送方式可选单二维码（推一张码）或交互卡片（成员各自点击后私聊二维码）。
+    </p>
 
     <% if @feishu_enabled && @feishu_app_id.present? && @feishu_receive_id.present? %>
       <div class="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
@@ -703,13 +681,13 @@
       </div>
 
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">微信读书登录方式</label>
-        <select name="feishu_weread_login_mode"
+        <label class="block text-sm font-medium text-gray-700 mb-2">扫码登录推送方式</label>
+        <select name="feishu_login_mode"
                 class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
-          <option value="qr" <%= 'selected' if @feishu_weread_login_mode != 'card' %>>单二维码（推一张码到群里）</option>
-          <option value="card" <%= 'selected' if @feishu_weread_login_mode == 'card' %>>交互卡片（成员点击后私聊各自二维码）</option>
+          <option value="qr" <%= 'selected' if @feishu_login_mode != 'card' %>>单二维码（推一张码到群里）</option>
+          <option value="card" <%= 'selected' if @feishu_login_mode == 'card' %>>交互卡片（成员点击后私聊各自二维码）</option>
         </select>
-        <p class="text-xs text-gray-500 mt-1">选择「交互卡片」可让多人各自扫码登录形成账号池。</p>
+        <p class="text-xs text-gray-500 mt-1">微信读书与微信公众号平台共用此设置。选择「交互卡片」可让多人各自扫码，微信读书借此形成账号池。</p>
       </div>
 
       <div>
@@ -745,7 +723,7 @@
   <div class="card bg-gray-50" id="info">
     <h3 class="font-semibold text-gray-900 mb-2">重要说明</h3>
     <ul class="space-y-2 text-sm text-gray-600">
-      <li>• <strong>MP 原生</strong>：扫码登录微信公众号平台后台，Cookie/Token 有效期约 2 小时，过期需重新扫码</li>
+      <li>• <strong>MP 原生</strong>：扫码登录微信公众号平台后台，Cookie/Token 有效期<%= wechat_mp_session_ttl_label %>，过期需重新扫码（每天会自动体检并通过飞书提醒）</li>
       <li>• <strong>Dajiala</strong>：使用公众号名称抓取文章，无需 fakeid；如遇频率限制可切换回 MP 原生</li>
       <li>• <strong>Profile Ext</strong>：使用 mitmproxy 抓包凭证，有效期约 25 分钟，过期需重新抓包</li>
       <li>• 搜索导入功能需要先扫码登录 MP 原生</li>
@@ -785,247 +763,6 @@
       });
     });
   })();
-</script>
-
-<script>
-  // MP Native QR Code Poller
-  const WechatMpQrPoller = {
-    pollTimer: null,
-    uuid: null,
-
-    async requestQrCode() {
-      const btn = document.getElementById('mp_native_get_qr_btn');
-      const area = document.getElementById('mp_native_qr_area');
-      const img = document.getElementById('mp_native_qr_image');
-      const status = document.getElementById('mp_native_qr_status');
-
-      // Stop any existing polling
-      this.stopPolling();
-
-      btn.disabled = true;
-      btn.textContent = '获取中...';
-
-      try {
-        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
-        const resp = await fetch('/admin/settings/wechat_mp_request_qrcode', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-Token': csrfToken,
-          },
-        });
-
-        if (!resp.ok) {
-          const data = await resp.json();
-          throw new Error(data.error || '获取二维码失败');
-        }
-
-        const data = await resp.json();
-        this.uuid = data.uuid;
-        // Add cache-busting timestamp
-        img.src = data.image_path + '?t=' + Date.now();
-        img.onerror = () => {
-          status.textContent = '二维码图片加载失败，请重试';
-          status.className = 'text-sm mt-3 text-red-600';
-          btn.disabled = false;
-          btn.textContent = '获取登录二维码';
-        };
-        area.style.display = 'block';
-        status.textContent = '等待扫码...';
-        status.className = 'text-sm mt-3 text-gray-500';
-        btn.textContent = '重新获取二维码';
-
-        // Start polling
-        this.startPolling();
-      } catch (err) {
-        status.textContent = '获取二维码失败: ' + err.message;
-        status.className = 'text-sm mt-3 text-red-600';
-        area.style.display = 'block';
-        btn.disabled = false;
-        btn.textContent = '获取登录二维码';
-      }
-    },
-
-    startPolling() {
-      if (this.pollTimer) clearInterval(this.pollTimer);
-
-      const status = document.getElementById('mp_native_qr_status');
-      const img = document.getElementById('mp_native_qr_image');
-
-      this.pollTimer = setInterval(async () => {
-        try {
-          const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
-          const resp = await fetch('/admin/settings/wechat_mp_qrcode_status', {
-            headers: { 'X-CSRF-Token': csrfToken },
-          });
-
-          if (!resp.ok) throw new Error('HTTP ' + resp.status);
-
-          const data = await resp.json();
-
-          switch (data.status) {
-            case 'waiting':
-              status.textContent = '等待扫码...';
-              status.className = 'text-sm mt-3 text-gray-500';
-              break;
-            case 'scanned':
-              status.textContent = '已扫码，请在手机上确认登录...';
-              status.className = 'text-sm mt-3 text-blue-600 font-semibold';
-              break;
-            case 'success':
-              status.textContent = '登录成功！页面即将刷新...';
-              status.className = 'text-sm mt-3 text-green-600 font-semibold';
-              this.stopPolling();
-              img.style.opacity = '0.5';
-              setTimeout(() => { window.location.reload(); }, 1500);
-              break;
-            case 'expired':
-              status.textContent = '二维码已过期，请重新获取';
-              status.className = 'text-sm mt-3 text-red-600';
-              this.stopPolling();
-              break;
-            case 'error':
-              status.textContent = '错误: ' + (data.message || '未知错误');
-              status.className = 'text-sm mt-3 text-red-600';
-              this.stopPolling();
-              break;
-          }
-        } catch (err) {
-          status.textContent = '轮询出错: ' + err.message;
-          status.className = 'text-sm mt-3 text-red-600';
-          this.stopPolling();
-        }
-      }, 2000); // Poll every 2 seconds
-    },
-
-    stopPolling() {
-      if (this.pollTimer) {
-        clearInterval(this.pollTimer);
-        this.pollTimer = null;
-      }
-      const btn = document.getElementById('mp_native_get_qr_btn');
-      if (btn) btn.disabled = false;
-    }
-  };
-</script>
-
-<script>
-  // WeRead QR Code Poller
-  const WereadQrPoller = {
-    pollTimer: null,
-
-    async requestQrCode() {
-      const btn = document.getElementById('weread_get_qr_btn');
-      const area = document.getElementById('weread_qr_area');
-      const img = document.getElementById('weread_qr_image');
-      const status = document.getElementById('weread_qr_status');
-
-      this.stopPolling();
-
-      btn.disabled = true;
-      btn.textContent = '获取中...';
-
-      try {
-        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
-        const resp = await fetch('/admin/settings/weread_request_qrcode', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-Token': csrfToken,
-          },
-        });
-
-        if (!resp.ok) {
-          const data = await resp.json();
-          throw new Error(data.error || '获取二维码失败');
-        }
-
-        const data = await resp.json();
-        // Use qrserver API to render QR code image
-        const scanUrl = data.scan_url;
-        img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=' + encodeURIComponent(scanUrl) + '&t=' + Date.now();
-        img.onerror = () => {
-          status.textContent = '二维码图片加载失败，请重试';
-          status.className = 'text-sm mt-3 text-red-600';
-          btn.disabled = false;
-          btn.textContent = '获取登录二维码';
-        };
-        area.style.display = 'block';
-        status.textContent = '等待扫码...';
-        status.className = 'text-sm mt-3 text-gray-500';
-        btn.textContent = '重新获取二维码';
-
-        this.startPolling();
-      } catch (err) {
-        status.textContent = '错误: ' + err.message;
-        status.className = 'text-sm mt-3 text-red-600';
-        area.style.display = 'block';
-        btn.disabled = false;
-        btn.textContent = '获取登录二维码';
-      }
-    },
-
-    startPolling() {
-      if (this.pollTimer) clearInterval(this.pollTimer);
-
-      const status = document.getElementById('weread_qr_status');
-      const img = document.getElementById('weread_qr_image');
-
-      this.pollTimer = setInterval(async () => {
-        try {
-          const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
-          const resp = await fetch('/admin/settings/weread_qrcode_status', {
-            headers: { 'X-CSRF-Token': csrfToken },
-          });
-
-          if (!resp.ok) throw new Error('HTTP ' + resp.status);
-
-          const data = await resp.json();
-
-          switch (data.status) {
-            case 'waiting':
-              status.textContent = data.message || '等待扫码...';
-              status.className = 'text-sm mt-3 text-gray-500';
-              break;
-            case 'scanned':
-              status.textContent = data.message || '已扫码，请在手机上确认登录...';
-              status.className = 'text-sm mt-3 text-blue-600 font-semibold';
-              break;
-            case 'success':
-              status.textContent = (data.message || '登录成功') + ' 页面即将刷新...';
-              status.className = 'text-sm mt-3 text-green-600 font-semibold';
-              this.stopPolling();
-              img.style.opacity = '0.5';
-              setTimeout(() => { window.location.reload(); }, 1500);
-              break;
-            case 'expired':
-              status.textContent = '二维码已过期，请重新获取';
-              status.className = 'text-sm mt-3 text-red-600';
-              this.stopPolling();
-              break;
-            case 'error':
-              status.textContent = '错误: ' + (data.message || '未知错误');
-              status.className = 'text-sm mt-3 text-red-600';
-              this.stopPolling();
-              break;
-          }
-        } catch (err) {
-          status.textContent = '轮询出错: ' + err.message;
-          status.className = 'text-sm mt-3 text-red-600';
-          this.stopPolling();
-        }
-      }, 3000);
-    },
-
-    stopPolling() {
-      if (this.pollTimer) {
-        clearInterval(this.pollTimer);
-        this.pollTimer = null;
-      }
-      const btn = document.getElementById('weread_get_qr_btn');
-      if (btn) btn.disabled = false;
-    }
-  };
 </script>
 
 <script>
