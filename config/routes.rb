@@ -138,6 +138,7 @@ Rails.application.routes.draw do
     end
 
     resources :mcp_tool_calls, only: [:index, :show]
+    resources :oauth_applications, only: [:index, :destroy]
   end
 
   get "/rss", to: "rss#index", as: :all_accounts_rss, defaults: { format: 'rss' }
@@ -176,13 +177,34 @@ Rails.application.routes.draw do
   get "api-docs", to: "api_docs#show", as: :api_docs
   get "api-docs/openapi.json", to: "api_docs#openapi", as: :api_docs_openapi
 
-  # OAuth Device Code flow
+  # OAuth 2.1 authorization server. Gives MCP clients (Claude Code, Codex, ...)
+  # a flow they can discover and drive on their own, instead of the user pasting
+  # a long-lived API key. Provides /oauth/authorize, /oauth/token, /oauth/revoke
+  # and /oauth/introspect.
+  use_doorkeeper do
+    controllers authorizations: "oauth/authorizations", tokens: "oauth/tokens"
+    skip_controllers :applications, :authorized_applications
+  end
+
   namespace :oauth do
+    # RFC 7591 Dynamic Client Registration. Deprecated by the 2026-07-28 spec in
+    # favour of Client ID Metadata Documents, but it is still what Claude Code
+    # and Codex attempt first, so it stays the supported path.
+    post "register", to: "registrations#create"
+
+    # RFC 8628 device flow, kept for headless clients that cannot open a browser.
     post "device", to: "device#create"
     get  "device/authorize", to: "device#show"
     post "device/authorize", to: "device#authorize"
-    post "token", to: "token#create"
   end
+
+  # OAuth discovery documents (RFC 9728 protected resource, RFC 8414 authorization
+  # server). Each is served both bare and with the resource path appended, because
+  # clients differ in which form they probe.
+  get ".well-known/oauth-protected-resource", to: "well_known#protected_resource"
+  get ".well-known/oauth-protected-resource/*resource_path", to: "well_known#protected_resource"
+  get ".well-known/oauth-authorization-server", to: "well_known#authorization_server"
+  get ".well-known/oauth-authorization-server/*resource_path", to: "well_known#authorization_server"
 
   # Health check
   get "up" => "rails/health#show", as: :rails_health_check

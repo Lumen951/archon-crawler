@@ -1,7 +1,12 @@
 module Oauth
   class DeviceController < ApplicationController
-    skip_before_action :verify_authenticity_token, only: [:create]
-    before_action :authenticate_user!, only: [:show, :authorize]
+    # A headless client calls #create with no session at all — it is asking for
+    # a code that the user will approve in a browser afterwards. #show and
+    # #authorize are the browser half and keep ApplicationController's usual
+    # `require_authentication` gate.
+    allow_unauthenticated_access only: [ :create ]
+    skip_before_action :verify_authenticity_token, only: [ :create ]
+    layout "oauth"
 
     # POST /oauth/device
     # Request a device code (called by MCP client)

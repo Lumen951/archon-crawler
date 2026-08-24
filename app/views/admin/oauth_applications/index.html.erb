@@ -1,0 +1,56 @@
+<div class="space-y-6">
+  <div>
+    <h1 class="text-3xl font-bold text-text-primary">MCP 客户端</h1>
+    <p class="text-text-secondary mt-2">已接入 MCP 服务的 OAuth 2.1 客户端（Claude Code、Codex 等）。撤销会同时删除该客户端持有的所有令牌。</p>
+  </div>
+
+  <% if @applications.any? %>
+    <div class="hidden md:block bg-bg-card border border-border-primary rounded-2xl overflow-hidden shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+      <table class="min-w-full divide-y divide-border-primary">
+        <thead class="bg-bg-secondary">
+          <tr>
+            <th class="px-6 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">客户端</th>
+            <th class="px-6 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">Client ID</th>
+            <th class="px-6 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">回调地址</th>
+            <th class="px-6 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">权限</th>
+            <th class="px-6 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">令牌数</th>
+            <th class="px-6 py-3 text-right text-xs font-semibold text-text-secondary uppercase tracking-wider">操作</th>
+          </tr>
+        </thead>
+        <tbody class="bg-bg-card divide-y divide-border-primary">
+          <% @applications.each do |application| %>
+            <tr class="hover:bg-bg-secondary transition">
+              <td class="px-6 py-4 text-sm text-text-primary">
+                <div class="font-medium"><%= application.name %></div>
+                <div class="text-xs text-text-muted mt-0.5"><%= application.confidential ? "机密客户端" : "公开客户端（PKCE）" %> · <%= l(application.created_at, format: :short) %></div>
+              </td>
+              <td class="px-6 py-4 text-sm font-mono text-text-secondary max-w-[14rem] truncate" title="<%= application.uid %>"><%= application.uid %></td>
+              <td class="px-6 py-4 text-sm text-text-secondary max-w-[16rem]">
+                <% application.redirect_uri.split("\n").each do |uri| %>
+                  <div class="font-mono text-xs truncate" title="<%= uri %>"><%= uri %></div>
+                <% end %>
+              </td>
+              <td class="px-6 py-4 text-sm text-text-secondary">
+                <% application.scopes.to_s.split.each do |scope| %>
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-bg-secondary text-text-secondary mr-1"><%= scope %></span>
+                <% end %>
+              </td>
+              <td class="px-6 py-4 text-sm text-text-secondary"><%= application.access_tokens.count %></td>
+              <td class="px-6 py-4 text-right whitespace-nowrap">
+                <%= button_to admin_oauth_application_path(application), method: :delete,
+                      data: { turbo_confirm: "确定撤销「#{application.name}」？将删除其全部 #{application.access_tokens.count} 个令牌。" },
+                      class: "h-8 px-3 rounded-lg border border-red-200 bg-bg-card text-red-600 hover:border-red-400 hover:bg-red-50 text-xs font-semibold transition" do %>
+                  撤销
+                <% end %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% else %>
+    <div class="bg-bg-card border border-border-primary rounded-2xl p-10 text-center text-text-muted">
+      还没有任何 MCP 客户端。用 <span class="font-mono">claude mcp add --transport http …</span> 或 <span class="font-mono">codex mcp add …</span> 连接后，客户端会自动注册到这里。
+    </div>
+  <% end %>
+</div>

@@ -8,11 +8,28 @@
 POST/GET/DELETE https://<your-host>/mcp/endpoint
 ```
 
-认证方式：`Authorization: Bearer <token>` header。
+认证有两条路：**OAuth 2.1 授权**（客户端自行发现并引导用户完成，推荐）或 `Authorization: Bearer <token>` header。
 
 ---
 
 ## 快速连接
+
+### Claude Code / Codex（OAuth，无需手动配置 token）
+
+服务端实现了 MCP 授权规范（2026-07-28），客户端会自动发现并拉起浏览器授权：
+
+```bash
+# Claude Code
+claude mcp add --transport http mp-crawler https://<your-host>/mcp/endpoint
+# 然后在会话中输入 /mcp，选择 Authenticate，浏览器会自动打开授权页
+
+# Codex
+codex mcp add mp-crawler --url https://<your-host>/mcp/endpoint
+codex mcp login mp-crawler
+```
+
+首次授权时会看到同意页，列出该客户端将获得的权限。授权后 access token 2 小时过期，客户端自动用
+refresh token 续期，无需再次操作。
 
 ### Claude Desktop
 
@@ -70,13 +87,43 @@ POST/GET/DELETE https://<your-host>/mcp/endpoint
 
 ## 认证方式
 
-### 方式一：Bearer Token（推荐）
+### 方式一：OAuth 2.1 授权码流程（推荐）
 
-在 `/profile` 页面创建 API Key，获取 token 后配置到 MCP 客户端。
+支持 MCP 授权规范的客户端（Claude Code、Codex 等）会自己走完下面这条链路，**你不需要做任何配置**，
+只要在客户端里添加 URL 然后按提示授权即可：
 
-### 方式二：Device Code 授权
+```
+1. Client → POST /mcp/endpoint（无 token）
+2. Server → 401 + WWW-Authenticate: Bearer resource_metadata="...", scope="mcp:read mcp:write"
+3. Client → GET /.well-known/oauth-protected-resource/mcp/endpoint   (RFC 9728)
+4. Client → GET /.well-known/oauth-authorization-server              (RFC 8414)
+5. Client → POST /oauth/register 动态注册自己                        (RFC 7591)
+6. Client → 浏览器打开 /oauth/authorize（PKCE S256 + resource 参数）
+7. Client → POST /oauth/token 换 access_token + refresh_token
+8. Client → 带 Bearer 重试 /mcp/endpoint
+```
 
-适用于无法直接配置 token 的场景（如首次使用）。
+**权限范围**：
+
+| Scope | 覆盖的工具 |
+|-------|-----------|
+| `mcp:read` | `list_accounts`、`get_account`、`list_articles`、`list_tags`、`get_activity_stats`、`weread_accounts` |
+| `mcp:write` | `update_accounts`、`batch_update_accounts_by_filter`、`weread_login_start`、`weread_login_status` |
+
+只拿到 `mcp:read` 的客户端调用写工具会收到 `403 insufficient_scope`，客户端据此发起提权授权。
+
+**如果客户端不支持动态注册**：部分客户端要求预先注册的 client_id。目前只能通过 `rails console`
+手工建一个（`Doorkeeper::Application.create!(name:, redirect_uri:, scopes: "mcp:read mcp:write", confidential: false)`），
+再把 `uid` 作为 client_id 配给客户端。
+
+### 方式二：Bearer Token
+
+在 `/profile` 或 `/mcp` 页面创建 API Key，获取 token 后配置到 MCP 客户端。适合脚本、CI 或不支持
+OAuth 的客户端。注意这类 token **不会过期**，请妥善保管并在不再需要时撤销。
+
+### 方式三：Device Code 授权
+
+适用于无法打开浏览器的环境。授权后签发的同样是长期 API Key。
 
 **流程**：
 

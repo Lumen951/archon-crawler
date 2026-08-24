@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html data-turbo="false">
+  <head>
+    <title><%= content_for(:title) || "授权 — Mp Crawler" %></title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
+    <meta name="referrer" content="no-referrer">
+    <link rel="icon" href="/icon.png" type="image/png">
+    <link rel="icon" href="/icon.svg" type="image/svg+xml">
+    <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
+    <%= javascript_importmap_tags %>
+  </head>
+
+  <%# Standalone layout for the OAuth consent / device-approval screens. Unlike the
+      application layout it carries no header, side nav or mobile bottom bar —
+      these pages are a discrete step in a client-driven flow, not part of the app. %>
+  <body class="min-h-screen flex flex-col bg-slate-50 antialiased">
+    <main class="flex-1 flex flex-col justify-center py-12 px-4">
+      <%
+        flash_messages = {}
+        flash_messages["success"] = flash[:success] || flash[:notice] if flash[:success].present? || flash[:notice].present?
+        flash_messages["error"]   = flash[:error]   || flash[:alert]  if flash[:error].present?   || flash[:alert].present?
+        flash_messages["warning"] = flash[:warning]                   if flash[:warning].present?
+      %>
+      <div id="toasts" data-controller="toast" data-toast-target="container"
+           class="fixed bottom-6 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none"
+           <% if flash_messages.any? %>data-flash="<%= flash_messages.to_json %>"<% end %>>
+      </div>
+      <%= yield %>
+    </main>
+  </body>
+</html>

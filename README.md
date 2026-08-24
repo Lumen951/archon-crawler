@@ -84,7 +84,7 @@ MP-Crawler 是一个基于 Ruby on Rails 的应用，用于自动抓取微信公
 - `AdminMailer`：邀请邮件、登录链接邮件、新用户凭据邮件
 
 ### 8. API Key 管理
-- **微信公众号**（`mp_native`）：通过 QR 码扫码登录（在 `/admin/settings` 页面），Cookie/Token 有效期约 2 小时
+- **微信公众号**（`mp_native`）：通过 QR 码扫码登录（在 `/admin/settings` 页面），Cookie/Token 有效期约 4 天（唯一定义在 `Option::WECHAT_MP_SESSION_TTL`）；失效时由 `FeishuLoginReminderJob` 每日体检并推送飞书提醒
 - **微信读书（WeRead）**：转发服务帐号池（支持多账号、QR 扫码登录、每日黑名单），在 `/admin/settings` 统一管理；支持通过 MCP 工具 `weread_login_start` / `weread_login_status` / `weread_accounts` 驱动扫码登录（终端 ASCII 二维码）
 - **大家拉（Dajiala）**：`dajiala_api_key`
 - **Profile Ext**：mitmproxy 抓取的凭证（`profile_ext_credentials`，约 25 分钟过期）
@@ -102,6 +102,15 @@ MP-Crawler 是一个基于 Ruby on Rails 的应用，用于自动抓取微信公
 - `/api/v1/articles`：文章列表
 - `/api/v1/accounts`：帐号列表
 - 基于用户 `ApiKey`（`has_secure_token`，SHA256 摘要存储）鉴权
+
+### 11. MCP 服务与 OAuth 授权
+- `/mcp/endpoint`：Streamable HTTP 的 MCP 服务（10 个工具），详见 `docs/mcp.md`
+- **OAuth 2.1 授权**（推荐）：Claude Code / Codex 等客户端可自行发现并完成授权，用户无需手动粘贴 Token
+  - 由 Doorkeeper 充当授权服务器，`McpController` 充当 OAuth 资源服务器
+  - 遵循 MCP 授权规范（2026-07-28）：RFC 9728 资源元数据、RFC 8414 授权服务器元数据、RFC 7591 动态客户端注册、RFC 8707 resource 参数与受众校验、PKCE（仅 S256）
+  - access token 2 小时过期 + refresh token 轮换；token 以 SHA-256 摘要存储
+  - 两级权限：`mcp:read`（只读工具）/ `mcp:write`（`update_accounts`、`batch_update_accounts_by_filter`、`weread_login_*`）
+- **Bearer Token**（保留）：`ApiKey` 长期凭据，供脚本 / CI 使用；RFC 8628 设备码流程（`/oauth/device`）也签发 `ApiKey`
 
 ## 架构设计
 
@@ -157,6 +166,9 @@ WechatContentDownloadTask (微信正文下载任务)
 
 Option (系统配置 - key-value 存储)
 - wechat_mp_cookie / wechat_mp_token / wechat_mp_expires_at (微信 mp_native 扫码登录)
+  · 有效期常量 WECHAT_MP_SESSION_TTL = 4.days，登录成功统一走 wechat_mp_session_started!
+- feishu_enabled / feishu_app_id / feishu_app_secret / feishu_receive_id / feishu_receive_id_type / feishu_encrypt_key (飞书推送)
+- feishu_login_mode (扫码登录推送方式：qr / card，微信读书与微信公众号平台共用；回退旧 key feishu_weread_login_mode)
 - wechat_api_provider (微信 API 提供方：mp_native / dajiala / profile_ext / weread)
 - dajiala_api_key / tikhub_api_key / rednote_api_key
 - profile_ext_credentials (mitmproxy 凭证，约 25 分钟过期)
@@ -210,6 +222,17 @@ ApiKey (用户 API Key)
 ├── belongs_to :user
 ├── has_secure_token :token（SHA256 摘要存储）
 └── scope :active
+
+DeviceCode (RFC 8628 设备码)
+├── belongs_to :user (optional)
+├── enum status: { pending: 0, authorized: 1, expired: 2, denied: 3 }
+└── 授权后签发 ApiKey（非 OAuth access token）
+
+Doorkeeper::Application / AccessGrant / AccessToken (OAuth 2.1)
+├── Application：MCP 客户端，多由 /oauth/register 动态注册（confidential: false，无 secret）
+├── AccessGrant：授权码，带 PKCE（code_challenge / code_challenge_method）与 resource
+└── AccessToken：resource_owner_id → User，scopes、resource（RFC 8707 受众绑定）
+    · token / refresh_token 以 SHA-256 摘要存储，2 小时过期 + refresh 轮换
 ```
 
 ### 核心服务
@@ -234,7 +257,8 @@ ApiKey (用户 API Key)
 
 **WechatMpNativeApiClient** (`lib/wechat_mp_native_api_client.rb`)
 - 直接访问微信公众号平台（`mp.weixin.qq.com`），无需第三方 API
-- 认证方式：QR 码扫码登录，获取 Cookie + Token（有效期约 2 小时）
+- 认证方式：QR 码扫码登录，获取 Cookie + Token（有效期见 `Option::WECHAT_MP_SESSION_TTL`，默认 4 天）
+- QR 登录为纯传输层：cookie jar 由调用方显式持有（支持多个登录流程并发），落库统一走 `Option.wechat_mp_session_started!`
 - 主要接口：`search_account`、`get_articles`、`download_content`
 - 自定义错误类：`ApiError`、`SessionExpiredError`（包含 `CrawlerApiKeyError`）、`LoginRequiredError`（包含 `CrawlerApiKeyError`）、`RateLimitError`
 
@@ -417,6 +441,61 @@ end
 - 每日下载所有缺失正文（`content_html IS NULL`）的微信文章，最新文章优先
 - 通过 `WechatContentDownloadTask` 的 `job_id` + `heartbeat_at` 防重叠：上一个 Job 仍在跑则跳过，心跳过期则接管
 
+**FeishuLoginReminderJob** (`app/jobs/feishu_login_reminder_job.rb`)
+- 每日提醒扫码登录，接收平台 key 参数（`"weread"` / `"wechat_mp"`），平台差异由 `QrLogin` 策略吸收
+- 是否推送由 `provider.reminder_needed?` 决定：微信读书恒推送（扩充账号池），微信公众号平台仅在 `validate_session` 探测到会话失效时推送
+- 推送方式由 `Option.feishu_login_mode` 决定：`qr` 直接推二维码并后台轮询；`card` 推交互卡片，成员点击后走 `FeishuLoginForUserJob`
+
+**FeishuLoginForUserJob** (`app/jobs/feishu_login_for_user_job.rb`)
+- 由 `FeishuCallbacksController` 在用户点击飞书卡片按钮后入队，为该 `open_id` 生成专属二维码、私聊推送并轮询
+
+### 扫码登录（QrLogin）
+
+微信读书与微信公众号平台的扫码登录流程一致（取码 → 轮询 → 落库），差异由 `app/services/qr_login/` 下的策略类吸收，
+设置页控制器、飞书 Job、飞书卡片回调三个调用方共用同一套接口：
+
+- `QrLogin.find(key)` / `QrLogin.find_by_card_action(action)`：注册表，按平台 key 或飞书卡片按钮 action 取策略
+- `QrLogin::Base`：`start` → `{handle:, image_bytes:, image_mime:}`；`poll(handle)` → `{status:, message:, handle:, result:}`（状态归一化为 waiting/scanned/success/expired/error）；`save_success!(result)` → 身份字符串；另含飞书卡片与文案
+- `QrLogin::Weread`：委托 `WereadApiClient`，二维码由 RQRCode 本地生成（不再依赖第三方渲染服务）
+- `QrLogin::WechatMp`：委托 `WechatMpNativeApiClient`，`handle` 里 round-trip cookie jar；落库走 `Option.wechat_mp_session_started!`
+- `QrLogin::Polling`：后台 Job 用的轮询循环（设置页由 Stimulus `qr_login_controller` 前端轮询，MCP 工具自带短轮询）
+- 设置页两个平台共用 partial `app/views/admin/settings/_qr_login.html.erb` + 通用端点 `qr_login_request` / `qr_login_status`；
+  进行中的 handle 存 `Rails.cache`（不放 session：默认 CookieStore 上限 4KB，装不下 cookie jar）
+
+### MCP 客户端授权（OAuth 2.1）
+
+MCP 客户端（Claude Code、Codex 等）内置了 OAuth 发现能力，服务端只要按规范暴露端点，用户体验就是
+`claude mcp add --transport http mp-crawler https://<host>/mcp/endpoint` → `/mcp` → 浏览器授权，全程无需手动粘贴 Token。
+
+整条链路的入口是 **401 响应上的 `WWW-Authenticate` 头**——没有它，客户端只会看到连接失败，不会去探测 OAuth：
+
+```
+1. Client → POST /mcp/endpoint（无 token）
+2. Server → 401 + WWW-Authenticate: Bearer resource_metadata="...", scope="mcp:read mcp:write"
+3. Client → GET /.well-known/oauth-protected-resource/mcp/endpoint   (RFC 9728)
+4. Client → GET /.well-known/oauth-authorization-server              (RFC 8414)
+5. Client → POST /oauth/register 动态注册自己                        (RFC 7591)
+6. Client → 浏览器打开 /oauth/authorize（authorization_code + PKCE + resource）
+7. Client → POST /oauth/token 换 access_token + refresh_token
+8. Client → 带 Bearer 重试 /mcp/endpoint
+```
+
+- **`McpOauth`** (`app/services/mcp_oauth.rb`)：资源服务器侧的共享常量与工具——scope 定义、写操作工具清单、
+  RFC 8707 canonical URI 归一化、`WWW-Authenticate` 挑战串构造、redirect_uri 白名单规则
+- **Doorkeeper** (`config/initializers/doorkeeper.rb`)：授权服务器。`base_controller` 设为 `ApplicationController`，
+  匿名访客先被应用自身的 `require_authentication` 引导去登录（MiraclePlus OAuth / magic link），再回到同意页
+- **`Oauth::AuthorizationsController`**：Doorkeeper 授权端点 + RFC 8707 `resource` 校验（不匹配返回 `invalid_target`）
+- **`Oauth::TokensController`**：`< Doorkeeper::TokensController`，按 `grant_type` 分流——设备码走原有逻辑签发 `ApiKey`，
+  其余交给 Doorkeeper
+- **`Oauth::RegistrationsController`**：RFC 7591 动态注册。必须匿名可访问，因此按 IP 限流（10 次/小时）并严格校验
+  redirect_uri（https 任意主机 / http 仅回环）
+- **`WellKnownController`**：两份发现文档，全部基于 `request.base_url` 生成；资源元数据同时提供根路径与路径插入两种形式
+- **`McpController`**：资源服务器。同时接受 Doorkeeper access token 与 `ApiKey`；校验 token 受众；
+  对 `tools/call` 按工具名要求 `mcp:read` / `mcp:write`，缺权限返回 403 + `insufficient_scope` 触发客户端提权
+
+已知取舍：Doorkeeper 不签发 RFC 9207 的 `iss` 参数，因此授权服务器元数据里
+`authorization_response_iss_parameter_supported` 声明为 `false`（规范中该项为 SHOULD，声明 false 时客户端行为正确）。
+
 ### 控制器
 
 - `AccountsController`：帐号 CRUD、导入（JSON/搜索/按 URL/按 ID/小红书/Twitter）、触发抓取、批量操作
@@ -432,6 +511,10 @@ end
 - `Admin::SettingsController`：系统设置（admin only），含各平台 API Key 校验、微信/微信读书扫码登录
 - `Admin::AnalyticsController`：活跃度分析看板、批量停用停更帐号（admin only）
 - `Api::V1::GroupsController` / `AccountsController` / `ArticlesController`：REST API（基于 ApiKey 鉴权）
+- `McpController`：MCP 服务端点（OAuth 资源服务器，接受 access token 或 ApiKey）
+- `McpGuideController`：MCP 接入指引页与 Token 管理
+- `WellKnownController`：OAuth 发现文档（RFC 9728 / RFC 8414）
+- `Oauth::AuthorizationsController` / `TokensController` / `RegistrationsController` / `DeviceController`：OAuth 2.1 授权服务器
 
 ### 关注点分离（Concerns）
 
@@ -500,7 +583,7 @@ resource :profile (edit, update, update_password, update_followed_tags, create_a
 namespace :admin {
   resources :users (reset_password, update_followed_tags, credentials)
   resources :tags (edit, update, destroy, refresh_counts)
-  resource :settings (validate_*_key, wechat_mp QR 登录, weread QR 登录/帐号管理)
+  resource :settings (validate_*_key, qr_login_request/qr_login_status 扫码登录, weread 帐号管理, test_feishu)
   resource :analytics (bulk_disable_dormant)
 }
 
@@ -510,6 +593,23 @@ namespace :api v1 {
   resources :articles (index)
   resources :accounts (index)
 }
+
+# MCP
+POST/GET/DELETE /mcp/endpoint         # MCP 服务（OAuth token 或 ApiKey 鉴权）
+GET  /mcp                             # MCP 接入指引页 + Token 管理
+
+# OAuth 2.1 授权服务器（Doorkeeper）
+GET/POST/DELETE /oauth/authorize      # 授权端点（含同意页）
+POST /oauth/token                     # authorization_code / refresh_token / device_code
+POST /oauth/revoke                    # RFC 7009 撤销
+POST /oauth/introspect                # RFC 7662 内省
+POST /oauth/register                  # RFC 7591 动态客户端注册
+POST /oauth/device                    # RFC 8628 设备码
+GET/POST /oauth/device/authorize      # 设备码审批页
+
+# OAuth discovery
+GET /.well-known/oauth-protected-resource(/mcp/endpoint)   # RFC 9728
+GET /.well-known/oauth-authorization-server                # RFC 8414
 
 # RSS
 GET /rss                              # 全局（支持 ?period=today|yesterday|7days|1month）
@@ -610,7 +710,7 @@ rails weread:status               # 显示 WeRead 配置状态
 ### 2. 配置 API Key
 
 访问 `/admin/settings`：
-- **微信公众号（mp_native）**：点击"获取登录二维码"，使用微信扫描二维码登录（有效期约 2 小时）
+- **微信公众号（mp_native）**：点击"获取登录二维码"，使用微信扫描二维码登录（有效期约 4 天）
 - **微信 API 提供方**：通过 `wechat_api_provider` 在 `mp_native` / `dajiala` / `profile_ext` / `weread` 之间切换
 - **微信读书（WeRead）**：扫码登录转发服务，可管理多个转发帐号（启用/禁用/移除）
 - **大家拉（Dajiala）Key**：从 API 提供商获取
@@ -752,9 +852,14 @@ mp-crawler/
 │   │   ├── profiles_controller.rb
 │   │   ├── rss_controller.rb
 │   │   ├── sessions_controller.rb
+│   │   ├── mcp_controller.rb        (MCP 端点 / OAuth 资源服务器)
+│   │   ├── mcp_guide_controller.rb
+│   │   ├── well_known_controller.rb (RFC 9728 / RFC 8414 发现文档)
 │   │   ├── concerns/ (authentication, authorization, query_persistence)
+│   │   ├── oauth/ (authorizations, tokens, registrations, device)
 │   │   ├── admin/ (settings, users, tags, analytics)
 │   │   └── api/v1/ (groups, accounts, articles)
+│   ├── mcp_server/tools/            (10 个 MCP 工具)
 │   ├── models/
 │   │   ├── account.rb (STI base)
 │   │   ├── wechat_account.rb
@@ -770,13 +875,18 @@ mp-crawler/
 │   │   ├── account_resolver.rb
 │   │   ├── accounts/importer.rb
 │   │   ├── rednote/importer.rb
-│   │   └── twitter/importer.rb
+│   │   ├── twitter/importer.rb
+│   │   ├── qr_login.rb              (扫码登录平台注册表)
+│   │   ├── qr_login/               (base / weread / wechat_mp / polling)
+│   │   └── mcp_oauth.rb             (MCP OAuth scope / 受众校验 / 挑战串)
 │   ├── jobs/
 │   │   ├── crawl_job.rb
 │   │   ├── wechat_content_download_job.rb
 │   │   ├── cleanup_old_tasks_job.rb
 │   │   ├── refresh_activity_counters_job.rb
-│   │   └── validate_api_keys_job.rb
+│   │   ├── validate_api_keys_job.rb
+│   │   ├── feishu_login_reminder_job.rb   (每日扫码登录提醒)
+│   │   └── feishu_login_for_user_job.rb   (飞书卡片点击后的专属二维码)
 │   ├── mailers/
 │   │   ├── admin_mailer.rb
 │   │   └── application_mailer.rb
@@ -823,7 +933,7 @@ mp-crawler/
 - 各 API 均可能有频率限制，超出时自动重试
 
 ### API Key 管理
-- 微信（mp_native）Cookie/Token 约 2 小时过期，需重新扫码登录
+- 微信（mp_native）Cookie/Token 约 4 天过期（`Option::WECHAT_MP_SESSION_TTL`），需重新扫码登录；每日体检发现失效会推送飞书提醒
 - 微信读书转发帐号可配置多个，失效/限流的账号会被自动跳过
 - Profile Ext 凭证约 25 分钟过期
 - 小红书 Key 无过期机制

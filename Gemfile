@@ -76,6 +76,8 @@ gem "ransack", "~> 4.3"
 gem "mission_control-jobs"
 gem "roo", "~> 3.0"
 gem "oauth2", "~> 2.0"
+# OAuth 2.1 authorization server (MCP client authorization, RFC 9728 / 8414 / 7591)
+gem "doorkeeper", "~> 5.9"
 gem "html2text", "~> 0.5.0"
 gem "rqrcode", "~> 2.2"
 gem "rqrcode_png", "~> 0.1.5"
