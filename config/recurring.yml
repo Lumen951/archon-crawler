@@ -27,11 +27,11 @@ development:
     queue: default
     args: [ "weread" ]
     schedule: every day at 9:30am
-  wechat_mp_login_reminder:
-    class: FeishuLoginReminderJob
-    queue: default
-    args: [ "wechat_mp" ]
-    schedule: every day at 9:36am
+  # wechat_mp_login_reminder:
+  #   class: FeishuLoginReminderJob
+  #   queue: default
+  #   args: [ "wechat_mp" ]
+  #   schedule: every day at 9:36am
 
 production:
   refresh_activity_counters:
@@ -62,8 +62,8 @@ production:
     queue: default
     args: [ "weread" ]
     schedule: every day at 9:30am
-  wechat_mp_login_reminder:
-    class: FeishuLoginReminderJob
-    queue: default
-    args: [ "wechat_mp" ]
-    schedule: every day at 9:36am
+  # wechat_mp_login_reminder:
+  #   class: FeishuLoginReminderJob
+  #   queue: default
+  #   args: [ "wechat_mp" ]
+  #   schedule: every day at 9:36am
