@@ -513,8 +513,8 @@ class AccountsController < ApplicationController
       redirect_to import_twitter_page_accounts_path and return
     end
 
-    # Support comma-separated or newline-separated screen names
-    screen_names = raw_input.split(/[\s,]+/).map { |n| n.strip.delete_prefix("@") }.reject(&:blank?).uniq
+    # Support comma-separated or newline-separated screen names or URLs
+    screen_names = raw_input.split(/[\s,]+/).map { |n| AccountResolver.normalize_twitter_screen_name(n) }.reject(&:blank?).uniq
 
     if screen_names.empty?
       flash[:error] = "请输入有效的 Twitter 用户名"

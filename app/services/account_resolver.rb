@@ -47,6 +47,20 @@ class AccountResolver
     users.is_a?(Array) ? users : []
   end
 
+  # Normalize a Twitter screen_name input into a bare handle.
+  # Accepts a plain handle ("@Foo"), or a profile URL
+  # (e.g. "https://x.com/Foo", "twitter.com/Foo?ref=1").
+  def self.normalize_twitter_screen_name(input)
+    value = input.to_s.strip
+
+    if value =~ %r{\A(?:https?://)?(?:www\.)?(?:mobile\.)?(?:twitter|x)\.com/}i
+      path = value.sub(%r{\A(?:https?://)?(?:www\.)?(?:mobile\.)?(?:twitter|x)\.com/}i, "")
+      value = path.split(%r{[/?#]}).first.to_s
+    end
+
+    value.delete_prefix("@").strip.downcase
+  end
+
   # ─── Resolve methods (search + DB create) ────────────────────────
 
   # Resolve a WeChat account from an article URL via WereadApiClient.
@@ -216,14 +230,14 @@ class AccountResolver
         Result.new(accounts: [], status: "not_found", error: "Twitter 帐号未找到: #{id}")
       end
     elsif name.present?
-      screen_name = name.strip.delete_prefix("@").downcase
+      screen_name = self.class.normalize_twitter_screen_name(name)
 
       # Check DB first by twitter_screen_name
       account = TwitterAccount.find_by(twitter_screen_name: screen_name)
       return Result.new(accounts: [ account ], status: "found", error: nil) if account
 
       begin
-        users = self.class.search_twitter(name)
+        users = self.class.search_twitter(screen_name)
         if users.any?
           resolved = create_twitter_accounts(users, fallback_screen_name: screen_name)
           Result.new(accounts: resolved, status: "found", error: nil)
