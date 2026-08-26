@@ -73,6 +73,12 @@ Rails.application.routes.draw do
     end
   end
 
+  resources :wechat_url_import_tasks, only: [:index, :show, :destroy] do
+    member do
+      get :poll
+    end
+  end
+
   resources :wechat_content_download_tasks, only: [:index, :show, :destroy] do
     collection do
       post :run

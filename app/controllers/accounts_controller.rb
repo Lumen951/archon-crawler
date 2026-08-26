@@ -131,44 +131,20 @@ class AccountsController < ApplicationController
       redirect_to import_wechat_page_accounts_path and return
     end
 
-    created = []
-    found = []
-    errors = []
-
-    urls.each do |url|
-      result = AccountResolver.resolve_wechat_by_url(url)
-      case result.status
-      when "created"
-        account = result.account
-        created << "#{account.nickname}（mpId: #{account.weread_mp_id}）"
-      when "found"
-        account = result.account
-        found << account.nickname
-      else
-        errors << (result.error.presence || "导入失败")
-      end
+    task = WechatUrlImportTask.transaction do
+      import_task = WechatUrlImportTask.create!(total_count: urls.size, status: :pending)
+      import_task.items.create!(urls.map { |url| { url: url } })
+      import_task
     end
 
-    if created.any? || found.any?
-      parts = []
-      parts << "成功导入 #{created.size} 个公众号" if created.any?
-      parts << "#{found.size} 个公众号已存在" if found.any?
-      message = parts.join("，")
-      if errors.any?
-        flash[:warning] = truncate_error("#{message}；#{errors.size} 个链接解析失败（#{errors.first}）")
-      else
-        flash[:success] = message
-      end
-    else
-      flash[:error] = truncate_error(errors.first || "导入失败")
-    end
-
-    redirect_to accounts_path
-  rescue ArgumentError => e
-    flash[:error] = truncate_error(e.message)
+    WechatUrlImportJob.perform_later(task.id)
+    flash[:success] = "已创建微信文章链接导入任务，共 #{urls.size} 个链接"
+    redirect_to wechat_url_import_task_path(task)
+  rescue ActiveRecord::RecordInvalid => e
+    flash[:error] = truncate_error("创建导入任务失败：#{e.message}")
     redirect_to import_wechat_page_accounts_path
   rescue StandardError => e
-    flash[:error] = truncate_error("导入失败：#{e.message}")
+    flash[:error] = truncate_error("提交导入任务失败：#{e.message}")
     redirect_to import_wechat_page_accounts_path
   end
 

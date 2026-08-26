@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_24_000001) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_26_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -306,6 +306,37 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_000001) do
     t.index ["job_id"], name: "index_wechat_content_download_tasks_on_job_id", unique: true
   end
 
+  create_table "wechat_url_import_items", force: :cascade do |t|
+    t.bigint "account_id"
+    t.datetime "created_at", null: false
+    t.text "error_message"
+    t.datetime "processed_at"
+    t.datetime "started_at"
+    t.integer "status", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.string "url", null: false
+    t.bigint "wechat_url_import_task_id", null: false
+    t.index ["account_id"], name: "index_wechat_url_import_items_on_account_id"
+    t.index ["status"], name: "index_wechat_url_import_items_on_status"
+    t.index ["wechat_url_import_task_id", "url"], name: "index_wechat_url_import_items_on_task_and_url", unique: true
+    t.index ["wechat_url_import_task_id"], name: "index_wechat_url_import_items_on_wechat_url_import_task_id"
+  end
+
+  create_table "wechat_url_import_tasks", force: :cascade do |t|
+    t.datetime "completed_at"
+    t.datetime "created_at", null: false
+    t.integer "created_count", default: 0, null: false
+    t.text "error_message"
+    t.integer "failed_count", default: 0, null: false
+    t.integer "found_count", default: 0, null: false
+    t.integer "processed_count", default: 0, null: false
+    t.datetime "started_at"
+    t.integer "status", default: 0, null: false
+    t.integer "total_count", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.index ["status"], name: "index_wechat_url_import_tasks_on_status"
+  end
+
   add_foreign_key "api_keys", "users"
   add_foreign_key "articles", "accounts"
   add_foreign_key "articles", "crawl_tasks"
@@ -326,4 +357,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_000001) do
   add_foreign_key "tag_accounts", "tags"
   add_foreign_key "user_tags", "tags"
   add_foreign_key "user_tags", "users"
+  add_foreign_key "wechat_url_import_items", "accounts"
+  add_foreign_key "wechat_url_import_items", "wechat_url_import_tasks"
 end

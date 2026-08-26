@@ -112,6 +112,31 @@ class AccountsControllerTest < ActionDispatch::IntegrationTest
     assert_match "请输入搜索关键词", response.body
   end
 
+  test "accepts multiple article URLs asynchronously" do
+    resolver_called = false
+    stub_class_method(AccountResolver, :resolve_wechat_by_url, ->(_url) { resolver_called = true }) do
+      assert_enqueued_with(job: WechatUrlImportJob) do
+        post import_wechat_by_url_accounts_path, params: {
+          article_urls: " https://mp.weixin.qq.com/s/one\n\nhttps://mp.weixin.qq.com/s/two\nhttps://mp.weixin.qq.com/s/one "
+        }
+      end
+    end
+
+    assert_redirected_to wechat_url_import_task_path(WechatUrlImportTask.last)
+    task = WechatUrlImportTask.last
+    assert_equal 2, task.total_count
+    assert_equal 2, task.items.count
+    assert_equal false, resolver_called
+  end
+
+  test "rejects an empty article URL batch" do
+    post import_wechat_by_url_accounts_path, params: { article_urls: " \n\n" }
+
+    assert_redirected_to import_wechat_page_accounts_path
+    follow_redirect!
+    assert_match "请输入至少一个微信公众号文章链接", response.body
+  end
+
   test "deletes account from show action" do
     account = WechatAccount.create!(fakeid: "to_delete_fakeid", nickname: "待删除帐号", status: :active)
 
