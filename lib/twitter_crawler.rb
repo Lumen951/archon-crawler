@@ -31,12 +31,30 @@ class TwitterCrawler < BaseCrawler
     start_time = Time.current
 
     begin
-      log(crawl_task, :info, "#{account.nickname}: 正在获取推文列表... (user_id: #{account.fakeid})")
+      # Fix legacy data: if fakeid contains a URL, resolve it to user_id
+      user_id = account.fakeid.to_s
+      if user_id.match?(%r{https?://|twitter\.com|x\.com}i)
+        log(crawl_task, :warn, "#{account.nickname}: fakeid 包含 URL，尝试解析为 user_id...")
+        if account.twitter_screen_name.present?
+          users = TwitterApiClient.lookup_user(account.twitter_screen_name)
+          if users.is_a?(Array) && users.first && users.first["rest_id"].present?
+            user_id = users.first["rest_id"].to_s
+            account.update_column(:fakeid, user_id)
+            log(crawl_task, :info, "#{account.nickname}: 已更新 user_id: #{user_id}")
+          else
+            raise TwitterApiClient::ApiError, "无法通过 screen_name 查找 user_id"
+          end
+        else
+          raise TwitterApiClient::ApiError, "fakeid 格式错误且缺少 screen_name"
+        end
+      end
+
+      log(crawl_task, :info, "#{account.nickname}: 正在获取推文列表... (user_id: #{user_id})")
       tweets = Retryable.with_retry(
         crawl_task: crawl_task,
         context: "#{account.nickname}: 推文列表获取"
       ) do
-        TwitterApiClient.get_user_tweets(account.fakeid)
+        TwitterApiClient.get_user_tweets(user_id)
       end
 
       if tweets.nil? || tweets.empty?

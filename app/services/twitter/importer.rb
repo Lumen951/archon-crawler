@@ -94,9 +94,10 @@ module Twitter
 
     def normalize_row(row)
       row = row.transform_keys(&:to_s) if row.respond_to?(:transform_keys)
+      raw_screen_name = (row["screen_name"] || row["username"] || row["handle"]).to_s.strip
       {
         user_id:   row["user_id"].to_s.strip.presence,
-        screen_name: (row["screen_name"] || row["username"] || row["handle"]).to_s.strip.delete_prefix("@").presence,
+        screen_name: raw_screen_name.present? ? AccountResolver.normalize_twitter_screen_name(raw_screen_name) : nil,
         name:      (row["name"] || row["display_name"]).to_s.strip.presence,
         image:     (row["image"] || row["avatar"] || row["profile_image_url_https"]).to_s.strip.presence
       }
@@ -108,7 +109,8 @@ module Twitter
       seen = Set.new
       csv.filter_map do |row|
         # Dedup by screen_name (case-insensitive) or user_id
-        key = row["user_id"].to_s.strip.presence || row["screen_name"].to_s.strip.downcase.delete_prefix("@")
+        raw_name = row["screen_name"].to_s.strip
+        key = row["user_id"].to_s.strip.presence || (raw_name.present? ? AccountResolver.normalize_twitter_screen_name(raw_name) : nil)
         next if key.blank? || seen.include?(key)
         seen << key
         row.to_h
