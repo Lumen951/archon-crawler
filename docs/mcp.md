@@ -210,7 +210,7 @@ curl -X POST https://<your-host>/oauth/token \
 | `page` | optional | 页码（默认 1） |
 | `per_page` | optional | 每页数量（默认 25，最大 100） |
 
-**Returns:** 文章列表，包含 id、title、url、published_at、digest、content_preview。
+**Returns:** 文章列表，包含 id、title、url、published_at、digest、content（完整正文 Markdown；无正文时为 null）。
 
 ---
 

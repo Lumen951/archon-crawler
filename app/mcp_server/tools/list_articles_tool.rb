@@ -4,14 +4,14 @@ module Tools
     description "查询某账号的文章列表，支持日期范围过滤和分页。用于分析账号发布内容。"
     annotations(read_only_hint: true, destructive_hint: false)
 
-    ARTICLE_FIELDS = %w[id title url published_at digest content_preview].freeze
+    ARTICLE_FIELDS = %w[id title url published_at digest content].freeze
 
     input_schema(
       properties: {
         account_id: { type: "integer", description: "账号 ID" },
         start_date: { type: "string", description: "起始日期（YYYY-MM-DD）" },
         end_date: { type: "string", description: "结束日期（YYYY-MM-DD）" },
-        fields: { type: "array", items: { type: "string" }, description: "只返回指定文章字段（可选值：#{ARTICLE_FIELDS.join('、')}），不传则返回除 content_preview 外的全部字段。content_preview 较大（每篇最多 200 字），仅在需要时传入。" },
+        fields: { type: "array", items: { type: "string" }, description: "只返回指定文章字段（可选值：#{ARTICLE_FIELDS.join('、')}），不传则返回除 content 外的全部字段。content 较大，仅在需要时传入。" },
         page: { type: "integer", description: "页码（默认 1）" },
         per_page: { type: "integer", description: "每页数量（默认 25，最大 100）" },
       },
@@ -58,8 +58,7 @@ module Tools
       per_page = [[per_page.to_i, 25].max, 100].min
 
       requested_fields = fields&.map { |f| f.to_s.to_sym }
-      # By default exclude content_preview to save tokens; only include when explicitly requested
-      want_content_preview = requested_fields&.include?(:content_preview)
+      want_content = requested_fields&.include?(:content)
 
       articles = scope.page(page).per(per_page)
 
@@ -81,9 +80,9 @@ module Tools
             url: a.url,
             published_at: a.published_at&.iso8601,
             digest: a.best_digest,
-            content_preview: want_content_preview ? a.clean_content_markdown&.truncate(200) : nil,
+            content: want_content ? a.clean_content_markdown : nil,
           }
-          requested_fields ? full.slice(*requested_fields) : full.except(:content_preview)
+          requested_fields ? full.slice(*requested_fields) : full.except(:content)
         }
       }
 
