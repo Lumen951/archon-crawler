@@ -54,7 +54,18 @@ class QrLoginTest < ActiveSupport::TestCase
     end
   end
 
-  test "weread poll surfaces relay errors instead of raising" do
+  test "weread poll treats a login status timeout as temporary waiting" do
+    timeout = proc { |*, **| raise WereadApiClient::LoginPollTimeoutError, "检查登录状态超时: execution expired" }
+
+    stub_class_method(WereadApiClient, :get_login_result, timeout) do
+      result = QrLogin::Weread.poll({ "uuid" => "u" })
+
+      assert_equal :waiting, result[:status]
+      assert_match "暂时超时", result[:message]
+    end
+  end
+
+  test "weread poll surfaces non-timeout relay errors instead of raising" do
     boom = proc { |*, **| raise WereadApiClient::ApiError, "检查登录状态失败: timeout" }
 
     stub_class_method(WereadApiClient, :get_login_result, boom) do

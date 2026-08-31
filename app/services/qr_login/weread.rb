@@ -48,6 +48,8 @@ module QrLogin
 
         message = data["message"].to_s
         { status: normalize_status(message), message: message.presence || "等待扫码...", handle: handle, result: nil }
+      rescue WereadApiClient::LoginPollTimeoutError => e
+        { status: :waiting, message: "等待扫码...（状态查询暂时超时）", handle: handle, result: nil }
       rescue WereadApiClient::ApiError => e
         { status: :error, message: e.message, handle: handle, result: nil }
       end

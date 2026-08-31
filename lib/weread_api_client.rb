@@ -39,6 +39,7 @@ class WereadApiClient
   class WeReadRateLimitError < ApiError; end
   class WeReadBadRequestError < ApiError; end
   class NoAvailableAccountError < ApiError; end
+  class LoginPollTimeoutError < ApiError; end
 
   # ── Faraday connections ────────────────────────────────
 
@@ -316,6 +317,8 @@ class WereadApiClient
 
     data = safe_json_parse(resp.body)
     data
+  rescue Faraday::TimeoutError => e
+    raise LoginPollTimeoutError, "检查登录状态超时: #{e.message}"
   rescue Faraday::Error => e
     raise ApiError, "检查登录状态失败: #{e.message}"
   end
