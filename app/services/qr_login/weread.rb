@@ -7,6 +7,7 @@ module QrLogin
     # 转发服务只返回自由文本 message，靠关键词归类
     SCANNED_PATTERN = /扫描|已扫码|扫码成功|scan/i
     EXPIRED_PATTERN = /过期|失效|expired|超时/i
+    ERROR_PATTERN = /WeReadError401/i
 
     class << self
       def key
@@ -66,6 +67,7 @@ module QrLogin
       private
 
       def normalize_status(message)
+        return :error if message.match?(ERROR_PATTERN)
         return :expired if message.match?(EXPIRED_PATTERN)
         return :scanned if message.match?(SCANNED_PATTERN)
 

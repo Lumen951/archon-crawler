@@ -44,7 +44,8 @@ class QrLoginTest < ActiveSupport::TestCase
     {
       "等待扫码" => :waiting,
       "已扫码，请在手机确认" => :scanned,
-      "二维码已过期" => :expired
+      "二维码已过期" => :expired,
+      "WeReadError401" => :error
     }.each do |message, expected|
       poll = proc { |*, **| { "message" => message } }
 
