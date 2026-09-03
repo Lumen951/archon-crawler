@@ -13,7 +13,8 @@ require "rate_limiter_middleware"
 #   "mp_native"   (default) — WechatMpNativeApiClient (扫码登录 mp.weixin.qq.com)
 #   "dajiala"               — DajialaApiClient (dajiala.com)
 #   "profile_ext"           — ProfileExtApiClient (mitmproxy 凭证)
-#   "weread"                — WereadApiClient (微信读书转发)
+#   "weread"                — WereadApiClient (微信读书转发服务账号池)
+#   "weread_native"         — WereadNativeApiClient (直连 weread.qq.com，扫码登录单会话)
 class WechatCrawler < BaseCrawler
   CHROME_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.64 Safari/537.36".freeze
 
@@ -45,6 +46,11 @@ class WechatCrawler < BaseCrawler
   # @param crawl_task [CrawlTask] 用于日志
   # @return [String] 清洗后的 HTML 内容
   def self.download_content(url, crawl_task: nil)
+    # 微信读书（直连）的正文链接走微信读书接口（需登录会话），其余直访 mp.weixin.qq.com
+    if WereadNativeApiClient.weread_content_url?(url)
+      return WereadNativeApiClient.download_content(url, crawl_task: crawl_task)
+    end
+
     article_url = normalize_article_url(url)
 
     log(crawl_task, :debug, "下载文章: #{article_url[0..80]}..., 速率限制: #{download_rate_limiter.remaining}/#{Option.wechat_download_rate_limit}")
@@ -153,6 +159,7 @@ class WechatCrawler < BaseCrawler
     when "dajiala" then DajialaApiClient
     when "profile_ext" then ProfileExtApiClient
     when "weread" then WereadApiClient
+    when "weread_native" then WereadNativeApiClient
     else WechatMpNativeApiClient
     end
   end
@@ -164,10 +171,14 @@ class WechatCrawler < BaseCrawler
     log(crawl_task, :info, "开始抓取微信帐号: #{account.nickname} (fakeid: #{account.fakeid})")
     dajiala = Option.wechat_api_provider == "dajiala"
     weread  = Option.wechat_api_provider == "weread"
+    weread_native = Option.wechat_api_provider == "weread_native"
 
-    # 解析抓取标识: weread 用 mpId（必要时自动解析），dajiala 用 nickname，其余用 fakeid
+    # 解析抓取标识: weread 用 mpId（必要时自动解析），weread_native 由 fakeid 换算 MP_WXS_，
+    # dajiala 用 nickname，其余用 fakeid
     identifier = if weread
                    resolve_weread_mp_id(account, crawl_task)
+                 elsif weread_native
+                   WereadNativeApiClient.normalize_book_id(account.weread_mp_id)
                  elsif dajiala
                    account.nickname
                  else
@@ -222,6 +233,9 @@ class WechatCrawler < BaseCrawler
       # weread 不足一页即到末尾，避免多发一次请求
       break if weread && articles_data.size < 20
 
+      # weread_native 只暴露最新一篇，取到即结束
+      break if weread_native
+
       pages_crawled += 1
     end
 
@@ -237,6 +251,9 @@ class WechatCrawler < BaseCrawler
     log(crawl_task, :error, "#{account.nickname}: 异常 backtrace: #{e.backtrace&.first(5)&.join(' | ')}")
 
     if [ WereadApiClient::NoAvailableAccountError ].any? { |err| e.is_a?(err) }
+      crawl_task.fail_platform!(account.class.name)
+      log(crawl_task, :error, "#{account.nickname}: #{e.message}，已中断微信平台剩余帐号抓取")
+    elsif [ WereadNativeApiClient::LoginRequiredError, WereadNativeApiClient::SessionExpiredError ].any? { |err| e.is_a?(err) }
       crawl_task.fail_platform!(account.class.name)
       log(crawl_task, :error, "#{account.nickname}: #{e.message}，已中断微信平台剩余帐号抓取")
     end

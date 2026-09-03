@@ -41,6 +41,11 @@ class Admin::SettingsController < Admin::BaseController
     @weread_blocked_accounts = Option.weread_blocked_accounts
     @weread_today_blocked = (@weread_blocked_accounts[WereadApiClient.today_shanghai] || [])
     @weread_key_check = Rails.cache.read('api_key_check:weread')
+    # WeRead Native (直连扫码登录)
+    @weread_native_session_valid = Option.weread_native_session_valid?
+    @weread_native_expires_at = Option.weread_native_expires_at
+    @weread_native_account_info = Option.weread_native_account_info
+    @weread_native_key_check = Rails.cache.read('api_key_check:weread_native')
     # Feishu
     @feishu_enabled = Option.feishu_enabled?
     @feishu_app_id = Option.feishu_app_id
@@ -426,6 +431,37 @@ class Admin::SettingsController < Admin::BaseController
     end
   rescue => e
     Rails.logger.error("[WeRead] validate error: #{e.message}")
+    respond_to do |format|
+      format.turbo_stream { render turbo_stream: helpers.toast_stream("验证失败：#{e.message[0..200]}", type: :error) }
+      format.html { flash[:error] = "验证失败：#{e.message[0..200]}"; redirect_to admin_settings_path }
+      format.json { render json: { error: e.message }, status: :unprocessable_entity }
+    end
+  end
+
+  # ── WeRead Native (直连扫码登录) ──────────────────────
+
+  def weread_native_logout
+    Option.weread_native_session_cleared!
+    message = "已退出微信读书（直连）登录"
+    respond_to do |format|
+      format.turbo_stream { render turbo_stream: helpers.toast_stream(message, type: :success) }
+      format.html { flash[:success] = message; redirect_to admin_settings_path }
+      format.json { render json: { status: "logged_out" } }
+    end
+  end
+
+  def validate_weread_native_key
+    valid = WereadNativeApiClient.validate_key
+    result = { valid: valid, checked_at: Time.current.iso8601 }
+    Rails.cache.write('api_key_check:weread_native', result, expires_in: 2.hours)
+    message = valid ? "✓ 微信读书（直连）会话有效" : "✗ 微信读书（直连）会话无效或已过期"
+    respond_to do |format|
+      format.turbo_stream { render turbo_stream: helpers.toast_stream(message, type: valid ? :success : :error) }
+      format.html { flash[:success] = message; redirect_to admin_settings_path }
+      format.json { render json: result }
+    end
+  rescue => e
+    Rails.logger.error("[WeReadNative] validate error: #{e.message}")
     respond_to do |format|
       format.turbo_stream { render turbo_stream: helpers.toast_stream("验证失败：#{e.message[0..200]}", type: :error) }
       format.html { flash[:error] = "验证失败：#{e.message[0..200]}"; redirect_to admin_settings_path }

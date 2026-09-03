@@ -7,6 +7,7 @@
 module QrLogin
   PROVIDERS = {
     "weread" => "QrLogin::Weread",
+    "weread_native" => "QrLogin::WereadNative",
     "wechat_mp" => "QrLogin::WechatMp"
   }.freeze
 

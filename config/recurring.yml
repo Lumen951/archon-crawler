@@ -22,10 +22,15 @@ development:
     class: CleanupOldTasksJob
     queue: default
     schedule: every day at 3am
-  weread_login_reminder:
+  # weread_login_reminder:
+  #   class: FeishuLoginReminderJob
+  #   queue: default
+  #   args: [ "weread" ]
+  #   schedule: every day at 9:30am
+  weread_native_login_reminder:
     class: FeishuLoginReminderJob
     queue: default
-    args: [ "weread" ]
+    args: [ "weread_native" ]
     schedule: every day at 9:30am
   # wechat_mp_login_reminder:
   #   class: FeishuLoginReminderJob
@@ -57,10 +62,15 @@ production:
     class: CleanupOldTasksJob
     queue: default
     schedule: every day at 3am
-  weread_login_reminder:
+  # weread_login_reminder:
+  #   class: FeishuLoginReminderJob
+  #   queue: default
+  #   args: [ "weread" ]
+  #   schedule: every day at 9:30am
+  weread_native_login_reminder:
     class: FeishuLoginReminderJob
     queue: default
-    args: [ "weread" ]
+    args: [ "weread_native" ]
     schedule: every day at 9:30am
   # wechat_mp_login_reminder:
   #   class: FeishuLoginReminderJob

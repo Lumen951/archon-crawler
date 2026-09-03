@@ -295,6 +295,86 @@ class Option < ApplicationRecord
       weread_accounts.any? { |a| a["status"].to_i == 1 }
     end
 
+    # ── WeRead Native (直连 weread.qq.com) 扫码登录会话 ──
+    #
+    # 与 mp_native 会话同构：扫码登录成功后写入一套 Cookie（wr_vid / wr_skey ...），
+    # 单会话槽位。TTL 仅为本地时间戳启发式，真正权威是 WereadNativeApiClient.validate_key
+    # 的实时探测（每日由 FeishuLoginReminderJob 体检）。
+    WEREAD_NATIVE_SESSION_TTL = 25.days
+
+    # Cookie 以 JSON 对象（name => value）持久化
+    def weread_native_cookie
+      get("weread_native_cookie")
+    end
+
+    def weread_native_cookie=(val)
+      set("weread_native_cookie", val)
+    end
+
+    def weread_native_cookie_jar
+      raw = weread_native_cookie
+      return {} if raw.blank?
+      JSON.parse(raw)
+    rescue JSON::ParserError
+      {}
+    end
+
+    def weread_native_expires_at
+      get("weread_native_expires_at")
+    end
+
+    def weread_native_expires_at=(val)
+      set("weread_native_expires_at", val)
+    end
+
+    def weread_native_login_state
+      get("weread_native_login_state")
+    end
+
+    def weread_native_login_state=(val)
+      set("weread_native_login_state", val)
+    end
+
+    def weread_native_account_info
+      get("weread_native_account_info")
+    end
+
+    def weread_native_account_info=(val)
+      set("weread_native_account_info", val)
+    end
+
+    def weread_native_session_ttl_label
+      ttl = WEREAD_NATIVE_SESSION_TTL
+      ttl < 1.day ? "约 #{(ttl / 1.hour).to_i} 小时" : "约 #{(ttl / 1.day).to_i} 天"
+    end
+
+    # 扫码登录成功后一次性写入整套会话字段（cookie_jar 为 name => value 的 Hash）
+    def weread_native_session_started!(cookie_jar:, account_info: {})
+      transaction do
+        self.weread_native_cookie = cookie_jar.is_a?(String) ? cookie_jar : cookie_jar.to_json
+        self.weread_native_login_state = "success"
+        self.weread_native_expires_at = (Time.current + WEREAD_NATIVE_SESSION_TTL).iso8601
+        self.weread_native_account_info = account_info.to_json
+      end
+    end
+
+    def weread_native_session_cleared!
+      transaction do
+        self.weread_native_cookie = nil
+        self.weread_native_login_state = nil
+        self.weread_native_expires_at = nil
+        self.weread_native_account_info = nil
+      end
+    end
+
+    def weread_native_session_valid?
+      return false if weread_native_cookie_jar.empty?
+
+      expires_at = weread_native_expires_at
+      return true if expires_at.blank?
+      Time.parse(expires_at).future? rescue false
+    end
+
     # ── Feishu (飞书) 推送配置 ──────────────────────────
     # 用于每日推送微信读书登录二维码到飞书（私聊/群）。
 

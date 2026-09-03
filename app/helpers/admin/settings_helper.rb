@@ -13,5 +13,10 @@ module Admin
     def wechat_mp_session_ttl_label
       Option.wechat_mp_session_ttl_label
     end
+
+    # 微信读书（直连）会话有效期文案（唯一来源是 Option::WEREAD_NATIVE_SESSION_TTL）
+    def weread_native_session_ttl_label
+      Option.weread_native_session_ttl_label
+    end
   end
 end

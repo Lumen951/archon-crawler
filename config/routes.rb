@@ -131,6 +131,9 @@ Rails.application.routes.draw do
       # WeRead
       post :weread_logout
       post :validate_weread_key
+      # WeRead Native (直连扫码登录)
+      post :weread_native_logout
+      post :validate_weread_native_key
       # WeRead account management
       post :weread_enable_account
       post :weread_disable_account
