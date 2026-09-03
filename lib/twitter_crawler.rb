@@ -31,21 +31,25 @@ class TwitterCrawler < BaseCrawler
     start_time = Time.current
 
     begin
-      # Fix legacy data: if fakeid contains a URL, resolve it to user_id
+      # Fix legacy data: if fakeid contains a URL, resolve it to user_id.
+      # The handle is usually embedded in the URL (e.g. https://x.com/foo), so
+      # derive it from the URL as a fallback when twitter_screen_name is blank.
       user_id = account.fakeid.to_s
       if user_id.match?(%r{https?://|twitter\.com|x\.com}i)
         log(crawl_task, :warn, "#{account.nickname}: fakeid 包含 URL，尝试解析为 user_id...")
-        if account.twitter_screen_name.present?
-          users = TwitterApiClient.lookup_user(account.twitter_screen_name)
+        screen_name = account.twitter_screen_name.presence ||
+                      AccountResolver.normalize_twitter_screen_name(account.fakeid)
+        if screen_name.present?
+          users = TwitterApiClient.lookup_user(screen_name)
           if users.is_a?(Array) && users.first && users.first["rest_id"].present?
             user_id = users.first["rest_id"].to_s
-            account.update_column(:fakeid, user_id)
+            account.update_columns(fakeid: user_id, twitter_screen_name: screen_name)
             log(crawl_task, :info, "#{account.nickname}: 已更新 user_id: #{user_id}")
           else
-            raise TwitterApiClient::ApiError, "无法通过 screen_name 查找 user_id"
+            raise TwitterApiClient::ApiError, "无法通过 screen_name 查找 user_id（@#{screen_name} 可能已改名或停用）"
           end
         else
-          raise TwitterApiClient::ApiError, "fakeid 格式错误且缺少 screen_name"
+          raise TwitterApiClient::ApiError, "fakeid 格式错误且无法解析出 screen_name"
         end
       end
 
