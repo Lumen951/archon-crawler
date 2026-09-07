@@ -32,8 +32,8 @@ class WereadNativeApiClient
 
   USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36".freeze
 
-  # 直连微信读书的保守限流（10 次/60 秒）
-  LIST_RATE_LIMITER = RateLimiter.new(10, 60)
+  # 直连微信读书的保守限流（30 次/60 秒）
+  LIST_RATE_LIMITER = RateLimiter.new(30, 60)
 
   # ── Error classes ──────────────────────────────────────
 
