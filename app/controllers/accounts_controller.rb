@@ -337,10 +337,7 @@ class AccountsController < ApplicationController
       redirect_back fallback_location: accounts_path and return
     end
 
-    crawl_task = CrawlTask.create!(status: :pending)
-    accounts.each do |account|
-      crawl_task.crawl_task_accounts.create!(account: account, status: :pending)
-    end
+    crawl_task = CrawlTask.create!(account_ids: accounts.ids, status: :pending)
     CrawlJob.perform_later(crawl_task.id)
     flash[:success] = "已为 #{accounts.size} 个帐号启动抓取"
     redirect_to crawl_task_path(crawl_task)
