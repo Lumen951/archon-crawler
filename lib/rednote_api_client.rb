@@ -8,6 +8,9 @@ class RednoteApiClient
   class ApiError < StandardError
   end
 
+  class ApiInsufficientBalanceError < ApiError
+  end
+
   class ApiKeyMissingError < ApiError
     include CrawlerApiKeyError
   end
@@ -84,7 +87,11 @@ class RednoteApiClient
       code = body["code"].to_i
       raise ApiRateLimitError, "API 速率限制 (429): #{response.status} - #{body_str}" if code == 429
       unless code == 0
-        raise ApiError, "API 返回错误 code=#{code}: #{body['msg'] || 'unknown'}: #{response.status} - #{body_str}"
+        error_message = "API 返回错误 code=#{code}: #{body['msg'] || 'unknown'}: #{response.status} - #{body_str}"
+        if code == 1001
+          raise ApiInsufficientBalanceError, error_message
+        end
+        raise ApiError, error_message
       end
       body["data"]
     when 401, 403

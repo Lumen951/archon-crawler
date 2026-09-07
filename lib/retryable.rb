@@ -30,6 +30,11 @@ module Retryable
         raise e
       end
 
+      if e.is_a?(RednoteApiClient::ApiInsufficientBalanceError)
+        crawl_task.log(:error, "#{context}: 余额不足，不重试: #{e.message}")
+        raise e
+      end
+
       if e.is_a?(WechatMpNativeApiClient::RateLimitError)
         crawl_task.log(:error, "#{context}: 触发速率限制，不重试: #{e.message}")
         raise e
