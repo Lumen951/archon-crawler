@@ -96,7 +96,7 @@ class RednoteCrawler < BaseCrawler
 
     if [ RednoteApiClient::ApiKeyMissingError, RednoteApiClient::ApiInsufficientBalanceError ].any? { |klass| e.is_a?(klass) }
       crawl_task.fail_platform!(account.class.name)
-      raise e
+      log(crawl_task, :error, "#{account.nickname}: #{e.message}，已中断#{account.platform_name}平台剩余帐号抓取")
     end
 
     { new_count: new_count, skip_count: skip_count, error_count: error_count + 1 }
