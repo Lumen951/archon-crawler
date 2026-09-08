@@ -94,7 +94,7 @@ class RednoteCrawler < BaseCrawler
     log(crawl_task, :error, "#{account.nickname}: 抓取出错 - #{e.class}: #{e.message}")
     log(crawl_task, :error, "#{account.nickname}: 异常 backtrace: #{e.backtrace&.first(5)&.join(' | ')}")
 
-    if [ RednoteApiClient::ApiKeyMissingError ].any? { |klass| e.is_a?(klass) }
+    if [ RednoteApiClient::ApiKeyMissingError, RednoteApiClient::ApiInsufficientBalanceError ].any? { |klass| e.is_a?(klass) }
       crawl_task.fail_platform!(account.class.name)
       raise e
     end

@@ -251,7 +251,6 @@ class WechatCrawler < BaseCrawler
     log(crawl_task, :error, "#{account.nickname}: 异常 backtrace: #{e.backtrace&.first(5)&.join(' | ')}")
 
     if [
-      RednoteApiClient::ApiInsufficientBalanceError,
       WereadApiClient::NoAvailableAccountError,
       WereadNativeApiClient::LoginRequiredError,
       WereadNativeApiClient::SessionExpiredError,
