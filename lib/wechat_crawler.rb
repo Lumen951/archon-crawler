@@ -250,12 +250,14 @@ class WechatCrawler < BaseCrawler
     log(crawl_task, :error, "#{account.nickname}: 抓取出错 - #{e.message}")
     log(crawl_task, :error, "#{account.nickname}: 异常 backtrace: #{e.backtrace&.first(5)&.join(' | ')}")
 
-    if [ WereadApiClient::NoAvailableAccountError ].any? { |err| e.is_a?(err) }
+    if [
+      RednoteApiClient::ApiInsufficientBalanceError,
+      WereadApiClient::NoAvailableAccountError,
+      WereadNativeApiClient::LoginRequiredError,
+      WereadNativeApiClient::SessionExpiredError,
+    ].any? { |err| e.is_a?(err) }
       crawl_task.fail_platform!(account.class.name)
-      log(crawl_task, :error, "#{account.nickname}: #{e.message}，已中断微信平台剩余帐号抓取")
-    elsif [ WereadNativeApiClient::LoginRequiredError, WereadNativeApiClient::SessionExpiredError ].any? { |err| e.is_a?(err) }
-      crawl_task.fail_platform!(account.class.name)
-      log(crawl_task, :error, "#{account.nickname}: #{e.message}，已中断微信平台剩余帐号抓取")
+      log(crawl_task, :error, "#{account.nickname}: #{e.message}，已中断#{account.platform_name}平台剩余帐号抓取")
     end
   end
 
