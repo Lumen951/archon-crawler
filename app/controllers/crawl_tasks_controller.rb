@@ -87,11 +87,6 @@ class CrawlTasksController < ApplicationController
   end
 
   def crawl_due
-    if CrawlTask.active.exists?
-      flash[:error] = "已有活跃的抓取任务"
-      redirect_to crawl_tasks_path and return
-    end
-
     account_ids = Account.due_for_crawl_ids_by_platform
     if account_ids.empty?
       flash[:warning] = "没有到期的帐号需要抓取"

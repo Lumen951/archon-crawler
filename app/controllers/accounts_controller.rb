@@ -233,11 +233,6 @@ class AccountsController < ApplicationController
       redirect_to account_path(@account) and return
     end
 
-    if CrawlTask.active.exists?
-      flash[:error] = "已有活跃的抓取任务"
-      redirect_to account_path(@account) and return
-    end
-
     crawl_task = nil
     begin
       @account.monitor_pages.destroy_all
@@ -256,11 +251,6 @@ class AccountsController < ApplicationController
 
   def crawl
     @account = Account.find(params[:id])
-
-    if CrawlTask.active.exists?
-      flash[:error] = "已有活跃的抓取任务"
-      redirect_to account_path(@account) and return
-    end
 
     begin
       crawl_task = @account.crawl!
@@ -383,11 +373,6 @@ class AccountsController < ApplicationController
     account_ids = resolve_bulk_account_ids
     if account_ids.blank?
       flash[:error] = "请选择帐号"
-      redirect_back fallback_location: accounts_path and return
-    end
-
-    if CrawlTask.active.exists?
-      flash[:error] = "已有活跃的抓取任务，请先完成或暂停"
       redirect_back fallback_location: accounts_path and return
     end
 
