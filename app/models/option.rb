@@ -300,7 +300,7 @@ class Option < ApplicationRecord
     # 与 mp_native 会话同构：扫码登录成功后写入一套 Cookie（wr_vid / wr_skey ...），
     # 单会话槽位。TTL 仅为本地时间戳启发式，真正权威是 WereadNativeApiClient.validate_key
     # 的实时探测（每日由 FeishuLoginReminderJob 体检）。
-    WEREAD_NATIVE_SESSION_TTL = 25.days
+    WEREAD_NATIVE_SESSION_TTL = 2.hours
 
     # Cookie 以 JSON 对象（name => value）持久化
     def weread_native_cookie
