@@ -22,12 +22,16 @@ class CrawlOrchestrator
     crawl_task.crawl_task_accounts.failed.or(crawl_task.crawl_task_accounts.running).update_all(status: :pending, error_message: nil, completed_at: nil)
     crawl_task.update!(status: :running, error_message: nil, error_count: 0, platform_error_counts: {}, completed_at: nil, started_at: Time.current)
 
-    platform_summary = Account.subclasses.filter_map { |klass|
+    # platform_classes (DB-driven) rather than Account.subclasses: in
+    # development lazy loading a subclass that has never been referenced
+    # would be missing from `subclasses` and silently skipped.
+    platform_classes = Account.platform_classes
+    platform_summary = platform_classes.filter_map { |klass|
       next if !klass.crawl_enabled?
       count = klass.where(id: incomplete_scope).count
       "#{klass.new.platform_name} #{count}" if count > 0
     }.join("，")
-    disabled_platforms = Account.subclasses.reject(&:crawl_enabled?).map { |k| k.new.platform_name }
+    disabled_platforms = platform_classes.reject(&:crawl_enabled?).map { |k| k.new.platform_name }
     crawl_task.log(:info, "已禁用的平台：#{disabled_platforms.join('，')}") if disabled_platforms.any?
     crawl_task.log(:info, "开始抓取任务，共 #{incomplete_scope.count} 个帐号（#{platform_summary}）")
     crawl_task.log(:info, "每平台并发：#{account_concurrency}，文章并发：#{article_concurrency}")
@@ -41,7 +45,7 @@ class CrawlOrchestrator
       # This way WeChat throttling doesn't block Rednote/Twitter.
       barrier = Async::Barrier.new
 
-      Account.subclasses.each do |platform_class|
+      platform_classes.each do |platform_class|
         unless platform_class.crawl_enabled?
           crawl_task.log(:info, "#{platform_class.new.platform_name} 平台抓取已禁用，跳过")
           next

@@ -7,7 +7,7 @@
     <%= link_to "← 返回帐号列表", accounts_path, class: "btn btn-secondary" %>
   </div>
 
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
     <!-- WeChat Card -->
     <%= link_to import_wechat_page_accounts_path, class: "card hover:shadow-lg transition-shadow cursor-pointer group" do %>
       <div class="flex items-center gap-4 mb-4">
@@ -61,6 +61,25 @@
       </div>
       <p class="text-gray-600 text-sm">支持搜索导入和 CSV 文件导入</p>
       <div class="mt-4 flex items-center text-sky-600 text-sm font-medium">
+        开始导入
+        <svg class="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+        </svg>
+      </div>
+    <% end %>
+    <!-- Website Card -->
+    <%= link_to import_website_page_accounts_path, class: "card hover:shadow-lg transition-shadow cursor-pointer group" do %>
+      <div class="flex items-center gap-4 mb-4">
+        <div class="w-12 h-12 bg-violet-100 rounded-xl flex items-center justify-center text-2xl group-hover:bg-violet-200 transition-colors">
+          🌐
+        </div>
+        <div>
+          <h2 class="text-xl font-semibold text-gray-900">官网</h2>
+          <p class="text-sm text-gray-500">Website Monitor</p>
+        </div>
+      </div>
+      <p class="text-gray-600 text-sm">粘贴多个网址批量导入，跟踪 blog / research / announcement 等页面变化</p>
+      <div class="mt-4 flex items-center text-violet-600 text-sm font-medium">
         开始导入
         <svg class="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />

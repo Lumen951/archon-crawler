@@ -213,6 +213,40 @@ class Option < ApplicationRecord
       Time.parse(expires_at).future? rescue false
     end
 
+    # ── OpenAI / LLM 配置（Website Monitor 语义分析）─────
+    # 通过 MiraclePlus OpenAI 代理调用 Responses API。密钥仅存于 Option，
+    # 切勿硬编码到代码中。见 LlmClient。
+    OPENAI_DEFAULT_PROXY_URL = "https://openai-proxy.miracleplus.com/v1"
+    OPENAI_DEFAULT_MODEL = "openai/gpt-5.2"
+
+    def openai_api_key
+      get("openai_api_key")
+    end
+
+    def openai_api_key=(val)
+      set("openai_api_key", val)
+    end
+
+    def openai_api_key_valid?
+      openai_api_key.present?
+    end
+
+    def openai_model
+      get("openai_model").presence || OPENAI_DEFAULT_MODEL
+    end
+
+    def openai_model=(val)
+      set("openai_model", val)
+    end
+
+    def openai_proxy_url
+      get("openai_proxy_url").presence || OPENAI_DEFAULT_PROXY_URL
+    end
+
+    def openai_proxy_url=(val)
+      set("openai_proxy_url", val)
+    end
+
     # Per-platform crawl toggle helpers
     def crawl_wechat_enabled?
       get("crawl_wechat_enabled") != "false"
@@ -224,6 +258,10 @@ class Option < ApplicationRecord
 
     def crawl_twitter_enabled?
       get("crawl_twitter_enabled") != "false"
+    end
+
+    def crawl_website_enabled?
+      get("crawl_website_enabled") != "false"
     end
 
     # Profile Ext credential helpers

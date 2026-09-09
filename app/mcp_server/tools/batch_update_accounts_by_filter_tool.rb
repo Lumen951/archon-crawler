@@ -10,7 +10,7 @@ module Tools
           type: "object",
           description: "过滤条件（与 list_accounts 一致），为空则匹配所有账号",
           properties: {
-            platform: { type: "string", enum: %w[wechat rednote twitter], description: "按平台过滤" },
+            platform: { type: "string", enum: %w[wechat rednote twitter website], description: "按平台过滤" },
             status: { type: "string", enum: %w[active inactive], description: "按状态过滤" },
             activity_level: { type: "string", enum: %w[active slow dormant dead never uncrawled], description: "按活跃度过滤" },
             tag_id: { type: "integer", description: "按标签 ID 过滤（仅匹配已打该标签的账号）" },
@@ -126,6 +126,7 @@ module Tools
                        when "wechat"   then "WechatAccount"
                        when "rednote"  then "RednoteAccount"
                        when "twitter"  then "TwitterAccount"
+                       when "website"  then "WebsiteAccount"
                        else nil
                        end
         scope = scope.where(type: account_type) if account_type

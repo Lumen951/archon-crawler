@@ -22,6 +22,10 @@ class AccountsController < ApplicationController
   def show
     @account = Account.find(params[:id])
     @articles = @account.articles.recent.page(params[:page]).per(25)
+    if @account.website?
+      @monitor_pages = @account.monitor_pages.ordered.limit(20)
+      @monitor_changes = @account.monitor_changes.recent.limit(10)
+    end
   end
 
   def update
@@ -61,6 +65,10 @@ class AccountsController < ApplicationController
 
   def import_twitter_page
     # Show Twitter import form
+  end
+
+  def import_website_page
+    # Show website import form
   end
 
   def import_wechat_search
@@ -192,6 +200,58 @@ class AccountsController < ApplicationController
   rescue StandardError => e
     flash[:error] = truncate_error("导入失败：#{e.message}")
     redirect_to import_wechat_page_accounts_path
+  end
+
+  def import_website
+    lines = params[:urls].to_s.split(/\r?\n/).map(&:strip).reject(&:blank?)
+
+    if lines.empty?
+      flash[:error] = "请输入至少一个网址（每行一个：名称, 网址 或仅网址）"
+      redirect_to import_website_page_accounts_path and return
+    end
+
+    result = Website::Importer.import_lines(lines)
+
+    if result.errors.any?
+      flash[:warning] = truncate_error("部分网址导入失败：#{result.errors.join('; ')}")
+    elsif result.imported_count.positive?
+      flash[:success] = success_message_for(result)
+    elsif result.skipped_count.positive?
+      flash[:warning] = "没有新网站需要导入（#{result.skipped_count} 个已存在）"
+    else
+      flash[:warning] = "没有新网站需要导入"
+    end
+
+    redirect_to accounts_path(q: { type_eq: "WebsiteAccount" })
+  end
+
+  def rediscover
+    @account = Account.find(params[:id])
+
+    unless @account.website?
+      flash[:error] = "只有官网帐号支持重新发现监控页面"
+      redirect_to account_path(@account) and return
+    end
+
+    if CrawlTask.active.exists?
+      flash[:error] = "已有活跃的抓取任务"
+      redirect_to account_path(@account) and return
+    end
+
+    crawl_task = nil
+    begin
+      @account.monitor_pages.destroy_all
+      crawl_task = @account.crawl!
+      flash[:success] = "已清空 #{@account.nickname} 的监控页面并启动重新发现"
+    rescue StandardError => e
+      flash[:error] = "启动重新发现失败：#{e.message}"
+    end
+
+    if crawl_task
+      redirect_to crawl_task_path(crawl_task)
+    else
+      redirect_to account_path(@account)
+    end
   end
 
   def crawl

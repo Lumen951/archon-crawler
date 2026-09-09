@@ -137,7 +137,43 @@
             </div>
           </div>
 
-          <!-- Tag Feeds -->
+          <!-- Monitor Feeds -->
+          <div class="pt-3 border-t border-border-primary">
+            <h3 class="text-xs font-medium text-text-muted uppercase tracking-wider mb-2">网站监控订阅</h3>
+            <div class="space-y-1.5">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-sm text-text-secondary">全部变更</span>
+                <div class="flex items-center gap-1.5">
+                  <%= link_to "RSS", monitor_changes_rss_path,
+                      class: "text-xs text-brand hover:text-brand-dark font-semibold transition",
+                      target: "_blank",
+                      title: monitor_changes_rss_url %>
+                  <%= render 'shared/copy_button', text: monitor_changes_rss_url %>
+                </div>
+              </div>
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-sm text-text-secondary">重要变更</span>
+                <div class="flex items-center gap-1.5">
+                  <%= link_to "RSS", important_monitor_changes_rss_path,
+                      class: "text-xs text-brand hover:text-brand-dark font-semibold transition",
+                      target: "_blank",
+                      title: important_monitor_changes_rss_url %>
+                  <%= render 'shared/copy_button', text: important_monitor_changes_rss_url %>
+                </div>
+              </div>
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-sm text-text-secondary">监控页面</span>
+                <div class="flex items-center gap-1.5">
+                  <%= link_to "RSS", monitor_pages_rss_path,
+                      class: "text-xs text-brand hover:text-brand-dark font-semibold transition",
+                      target: "_blank",
+                      title: monitor_pages_rss_url %>
+                  <%= render 'shared/copy_button', text: monitor_pages_rss_url %>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <% tags = Tag.ordered %>
           <% if tags.any? %>
             <div class="pt-3 border-t border-border-primary">

@@ -1,0 +1,39 @@
+<div class="space-y-6">
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-3xl font-bold text-gray-900">导入官网</h1>
+      <p class="text-gray-600 mt-1">粘贴要跟踪的官网网址（支持多行批量导入）</p>
+    </div>
+    <%= link_to "← 返回导入页", import_accounts_path, class: "btn btn-secondary" %>
+  </div>
+
+  <div class="card">
+    <%= form_with url: import_website_accounts_path, method: :post, local: true do %>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">官网列表</label>
+          <%= text_area_tag :urls, nil, rows: 10,
+              placeholder: "每行一个网站，格式：名称, 网址（名称可省略），例如：\nDeepSeek, https://www.deepseek.com\nhttps://www.openai.com\nAnthropic, https://www.anthropic.com",
+              class: "w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent font-mono",
+              required: true %>
+          <p class="mt-2 text-sm text-gray-500">
+            只填网址时，首次抓取会自动用站点标题补全名称。导入后可在帐号列表勾选并批量抓取，系统会自动发现博客、研究、公告等监控页面。
+          </p>
+        </div>
+        <div class="flex justify-end">
+          <button type="submit" class="btn btn-primary">导入官网</button>
+        </div>
+      </div>
+    <% end %>
+  </div>
+
+  <div class="card bg-blue-50 border-blue-200">
+    <h3 class="font-semibold text-blue-900 mb-3">💡 导入提示</h3>
+    <ul class="space-y-2 text-sm text-blue-800">
+      <li>• 每行一个网站：<code class="bg-blue-100 px-1 rounded">名称, 网址</code> 或只填网址（中英文逗号均可）</li>
+      <li>• 同一网站（域名相同）只保留一个帐号，重复导入会自动跳过</li>
+      <li>• 导入只是创建帐号，不会立即抓取——到帐号列表点「立即抓取」或勾选后批量抓取</li>
+      <li>• 首次抓取会自动发现监控页面并建立基线，之后的变化（含具体内容条目）会进入文章列表和 RSS</li>
+    </ul>
+  </div>
+</div>

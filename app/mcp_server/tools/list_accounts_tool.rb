@@ -10,7 +10,7 @@ module Tools
 
     input_schema(
       properties: {
-        platform: { type: "string", enum: %w[wechat rednote twitter], description: "按平台过滤" },
+        platform: { type: "string", enum: %w[wechat rednote twitter website], description: "按平台过滤" },
         status: { type: "string", enum: %w[active inactive], description: "按状态过滤" },
         activity_level: { type: "string", enum: %w[active slow dormant dead never uncrawled], description: "按活跃度过滤" },
         tag_id: { type: "integer", description: "按标签 ID 过滤" },
@@ -30,6 +30,7 @@ module Tools
                        when "wechat"   then "WechatAccount"
                        when "rednote"  then "RednoteAccount"
                        when "twitter"  then "TwitterAccount"
+                       when "website"  then "WebsiteAccount"
                        else
                          return MCP::Tool::Response.new(
                            [{ type: "text", text: "不支持的平台: #{platform}" }],

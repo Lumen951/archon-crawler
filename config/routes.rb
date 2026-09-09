@@ -51,11 +51,15 @@ Rails.application.routes.draw do
       get  :import_twitter_search
       post :import_twitter
       post :import_twitter_file
+      # Website import routes
+      get  "import/website", to: "accounts#import_website_page", as: :import_website_page
+      post :import_website
     end
     member do
       post :crawl
       post :toggle_status
       post :resolve_weread_mp_id
+      post :rediscover
     end
   end
 
@@ -88,6 +92,11 @@ Rails.application.routes.draw do
       get :poll
     end
   end
+
+  resources :monitor_changes, only: [:index, :show]
+
+  resources :monitor_pages, only: [:show]
+  resources :monitor_page_versions, only: [:show]
 
   # Profile management (users can edit their own password)
   resource :profile, only: [:edit, :update] do
@@ -155,6 +164,12 @@ Rails.application.routes.draw do
   get "/rss/accounts/active", to: "rss#active_accounts", as: :active_accounts_list_rss, defaults: { format: 'rss' }
   get "/rss/tag/:tag_id", to: "rss#by_tag", as: :tag_rss, defaults: { format: 'rss' }
   get "/rss/user/:token", to: "rss#by_user", as: :user_rss, defaults: { format: 'rss' }
+  get "/rss/monitor/changes/important", to: "rss#monitor_changes", as: :important_monitor_changes_rss, defaults: { format: 'rss', important: '1' }
+  get "/rss/monitor/changes", to: "rss#monitor_changes", as: :monitor_changes_rss, defaults: { format: 'rss' }
+  get "/rss/monitor/accounts/:id/changes", to: "rss#monitor_website_changes", as: :monitor_website_changes_rss, defaults: { format: 'rss' }
+  get "/rss/monitor/pages/:id/changes", to: "rss#monitor_page_changes", as: :monitor_page_changes_rss, defaults: { format: 'rss' }
+  get "/rss/monitor/pages", to: "rss#monitor_pages", as: :monitor_pages_rss, defaults: { format: 'rss' }
+  get "/rss/monitor/accounts/:id/pages", to: "rss#monitor_website_pages", as: :monitor_website_pages_rss, defaults: { format: 'rss' }
   get "/rss/:fakeid", to: "rss#show", as: :account_rss, defaults: { format: 'rss' }
 
   # API routes

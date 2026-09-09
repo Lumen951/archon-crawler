@@ -1,0 +1,76 @@
+<div class="space-y-6">
+  <div>
+    <div class="flex items-center gap-3">
+      <h1 class="text-3xl font-bold text-text-primary"><%= @page.display_title %></h1>
+      <span class="inline-block px-2 py-0.5 rounded bg-bg-secondary text-sm"><%= @page.type_label %></span>
+    </div>
+    <p class="text-text-secondary">
+      <%= link_to @page.account.nickname, account_path(@page.account), class: "text-brand" %>
+      · <%= link_to @page.url, @page.url, target: "_blank", class: "text-brand break-all" %>
+    </p>
+    <div class="flex items-center gap-2">
+      <%= link_to "RSS", monitor_page_changes_rss_path(@page), target: "_blank", title: monitor_page_changes_rss_url(@page), class: "h-9 px-3 rounded-xl border border-border-primary text-sm font-semibold inline-flex items-center" %>
+      <%= render "shared/copy_button", text: monitor_page_changes_rss_url(@page) %>
+    </div>
+  </div>
+
+  <% if @page.last_error.present? %>
+    <div class="bg-red-50 border border-red-200 text-red-700 rounded-2xl px-5 py-4 text-sm">
+      <span class="font-semibold">上次抓取失败（<%= @page.last_status %>）：</span><%= @page.last_error %>
+    </div>
+  <% end %>
+
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+    <div class="bg-bg-card border border-border-primary rounded-2xl p-4"><div class="text-text-secondary">版本数</div><div class="text-lg font-bold"><%= @page.versions_count %></div></div>
+    <div class="bg-bg-card border border-border-primary rounded-2xl p-4"><div class="text-text-secondary">最近检查</div><div class="text-lg font-bold"><%= @page.last_checked_at ? l(@page.last_checked_at, format: :short) : "—" %></div></div>
+    <div class="bg-bg-card border border-border-primary rounded-2xl p-4"><div class="text-text-secondary">最近变化</div><div class="text-lg font-bold"><%= @page.last_changed_at ? l(@page.last_changed_at, format: :short) : "—" %></div></div>
+    <div class="bg-bg-card border border-border-primary rounded-2xl p-4"><div class="text-text-secondary">抓取方式</div><div class="text-lg font-bold"><%= @page.fetched_via.presence || "—" %></div></div>
+  </div>
+
+  <% if @changes.any? %>
+    <section class="bg-bg-card border border-border-primary rounded-2xl p-5">
+      <h2 class="font-bold mb-3">变更历史</h2>
+      <div class="space-y-2">
+        <% @changes.each do |change| %>
+          <div class="flex items-center justify-between gap-4">
+            <%= link_to change.summary, monitor_change_path(change), class: "text-brand" %>
+            <div class="shrink-0 flex items-center gap-3">
+              <span class="text-sm text-text-secondary"><%= change.created_at.strftime("%Y-%m-%d %H:%M") %></span>
+              <%= render "shared/importance_badge", importance: change.importance %>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </section>
+  <% end %>
+
+  <section class="bg-bg-card border border-border-primary rounded-2xl p-5">
+    <h2 class="font-bold mb-3">当前基线内容</h2>
+    <% if @page.current_version %>
+      <p class="text-sm text-text-secondary mb-3">抓取于 <%= l(@page.current_version.captured_at, format: :long) %> · <%= @page.current_version.content_length %> 字符 · <%= link_to "查看此版本", monitor_page_version_path(@page.current_version), class: "text-brand" %></p>
+      <pre class="whitespace-pre-wrap text-sm leading-relaxed bg-bg border border-border-primary rounded-xl p-4 max-h-[36rem] overflow-y-auto"><%= @page.current_version.content %></pre>
+    <% else %>
+      <p class="text-sm text-text-secondary">尚未抓取到内容。执行「立即抓取」建立基线。</p>
+    <% end %>
+  </section>
+
+  <section class="bg-bg-card border border-border-primary rounded-2xl p-5">
+    <h2 class="font-bold mb-3">版本历史</h2>
+    <% if @versions.any? %>
+      <div class="space-y-2">
+        <% @versions.each do |version| %>
+          <div class="flex items-center justify-between text-sm">
+            <div>
+              <%= link_to l(version.captured_at, format: :long), monitor_page_version_path(version), class: "text-brand font-semibold" %>
+              <span class="text-text-secondary ml-2"><%= version.content_length %> 字符</span>
+              <% if @page.current_version_id == version.id %><span class="ml-2 px-2 py-0.5 rounded bg-brand-soft text-brand text-xs">当前基线</span><% end %>
+            </div>
+            <span class="text-text-secondary"><%= version.content_hash.first(8) %></span>
+          </div>
+        <% end %>
+      </div>
+    <% else %>
+      <p class="text-sm text-text-secondary">暂无版本。</p>
+    <% end %>
+  </section>
+</div>

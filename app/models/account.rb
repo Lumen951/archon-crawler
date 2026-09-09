@@ -107,6 +107,10 @@ class Account < ApplicationRecord
     is_a?(TwitterAccount)
   end
 
+  def website?
+    is_a?(WebsiteAccount)
+  end
+
   # === Activity & Health ===
 
   # Returns the activity tier for this account, derived from `last_published_at`.

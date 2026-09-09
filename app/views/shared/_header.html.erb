@@ -24,6 +24,9 @@
         <%= link_to wechat_content_download_tasks_path, class: "h-9 inline-flex items-center px-4 rounded-xl text-sm font-semibold transition #{current_page?(wechat_content_download_tasks_path) ? 'text-brand bg-brand-soft' : 'text-text-secondary hover:text-brand hover:bg-bg-card'}" do %>
           正文下载
         <% end %>
+        <%= link_to monitor_changes_path, class: "h-9 inline-flex items-center px-4 rounded-xl text-sm font-semibold transition #{current_page?(monitor_changes_path) ? 'text-brand bg-brand-soft' : 'text-text-secondary hover:text-brand hover:bg-bg-card'}" do %>
+          官网变更
+        <% end %>
       </nav>
 
       <div class="flex items-center gap-2">

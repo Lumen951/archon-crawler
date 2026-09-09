@@ -1,0 +1,11 @@
+<%
+  importance = importance.to_i
+  level = if importance >= 7
+            { label: "重要 #{importance}", class: "bg-red-100 text-red-700" }
+          elsif importance >= 4
+            { label: "中等 #{importance}", class: "bg-amber-100 text-amber-700" }
+          else
+            { label: "一般 #{importance}", class: "bg-bg-secondary text-text-secondary" }
+          end
+%>
+<span class="inline-block px-2 py-0.5 rounded-full text-xs font-semibold <%= level[:class] %>"><%= level[:label] %></span>

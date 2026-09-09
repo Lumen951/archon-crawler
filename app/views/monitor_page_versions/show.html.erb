@@ -1,0 +1,47 @@
+<div class="space-y-6">
+  <div>
+    <h1 class="text-3xl font-bold text-text-primary"><%= @version.title.presence || @page.title.presence || @page.url %></h1>
+    <p class="text-text-secondary">
+      <%= link_to @page.account.nickname, account_path(@page.account), class: "text-brand" %>
+      · <%= link_to "← 返回页面", monitor_page_path(@page), class: "text-brand" %>
+    </p>
+  </div>
+
+  <div class="grid grid-cols-2 gap-4 text-sm">
+    <div class="bg-bg-card border border-border-primary rounded-2xl p-4"><div class="text-text-secondary">抓取时间</div><div class="text-lg font-bold"><%= l(@version.captured_at, format: :long) %></div></div>
+    <div class="bg-bg-card border border-border-primary rounded-2xl p-4"><div class="text-text-secondary">内容长度</div><div class="text-lg font-bold"><%= @version.content_length %> 字符</div></div>
+    <div class="bg-bg-card border border-border-primary rounded-2xl p-4"><div class="text-text-secondary">抓取方式</div><div class="text-lg font-bold"><%= @version.fetched_via || "—" %></div></div>
+    <div class="bg-bg-card border border-border-primary rounded-2xl p-4"><div class="text-text-secondary">HTTP 状态</div><div class="text-lg font-bold"><%= @version.http_status || "—" %></div></div>
+  </div>
+
+  <% if @diff %>
+    <section class="bg-bg-card border border-border-primary rounded-2xl p-5">
+      <h2 class="font-bold mb-3">相对上一版本的差异</h2>
+      <div class="grid md:grid-cols-2 gap-4">
+        <div>
+          <h3 class="text-sm font-semibold text-red-600 mb-2">删除（<%= @diff.removed_count %> 行）</h3>
+          <% if @diff.removed.any? %>
+            <pre class="whitespace-pre-wrap text-sm leading-relaxed bg-bg border border-border-primary rounded-xl p-4 max-h-[24rem] overflow-y-auto"><% @diff.removed.each do |line| %><span class="text-red-600">− <%= line %></span>
+<% end %></pre>
+          <% else %>
+            <p class="text-sm text-text-secondary">无</p>
+          <% end %>
+        </div>
+        <div>
+          <h3 class="text-sm font-semibold text-green-600 mb-2">新增（<%= @diff.added_count %> 行）</h3>
+          <% if @diff.added.any? %>
+            <pre class="whitespace-pre-wrap text-sm leading-relaxed bg-bg border border-border-primary rounded-xl p-4 max-h-[24rem] overflow-y-auto"><% @diff.added.each do |line| %><span class="text-green-600">+ <%= line %></span>
+<% end %></pre>
+          <% else %>
+            <p class="text-sm text-text-secondary">无</p>
+          <% end %>
+        </div>
+      </div>
+    </section>
+  <% end %>
+
+  <section class="bg-bg-card border border-border-primary rounded-2xl p-5">
+    <h2 class="font-bold mb-3">完整内容</h2>
+    <pre class="whitespace-pre-wrap text-sm leading-relaxed bg-bg border border-border-primary rounded-xl p-4 max-h-[36rem] overflow-y-auto"><%= @version.content %></pre>
+  </section>
+</div>

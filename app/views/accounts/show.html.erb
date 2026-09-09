@@ -38,6 +38,11 @@
           <p class="text-text-secondary text-sm">
             Fakeid: <code class="bg-bg-secondary px-2 py-1 rounded text-xs text-brand font-mono"><%= @account.fakeid %></code>
           </p>
+          <% if @account.website? %>
+            <p class="text-text-secondary text-sm">
+              网址: <%= link_to @account.url, @account.url, target: "_blank", rel: "noopener noreferrer", class: "text-brand hover:text-brand-dark transition" %>
+            </p>
+          <% end %>
           <div class="flex items-center gap-2 text-sm">
             <span class="text-text-secondary">RSS Feed:</span>
             <%= link_to "订阅链接", account_rss_url(@account.fakeid), class: "text-brand hover:text-brand-dark font-semibold transition", target: "_blank" %>
@@ -48,6 +53,13 @@
         <div class="mt-5 flex flex-wrap items-center gap-2">
           <%= button_to crawl_account_path(@account), method: :post, class: "h-9 px-4 rounded-lg bg-brand text-white hover:bg-brand-dark text-sm font-semibold transition" do %>
             立即抓取
+          <% end %>
+          <% if @account.website? %>
+            <%= button_to rediscover_account_path(@account), method: :post,
+                  form: { data: { turbo_confirm: "重新发现会清空该网站的监控页面、版本和变更历史，然后重新抓取。确定继续？" } },
+                  class: "h-9 px-4 rounded-lg border border-border-primary bg-bg-card hover:border-brand hover:text-brand text-sm font-semibold transition" do %>
+              重新发现
+            <% end %>
           <% end %>
           <%= button_to toggle_status_account_path(@account), method: :post, class: "h-9 px-4 rounded-lg border border-border-primary bg-bg-card hover:border-brand hover:text-brand text-sm font-semibold transition" do %>
             <%= @account.active? ? "停用" : "启用" %>
@@ -218,6 +230,91 @@
         <p class="text-xs text-text-muted mt-1">粘贴该公众号任意一篇文章的链接，系统将自动解析并更新 WeRead mpId</p>
       </div>
     </div>
+  <% end %>
+
+  <!-- Website Monitor Section (WebsiteAccount only) -->
+  <% if @account.website? %>
+    <div class="bg-bg-card border border-border-primary rounded-xl p-6 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-semibold text-text-primary">监控页面</h3>
+        <div class="flex items-center gap-3 text-sm">
+          <%= link_to "页面 RSS", monitor_website_pages_rss_url(@account.id), target: "_blank", class: "text-brand hover:text-brand-dark transition" %>
+          <%= link_to "官网变更 RSS", monitor_website_changes_rss_url(@account.id), target: "_blank", class: "text-brand hover:text-brand-dark transition" %>
+          <%= link_to "全部变更", monitor_changes_path(account_id: @account.id), class: "text-brand hover:text-brand-dark transition" %>
+        </div>
+      </div>
+
+      <% if @account.last_error.present? %>
+        <div class="mb-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+          上次检查错误：<%= @account.last_error %>
+        </div>
+      <% end %>
+
+      <% if @monitor_pages.any? %>
+        <div class="overflow-x-auto">
+          <table class="min-w-full text-sm">
+            <thead>
+              <tr class="text-left text-xs text-text-secondary uppercase tracking-wider border-b border-border-primary">
+                <th class="py-2 pr-4">页面</th>
+                <th class="py-2 pr-4">类型</th>
+                <th class="py-2 pr-4">版本数</th>
+                <th class="py-2 pr-4">最近变化</th>
+                <th class="py-2">状态</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-border-primary">
+              <% @monitor_pages.each do |page| %>
+                <tr class="hover:bg-bg-secondary transition">
+                  <td class="py-2 pr-4">
+                    <%= link_to page.display_title, monitor_page_path(page), class: "text-brand hover:text-brand-dark transition" %>
+                  </td>
+                  <td class="py-2 pr-4 text-text-secondary"><%= page.type_label %></td>
+                  <td class="py-2 pr-4 text-text-secondary"><%= page.versions_count %></td>
+                  <td class="py-2 pr-4 text-text-secondary whitespace-nowrap">
+                    <%= page.last_changed_at ? time_ago_in_words(page.last_changed_at) + '前' : '—' %>
+                  </td>
+                  <td class="py-2">
+                    <% if page.last_error.present? %>
+                      <span class="text-red-600" title="<%= page.last_error %>">异常</span>
+                    <% elsif page.baseline_ready? %>
+                      <span class="text-green-600">正常</span>
+                    <% else %>
+                      <span class="text-text-muted">待基线</span>
+                    <% end %>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      <% else %>
+        <p class="text-sm text-text-secondary">
+          尚未发现监控页面 — 点击「立即抓取」，系统会自动发现博客、研究、公告等页面并建立基线。
+        </p>
+      <% end %>
+    </div>
+
+    <% if @monitor_changes.any? %>
+      <div class="bg-bg-card border border-border-primary rounded-xl p-6 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-semibold text-text-primary">最近变更</h3>
+          <%= link_to "查看全部", monitor_changes_path(account_id: @account.id), class: "text-sm text-brand hover:text-brand-dark transition" %>
+        </div>
+        <ul class="divide-y divide-border-primary">
+          <% @monitor_changes.each do |change| %>
+            <li class="py-2.5 flex items-start gap-3">
+              <%= render 'shared/importance_badge', importance: change.importance %>
+              <div class="flex-1 min-w-0">
+                <%= link_to change.summary.to_s.truncate(120), monitor_change_path(change), class: "text-sm text-text-primary hover:text-brand transition" %>
+                <p class="text-xs text-text-muted mt-0.5">
+                  <%= change.monitor_page&.type_label %> · <%= time_ago_in_words(change.created_at) %>前
+                </p>
+              </div>
+            </li>
+          <% end %>
+        </ul>
+      </div>
+    <% end %>
   <% end %>
 
   <!-- Recent Articles -->

@@ -1,0 +1,62 @@
+<div class="space-y-6">
+  <div>
+    <h1 class="text-3xl font-bold text-text-primary">变更详情</h1>
+    <%= link_to "← 返回变更列表", monitor_changes_path, class: "text-brand" %>
+  </div>
+
+  <article class="bg-bg-card border border-border-primary rounded-2xl p-6 space-y-4">
+    <div class="text-sm text-text-secondary">
+      <%= link_to @change.account.nickname, account_path(@change.account), class: "text-brand" %>
+      · <%= link_to @change.monitor_page.title.presence || @change.monitor_page.url, monitor_page_path(@change.monitor_page), class: "text-brand" %>
+    </div>
+    <h2 class="text-xl font-bold"><%= @change.summary %></h2>
+    <div class="grid grid-cols-2 gap-4 text-sm">
+      <div>变更类型：<%= @change.change_type %></div>
+      <div>分析状态：<%= @change.analysis_status %></div>
+      <div>重要度：<%= @change.importance %></div>
+      <div>相关度：<%= @change.relevance %></div>
+      <div>新增：<%= @change.diff_added %> 行</div>
+      <div>删除：<%= @change.diff_removed %> 行</div>
+    </div>
+    <% if @current_version || @previous_version %>
+      <div class="text-sm text-text-secondary">
+        版本：
+        <% if @previous_version %>
+          <%= link_to "旧版本（#{l(@previous_version.captured_at, format: :short)}）", monitor_page_version_path(@previous_version), class: "text-brand" %>
+        <% end %>
+        <% if @previous_version && @current_version %> → <% end %>
+        <% if @current_version %>
+          <%= link_to "新版本（#{l(@current_version.captured_at, format: :short)}）", monitor_page_version_path(@current_version), class: "text-brand" %>
+        <% end %>
+      </div>
+    <% end %>
+    <div><h3 class="font-semibold mb-2">变化</h3><ul class="list-disc pl-5"><% Array(@change.change_items).each do |item| %><li><%= item %></li><% end %></ul></div>
+    <div><h3 class="font-semibold mb-2">实体</h3><p><%= Array(@change.entities).join(", ") %></p></div>
+  </article>
+
+  <% if @diff %>
+    <section class="bg-bg-card border border-border-primary rounded-2xl p-6">
+      <h2 class="font-bold mb-4">内容差异</h2>
+      <div class="grid md:grid-cols-2 gap-4">
+        <div>
+          <h3 class="text-sm font-semibold text-red-600 mb-2">删除（<%= @diff.removed_count %> 行）</h3>
+          <% if @diff.removed.any? %>
+            <pre class="whitespace-pre-wrap text-sm leading-relaxed bg-bg border border-border-primary rounded-xl p-4 max-h-[32rem] overflow-y-auto"><% @diff.removed.each do |line| %><span class="text-red-600">− <%= line %></span>
+<% end %></pre>
+          <% else %>
+            <p class="text-sm text-text-secondary">无</p>
+          <% end %>
+        </div>
+        <div>
+          <h3 class="text-sm font-semibold text-green-600 mb-2">新增（<%= @diff.added_count %> 行）</h3>
+          <% if @diff.added.any? %>
+            <pre class="whitespace-pre-wrap text-sm leading-relaxed bg-bg border border-border-primary rounded-xl p-4 max-h-[32rem] overflow-y-auto"><% @diff.added.each do |line| %><span class="text-green-600">+ <%= line %></span>
+<% end %></pre>
+          <% else %>
+            <p class="text-sm text-text-secondary">无</p>
+          <% end %>
+        </div>
+      </div>
+    </section>
+  <% end %>
+</div>

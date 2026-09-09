@@ -122,7 +122,7 @@ class FeishuLoginReminderJobTest < ActiveSupport::TestCase
     entries = schedule["production"].values.select { |e| e["class"] == "FeishuLoginReminderJob" }
     platform_keys = entries.flat_map { |e| e["args"] }
 
-    assert_includes platform_keys, "weread"
+    assert_includes platform_keys, "weread_native"
     platform_keys.each { |key| assert_nothing_raised { QrLogin.find(key) } }
   end
 end

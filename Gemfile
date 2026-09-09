@@ -67,6 +67,7 @@ group :test do
   gem "selenium-webdriver"
 end
 gem "async", "~> 2.41"
+gem "nokogiri", "~> 1.16"
 gem "faraday", "~> 2.14"
 gem "faraday-retry", "~> 2.4"
 gem "faraday-multipart", "~> 1.0"

@@ -147,4 +147,36 @@ class AccountsControllerTest < ActionDispatch::IntegrationTest
     assert_match "帐号 待删除帐号 已删除", response.body
     assert_not Account.exists?(id: account.id)
   end
+
+  test "imports websites from textarea lines" do
+    post import_website_accounts_path, params: {
+      urls: "DeepSeek, https://www.deepseek.com\nhttps://www.openai.com"
+    }
+
+    assert_redirected_to accounts_path(q: { type_eq: "WebsiteAccount" })
+    follow_redirect!
+    assert_match "成功导入 2 个帐号", response.body
+
+    deepseek = Account.find_by(fakeid: "deepseek.com")
+    assert_equal "WebsiteAccount", deepseek.type
+    assert_equal "DeepSeek", deepseek.nickname
+    assert_equal "https://www.deepseek.com", deepseek.metadata["url"]
+
+    openai = Account.find_by(fakeid: "openai.com")
+    assert_equal "openai.com", openai.nickname
+    assert_equal "https://www.openai.com", openai.metadata["url"]
+  end
+
+  test "website import skips duplicates and reports invalid lines" do
+    WebsiteAccount.create!(fakeid: "deepseek.com", nickname: "DeepSeek", metadata: { url: "https://www.deepseek.com" })
+
+    post import_website_accounts_path, params: {
+      urls: "https://www.deepseek.com\nnot a url"
+    }
+
+    assert_redirected_to accounts_path(q: { type_eq: "WebsiteAccount" })
+    follow_redirect!
+    assert_match "部分网址导入失败", response.body
+    assert_equal 1, WebsiteAccount.count
+  end
 end

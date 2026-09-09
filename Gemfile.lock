@@ -529,6 +529,7 @@ DEPENDENCIES
   kaminari (~> 1.2)
   mcp (~> 1.1)
   mission_control-jobs
+  nokogiri (~> 1.16)
   oauth2 (~> 2.0)
   pg (~> 1.1)
   propshaft

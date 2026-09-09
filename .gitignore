@@ -38,3 +38,8 @@
 !/app/assets/builds/.keep
 
 /data/*
+
+/node_modules/*
+/vibe/*
+
+__pycache__

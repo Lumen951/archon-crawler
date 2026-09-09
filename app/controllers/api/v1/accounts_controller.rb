@@ -204,6 +204,7 @@ module Api
         when "wechat"   then "WechatAccount"
         when "rednote"  then "RednoteAccount"
         when "twitter"  then "TwitterAccount"
+        when "website"  then "WebsiteAccount"
         else
           render json: { error: "不支持的平台: #{platform}" }, status: :bad_request
           nil

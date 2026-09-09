@@ -9,6 +9,7 @@ class Admin::SettingsController < Admin::BaseController
     @daily_crawl_budget_wechat = Option.daily_crawl_budget_for('wechat')
     @daily_crawl_budget_rednote = Option.daily_crawl_budget_for('rednote')
     @daily_crawl_budget_twitter = Option.daily_crawl_budget_for('twitter')
+    @daily_crawl_budget_website = Option.daily_crawl_budget_for('website')
     @verbose_mode = Option[:crawler_verbose_mode]
     @log_retention_days = Option[:crawler_log_retention_days]
     @twitter_ct0 = Option.get('twitter_ct0')
@@ -22,6 +23,7 @@ class Admin::SettingsController < Admin::BaseController
     @crawl_wechat_enabled = Option.crawl_wechat_enabled?
     @crawl_rednote_enabled = Option.crawl_rednote_enabled?
     @crawl_twitter_enabled = Option.crawl_twitter_enabled?
+    @crawl_website_enabled = Option.crawl_website_enabled?
     @profile_ext_credentials = Option.profile_ext_credentials
     @profile_ext_expired = Option.profile_ext_credentials_expired?
     @profile_ext_updated_at = Option.profile_ext_credentials_updated_at
@@ -130,6 +132,11 @@ class Admin::SettingsController < Admin::BaseController
       message = "每日抓取配额更新成功"
     end
 
+    if params[:daily_crawl_budget_website].present?
+      Option.set('daily_crawl_budget_website', params[:daily_crawl_budget_website])
+      message = "每日抓取配额更新成功"
+    end
+
     if params[:verbose_mode].present?
       Option[:crawler_verbose_mode] = params[:verbose_mode] == '1'
       message = "详细日志模式更新成功"
@@ -150,6 +157,10 @@ class Admin::SettingsController < Admin::BaseController
 
     if params.key?(:crawl_twitter_enabled)
       Option.set("crawl_twitter_enabled", params[:crawl_twitter_enabled] == "1")
+    end
+
+    if params.key?(:crawl_website_enabled)
+      Option.set("crawl_website_enabled", params[:crawl_website_enabled] == "1")
     end
 
     if params.key?(:profile_ext_credentials)

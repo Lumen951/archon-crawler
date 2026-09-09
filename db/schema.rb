@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_26_000001) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_09_000003) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -177,6 +177,75 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_26_000001) do
     t.index ["method"], name: "index_mcp_tool_calls_on_method"
     t.index ["tool_name"], name: "index_mcp_tool_calls_on_tool_name"
     t.index ["user_id"], name: "index_mcp_tool_calls_on_user_id"
+  end
+
+  create_table "monitor_changes", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.string "analysis_status", default: "pending", null: false
+    t.jsonb "change_items", default: []
+    t.string "change_type"
+    t.bigint "crawl_task_id"
+    t.datetime "created_at", null: false
+    t.integer "diff_added", default: 0, null: false
+    t.integer "diff_removed", default: 0, null: false
+    t.jsonb "entities", default: []
+    t.integer "importance", default: 0, null: false
+    t.bigint "monitor_page_id", null: false
+    t.bigint "monitor_page_version_id"
+    t.datetime "notified_at"
+    t.bigint "previous_version_id"
+    t.string "refer_url"
+    t.integer "relevance", default: 0, null: false
+    t.text "summary"
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "created_at"], name: "index_monitor_changes_on_account_id_and_created_at"
+    t.index ["account_id"], name: "index_monitor_changes_on_account_id"
+    t.index ["crawl_task_id"], name: "index_monitor_changes_on_crawl_task_id"
+    t.index ["importance"], name: "index_monitor_changes_on_importance"
+    t.index ["monitor_page_id"], name: "index_monitor_changes_on_monitor_page_id"
+    t.index ["monitor_page_version_id"], name: "index_monitor_changes_on_monitor_page_version_id"
+    t.index ["refer_url"], name: "index_monitor_changes_on_refer_url"
+  end
+
+  create_table "monitor_page_versions", force: :cascade do |t|
+    t.datetime "captured_at", null: false
+    t.text "content"
+    t.string "content_hash", null: false
+    t.integer "content_length", default: 0, null: false
+    t.datetime "created_at", null: false
+    t.string "fetched_via"
+    t.integer "http_status"
+    t.bigint "monitor_page_id", null: false
+    t.string "title"
+    t.datetime "updated_at", null: false
+    t.index ["monitor_page_id", "content_hash"], name: "index_monitor_page_versions_on_page_and_content_hash"
+    t.index ["monitor_page_id", "created_at"], name: "index_monitor_page_versions_on_page_and_created_at"
+    t.index ["monitor_page_id"], name: "index_monitor_page_versions_on_monitor_page_id"
+  end
+
+  create_table "monitor_pages", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.boolean "active", default: true, null: false
+    t.float "confidence"
+    t.datetime "created_at", null: false
+    t.bigint "current_version_id"
+    t.string "discovered_via"
+    t.integer "error_count", default: 0, null: false
+    t.string "fetched_via"
+    t.datetime "last_changed_at"
+    t.datetime "last_checked_at"
+    t.text "last_error"
+    t.string "last_status"
+    t.string "page_type"
+    t.datetime "sitemap_lastmod"
+    t.string "title"
+    t.datetime "updated_at", null: false
+    t.string "url", null: false
+    t.integer "versions_count", default: 0, null: false
+    t.index ["account_id", "url"], name: "index_monitor_pages_on_account_and_url", unique: true
+    t.index ["account_id"], name: "index_monitor_pages_on_account_id"
+    t.index ["active"], name: "index_monitor_pages_on_active"
+    t.index ["current_version_id"], name: "index_monitor_pages_on_current_version_id"
   end
 
   create_table "oauth_access_grants", force: :cascade do |t|
@@ -348,6 +417,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_26_000001) do
   add_foreign_key "groups", "users"
   add_foreign_key "mcp_tool_calls", "api_keys"
   add_foreign_key "mcp_tool_calls", "users"
+  add_foreign_key "monitor_changes", "accounts"
+  add_foreign_key "monitor_changes", "crawl_tasks"
+  add_foreign_key "monitor_changes", "monitor_page_versions"
+  add_foreign_key "monitor_changes", "monitor_pages"
+  add_foreign_key "monitor_page_versions", "monitor_pages"
+  add_foreign_key "monitor_pages", "accounts"
   add_foreign_key "oauth_access_grants", "oauth_applications", column: "application_id"
   add_foreign_key "oauth_access_grants", "users", column: "resource_owner_id"
   add_foreign_key "oauth_access_tokens", "oauth_applications", column: "application_id"
