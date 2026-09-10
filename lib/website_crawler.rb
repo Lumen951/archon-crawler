@@ -268,12 +268,19 @@ class WebsiteCrawler < BaseCrawler
 
     def connection
       @connection ||= Faraday.new do |faraday|
+        faraday.proxy = proxy_url if proxy_url
         faraday.request :retry, max: 2, interval: 0.5, backoff_factor: 2,
                                  exceptions: [Faraday::TimeoutError, Faraday::ConnectionFailed]
         faraday.options.timeout = @timeout
         faraday.options.open_timeout = @timeout
         faraday.adapter Faraday.default_adapter
       end
+    end
+
+    # Option.twitter_proxy (e.g. "http://user:pass@host:port") routes every
+    # request through an outbound proxy when configured; nil otherwise.
+    def proxy_url
+      Option.get("twitter_proxy").presence
     end
 
     def content_type(response)
