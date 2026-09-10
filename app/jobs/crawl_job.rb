@@ -22,5 +22,6 @@ class CrawlJob < ApplicationJob
     end
 
     CrawlOrchestrator.crawl(crawl_task)
+    WechatContentDownloadJob.perform_later
   end
 end

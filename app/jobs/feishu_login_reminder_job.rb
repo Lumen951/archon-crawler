@@ -23,10 +23,10 @@ class FeishuLoginReminderJob < ApplicationJob
       return
     end
 
-    unless provider.reminder_needed?
-      Rails.logger.info("[FeishuLoginReminderJob] #{provider.label}无需登录提醒，跳过")
-      return
-    end
+    # unless provider.reminder_needed?
+    #   Rails.logger.info("[FeishuLoginReminderJob] #{provider.label}无需登录提醒，跳过")
+    #   return
+    # end
 
     if Option.feishu_login_card_mode?
       send_login_card(provider)
