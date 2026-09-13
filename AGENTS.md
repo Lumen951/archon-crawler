@@ -126,9 +126,10 @@ credentials or external services in the test suite.
 - Deploy with Kamal configuration in `config/deploy.yml`. Do not edit or expose
   `.kamal/secrets`; validate deployment changes separately from application
   behavior.
-- `tmp/` is for local investigative scripts and generated notes. Do not add
-  temporary artifacts to version control unless the user explicitly requests a
-  durable document elsewhere.
+- `tmp/` is for local investigative scripts and generated notes. Put generated
+  analysis and onboarding documents in `tmp/doc/`; keep scripts and runtime
+  artifacts outside that directory. Do not add temporary artifacts to version
+  control unless the user explicitly requests a durable document elsewhere.
 
 ## Review Priorities
 
