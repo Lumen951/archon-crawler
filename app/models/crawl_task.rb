@@ -1,3 +1,26 @@
+# == Schema Information
+#
+# Table name: crawl_tasks
+#
+#  id                    :bigint           not null, primary key
+#  account_concurrency   :integer
+#  account_ids           :json
+#  article_concurrency   :integer
+#  completed_at          :datetime
+#  error_count           :integer          default(0)
+#  error_message         :text
+#  platform_error_counts :json
+#  progress              :integer          default(0)
+#  started_at            :datetime
+#  status                :integer          default(0)
+#  total                 :integer
+#  created_at            :datetime         not null
+#  updated_at            :datetime         not null
+#
+# Indexes
+#
+#  index_crawl_tasks_on_status  (status)
+#
 class CrawlTask < ApplicationRecord
   has_many :crawl_logs, as: :loggable, dependent: :destroy
   has_many :articles, dependent: :nullify

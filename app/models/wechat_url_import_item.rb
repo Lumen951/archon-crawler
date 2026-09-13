@@ -1,3 +1,30 @@
+# == Schema Information
+#
+# Table name: wechat_url_import_items
+#
+#  id                        :bigint           not null, primary key
+#  error_message             :text
+#  processed_at              :datetime
+#  started_at                :datetime
+#  status                    :integer          default(0), not null
+#  url                       :string           not null
+#  created_at                :datetime         not null
+#  updated_at                :datetime         not null
+#  account_id                :bigint
+#  wechat_url_import_task_id :bigint           not null
+#
+# Indexes
+#
+#  index_wechat_url_import_items_on_account_id                 (account_id)
+#  index_wechat_url_import_items_on_status                     (status)
+#  index_wechat_url_import_items_on_task_and_url               (wechat_url_import_task_id,url) UNIQUE
+#  index_wechat_url_import_items_on_wechat_url_import_task_id  (wechat_url_import_task_id)
+#
+# Foreign Keys
+#
+#  fk_rails_...  (account_id => accounts.id)
+#  fk_rails_...  (wechat_url_import_task_id => wechat_url_import_tasks.id)
+#
 class WechatUrlImportItem < ApplicationRecord
   belongs_to :wechat_url_import_task
   belongs_to :account, optional: true

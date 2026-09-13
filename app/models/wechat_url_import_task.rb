@@ -1,3 +1,24 @@
+# == Schema Information
+#
+# Table name: wechat_url_import_tasks
+#
+#  id              :bigint           not null, primary key
+#  completed_at    :datetime
+#  created_count   :integer          default(0), not null
+#  error_message   :text
+#  failed_count    :integer          default(0), not null
+#  found_count     :integer          default(0), not null
+#  processed_count :integer          default(0), not null
+#  started_at      :datetime
+#  status          :integer          default(0), not null
+#  total_count     :integer          default(0), not null
+#  created_at      :datetime         not null
+#  updated_at      :datetime         not null
+#
+# Indexes
+#
+#  index_wechat_url_import_tasks_on_status  (status)
+#
 class WechatUrlImportTask < ApplicationRecord
   has_many :items, class_name: "WechatUrlImportItem", dependent: :destroy
 
