@@ -1,3 +1,23 @@
+# == Schema Information
+#
+# Table name: crawl_logs
+#
+#  id            :bigint           not null, primary key
+#  context       :text
+#  level         :string           not null
+#  loggable_type :string
+#  logged_at     :datetime
+#  message       :text
+#  created_at    :datetime         not null
+#  updated_at    :datetime         not null
+#  loggable_id   :bigint
+#
+# Indexes
+#
+#  index_crawl_logs_on_level                          (level)
+#  index_crawl_logs_on_loggable_type_and_loggable_id  (loggable_type,loggable_id)
+#  index_crawl_logs_on_logged_at                      (logged_at)
+#
 class CrawlLog < ApplicationRecord
   belongs_to :loggable, polymorphic: true
 

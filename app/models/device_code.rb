@@ -1,3 +1,31 @@
+# == Schema Information
+#
+# Table name: device_codes
+#
+#  id          :bigint           not null, primary key
+#  device_code :string           not null
+#  expires_at  :datetime         not null
+#  interval    :integer          default(5), not null
+#  ip_address  :string
+#  scope       :string
+#  status      :integer          default(0), not null
+#  user_code   :string           not null
+#  created_at  :datetime         not null
+#  updated_at  :datetime         not null
+#  client_id   :string           not null
+#  user_id     :bigint
+#
+# Indexes
+#
+#  index_device_codes_on_device_code  (device_code) UNIQUE
+#  index_device_codes_on_expires_at   (expires_at)
+#  index_device_codes_on_user_code    (user_code) UNIQUE
+#  index_device_codes_on_user_id      (user_id)
+#
+# Foreign Keys
+#
+#  fk_rails_...  (user_id => users.id)
+#
 class DeviceCode < ApplicationRecord
   belongs_to :user, optional: true
 

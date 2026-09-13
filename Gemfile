@@ -59,6 +59,9 @@ end
 group :development do
   # Use console on exceptions pages [https://github.com/rails/web-console]
   gem "web-console"
+
+  # Adds model schema comments for local development.
+  gem "annotaterb", "~> 4.22"
 end
 
 group :test do

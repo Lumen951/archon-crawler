@@ -1,3 +1,25 @@
+# == Schema Information
+#
+# Table name: users
+#
+#  id                 :bigint           not null, primary key
+#  email_address      :string           not null
+#  email_confirmed_at :datetime
+#  last_login_at      :datetime
+#  name               :string
+#  password_digest    :string
+#  role               :integer          default(0), not null
+#  settings           :json
+#  created_at         :datetime         not null
+#  updated_at         :datetime         not null
+#  mp_id              :string
+#
+# Indexes
+#
+#  index_users_on_email_address  (email_address) UNIQUE
+#  index_users_on_mp_id          (mp_id) UNIQUE
+#  index_users_on_role           (role)
+#
 class User < ApplicationRecord
   has_secure_password
   has_many :sessions, dependent: :destroy

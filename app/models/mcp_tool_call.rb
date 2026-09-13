@@ -1,3 +1,34 @@
+# == Schema Information
+#
+# Table name: mcp_tool_calls
+#
+#  id            :bigint           not null, primary key
+#  arguments     :jsonb
+#  duration_ms   :integer
+#  error_type    :string
+#  ip_address    :string
+#  method        :string           not null
+#  response_size :integer
+#  status        :integer          default(0), not null
+#  tool_name     :string
+#  created_at    :datetime         not null
+#  updated_at    :datetime         not null
+#  api_key_id    :bigint
+#  user_id       :bigint
+#
+# Indexes
+#
+#  index_mcp_tool_calls_on_api_key_id  (api_key_id)
+#  index_mcp_tool_calls_on_created_at  (created_at)
+#  index_mcp_tool_calls_on_method      (method)
+#  index_mcp_tool_calls_on_tool_name   (tool_name)
+#  index_mcp_tool_calls_on_user_id     (user_id)
+#
+# Foreign Keys
+#
+#  fk_rails_...  (api_key_id => api_keys.id)
+#  fk_rails_...  (user_id => users.id)
+#
 class McpToolCall < ApplicationRecord
   belongs_to :user, optional: true
   belongs_to :api_key, optional: true

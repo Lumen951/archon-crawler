@@ -1,3 +1,22 @@
+# == Schema Information
+#
+# Table name: tags
+#
+#  id                 :bigint           not null, primary key
+#  color              :string           default("#6366f1")
+#  description        :text
+#  name               :string           not null
+#  name_normalized    :string           not null
+#  position           :integer          default(0)
+#  tag_accounts_count :integer          default(0)
+#  created_at         :datetime         not null
+#  updated_at         :datetime         not null
+#
+# Indexes
+#
+#  index_tags_on_name_normalized  (name_normalized) UNIQUE
+#  index_tags_on_position         (position)
+#
 class Tag < ApplicationRecord
   has_many :tag_accounts, dependent: :destroy
   has_many :accounts, through: :tag_accounts

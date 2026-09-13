@@ -1,3 +1,17 @@
+# == Schema Information
+#
+# Table name: options
+#
+#  id         :bigint           not null, primary key
+#  opt_key    :string           not null
+#  opt_value  :string
+#  created_at :datetime         not null
+#  updated_at :datetime         not null
+#
+# Indexes
+#
+#  index_options_on_opt_key  (opt_key) UNIQUE
+#
 class Option < ApplicationRecord
   self.table_name = 'options'
 
