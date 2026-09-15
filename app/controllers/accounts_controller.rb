@@ -668,7 +668,7 @@ class AccountsController < ApplicationController
       redirect_to account_path(@account) and return
     end
 
-    result = WereadNativeApiClient.get_mp_info(url)
+    result = WechatCrawler.get_mp_info(url)
     if result.is_a?(Array) && result.any? && result.first["id"].present?
       mp_info = result.first
       new_mp_id = mp_info["id"]
@@ -680,7 +680,7 @@ class AccountsController < ApplicationController
       flash[:error] = "未能从该链接解析到公众号信息，请确认链接有效"
     end
     redirect_to account_path(@account)
-  rescue WereadNativeApiClient::ApiError => e
+  rescue WechatCrawler::DownloadError => e
     flash[:error] = "解析失败：#{e.message}"
     redirect_to account_path(@account)
   rescue StandardError => e

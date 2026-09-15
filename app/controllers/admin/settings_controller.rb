@@ -10,6 +10,10 @@ class Admin::SettingsController < Admin::BaseController
     @daily_crawl_budget_rednote = Option.daily_crawl_budget_for('rednote')
     @daily_crawl_budget_twitter = Option.daily_crawl_budget_for('twitter')
     @daily_crawl_budget_website = Option.daily_crawl_budget_for('website')
+    @wechat_download_rate_limit = Option.wechat_download_rate_limit
+    @wechat_download_rate_window = Option.wechat_download_rate_window
+    @weread_native_list_rate_limit = Option.weread_native_list_rate_limit
+    @weread_native_list_rate_window = Option.weread_native_list_rate_window
     @verbose_mode = Option[:crawler_verbose_mode]
     @log_retention_days = Option[:crawler_log_retention_days]
     @twitter_ct0 = Option.get('twitter_ct0')
@@ -135,6 +139,18 @@ class Admin::SettingsController < Admin::BaseController
     if params[:daily_crawl_budget_website].present?
       Option.set('daily_crawl_budget_website', params[:daily_crawl_budget_website])
       message = "每日抓取配额更新成功"
+    end
+
+    if params[:wechat_download_rate_limit].present? && params[:wechat_download_rate_window].present?
+      Option.set('wechat_download_rate_limit', params[:wechat_download_rate_limit])
+      Option.set('wechat_download_rate_window', params[:wechat_download_rate_window])
+      message = "微信正文下载限流更新成功"
+    end
+
+    if params[:weread_native_list_rate_limit].present? && params[:weread_native_list_rate_window].present?
+      Option.set('weread_native_list_rate_limit', params[:weread_native_list_rate_limit])
+      Option.set('weread_native_list_rate_window', params[:weread_native_list_rate_window])
+      message = "微信读书直连限流更新成功"
     end
 
     if params[:verbose_mode].present?

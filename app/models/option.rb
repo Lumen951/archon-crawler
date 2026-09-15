@@ -134,6 +134,23 @@ class Option < ApplicationRecord
       set('wechat_download_rate_window', val)
     end
 
+    # WeRead Native（直连）文章列表限流参数：请求数 / 窗口秒数（默认 30 次/60 秒）
+    def weread_native_list_rate_limit
+      (get('weread_native_list_rate_limit') || 30).to_i
+    end
+
+    def weread_native_list_rate_limit=(val)
+      set('weread_native_list_rate_limit', val)
+    end
+
+    def weread_native_list_rate_window
+      (get('weread_native_list_rate_window') || 60).to_i
+    end
+
+    def weread_native_list_rate_window=(val)
+      set('weread_native_list_rate_window', val)
+    end
+
     # Dajiala API key helpers
     def dajiala_api_key
       get('dajiala_api_key')
