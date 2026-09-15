@@ -53,7 +53,7 @@ MP-Crawler 是一个基于 Ruby on Rails 的应用，用于自动抓取微信公
 
 ### 4. 抓取日志
 - `CrawlLog`：结构化日志记录（debug/info/warn/error）
-- 仅在 `verbose_mode` 开启时写入日志
+- 仅在 `verbose_mode` 开启时写入日志（例外：各平台的第三方 API 用量汇总行用 `force: true`，始终写入）
 - 支持日志清理（按保留天数配置）
 
 ### 5. 标签系统
@@ -157,7 +157,7 @@ CrawlTaskAccount (帐号抓取状态)
 CrawlLog (抓取日志)
 ├── belongs_to :loggable (polymorphic，可挂 CrawlTask 或 WechatContentDownloadTask)
 ├── LEVELS: debug, info, warn, error
-└── 仅在 verbose_mode 开启时写入
+└── 仅在 verbose_mode 开启时写入（API 用量汇总行 force: true 除外）
 
 WechatContentDownloadTask (微信正文下载任务)
 ├── has_many :crawl_logs, as: :loggable
@@ -248,7 +248,9 @@ Doorkeeper::Application / AccessGrant / AccessToken (OAuth 2.1)
 - API 速率限制由各平台 API Client 的 Faraday 中间件处理（如 `WechatCrawler.download_connection` 的 `RateLimiterMiddleware`），调度层无需平台特定的 sleep
 
 **BaseCrawler** (`lib/base_crawler.rb`)
-- 所有平台 Crawler 的基类，只定义一个接口：`self.crawl_account(account, crawl_task, article_concurrency:, max_pages:)`
+- 所有平台 Crawler 的基类，只要求实现一个接口：`self.crawl_account(account, crawl_task, article_concurrency:, max_pages:)`
+- 另有一个可选钩子 `self.platform_crawl_summary(crawl_task)`（默认返回 nil）：该平台所有帐号抓完后由
+  `CrawlOrchestrator` 调用一次，返回值会被拼到"平台抓取完成"日志行上，供按次计费的平台汇报消耗/余额
 - 平台 Crawler 只需实现「如何抓取单个帐号」，不再关心跨帐号的并发调度（由 `CrawlOrchestrator` 统一负责）
 
 **CrawlerApiKeyError** (`lib/crawler_api_key_error.rb`)
@@ -288,6 +290,9 @@ Doorkeeper::Application / AccessGrant / AccessToken (OAuth 2.1)
 - 封装小红书 API（`api.yddm.com`）
 - 认证方式：`X-API-Key` header
 - 主要接口：`get_user_notes`、`get_note_detail`
+- 计费：厂商按次计费，每个响应体都带回本次消耗（`cost`）与剩余额度（`balance`，文档中位于 `data` 内，顶层同样兼容）。
+  三个查询方法都接受可选的 `&on_usage` 块，会在**抛出业务错误之前**被调用并收到 `Usage` 值对象 ——
+  返回业务错误的调用（如 code 1001 余额不足）同样计费；被重试 N 次就记录 N 次
 - 自定义错误类：`ApiError`、`ApiKeyMissingError`（包含 `CrawlerApiKeyError`）、`ApiRateLimitError`
 
 **TikHubApiClient** (`lib/tik_hub_api_client.rb`)
@@ -299,6 +304,14 @@ Doorkeeper::Application / AccessGrant / AccessToken (OAuth 2.1)
 **RednoteCrawler** (`lib/rednote_crawler.rb`, `< BaseCrawler`)
 - 抓取单个小红书帐号：获取笔记列表 → 获取详情 → 保存文章
 - 统计新增/跳过/失败数量
+- 计费：每次 API 调用的消耗/余额记一条 `debug` 日志（遵循 `verbose_mode`），并累计到本次任务；
+  平台抓取结束时由 `platform_crawl_summary` 返回一行汇总（调用次数 / 消耗 / 余额），
+  由 `CrawlOrchestrator` 拼到该平台的"平台抓取完成"日志行上（该行始终写入）
+
+**ApiUsageTally** (`lib/api_usage_tally.rb`)
+- 单次抓取运行期间的第三方 API 计费累计（按平台 key 分别累计调用次数 / 消耗 / 首次余额 / 最后余额）
+- 由 `CrawlTask#api_usage_tally` 持有：一个 CrawlTask 对象对应一次 `CrawlOrchestrator` 运行，
+  不持久化、随对象回收，因此无需按任务 id 注册或清理
 
 **TwitterApiClient** (`lib/twitter_api_client.rb`)
 - 通过 Python 脚本 (`bin/twitter_fetch.py`) 调用 twitter-api-client 库
@@ -349,7 +362,8 @@ Doorkeeper::Application / AccessGrant / AccessToken (OAuth 2.1)
 2. 新增 `XxxCrawler < BaseCrawler`，实现 `self.crawl_account(account, crawl_task, article_concurrency:, max_pages:)`
 3. 如该平台 API 有密钥失效的场景，将对应错误类 `include CrawlerApiKeyError`
 4. 如该平台 API 有频率限制，在 API Client 中使用 `RateLimiter` + `RateLimiterMiddleware`（参考 `WechatMpNativeApiClient` / `WereadApiClient`）
-5. 完成 — `CrawlJob` / `CrawlOrchestrator` 会自动把该类型帐号纳入同一个并发循环，与其他平台交替抓取
+5. 如该平台 API 按次计费，实现可选的 `self.platform_crawl_summary(crawl_task)`，把消耗/余额随平台完成日志一起记录（参考 `RednoteCrawler`）
+6. 完成 — `CrawlJob` / `CrawlOrchestrator` 会自动把该类型帐号纳入同一个并发循环，与其他平台交替抓取
 
 ### 添加新的导入平台
 
