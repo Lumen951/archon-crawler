@@ -38,6 +38,15 @@ class CrawlTask < ApplicationRecord
 
   ERROR_THRESHOLD = 50
 
+  # api_usage_tally 的懒加载要防并发首次访问（同一平台的多个帐号协程会同时进来）
+  API_USAGE_MUTEX = Mutex.new
+
+  # 本次运行期间的第三方 API 计费累计（不持久化，随本对象生命周期结束）。
+  # 一个 CrawlTask 对象对应一次 CrawlOrchestrator 运行，故无需清理或按 id 注册。
+  def api_usage_tally
+    @api_usage_tally || API_USAGE_MUTEX.synchronize { @api_usage_tally ||= ApiUsageTally.new }
+  end
+
   def resolved_accounts
     if account_ids.present?
       Account.where(id: account_ids)
@@ -94,8 +103,8 @@ class CrawlTask < ApplicationRecord
     increment!(:progress)
   end
 
-  def log(level, message, context: nil)
-    CrawlLog.log(self, level, message, context: context)
+  def log(level, message, context: nil, force: false)
+    CrawlLog.log(self, level, message, context: context, force: force)
   end
 
   def pause!

@@ -81,7 +81,20 @@ class CrawlOrchestrator
 
           # 等待该平台所有帐号任务真正结束（semaphore.async 只调度不等待，会导致日志乱序）
           account_barrier.wait
-          crawl_task.log(:info, "#{platform_class.new.platform_name} 平台抓取完成") unless crawl_task.reload.paused? || crawl_task.reload.failed?
+
+          next if crawl_task.reload.paused? || crawl_task.reload.failed?
+
+          # 平台级用量摘要（如第三方 API 消耗/余额）。每个平台每次任务只有这一行，始终写入：
+          # verbose_mode 关闭时，它是唯一的额度审计记录。
+          summary = platform_class.crawler_class.platform_crawl_summary(crawl_task)
+          if summary
+            usage = crawl_task.api_usage_tally.totals_for(platform_class.name)
+            crawl_task.log(:info, "#{platform_class.new.platform_name} 平台抓取完成，#{summary}",
+                           context: usage && { kind: "platform_api_usage", platform: platform_class.name }.merge(usage),
+                           force: true)
+          else
+            crawl_task.log(:info, "#{platform_class.new.platform_name} 平台抓取完成")
+          end
         end
       end
 

@@ -30,8 +30,10 @@ class CrawlLog < ApplicationRecord
   scope :errors, -> { where(level: 'error') }
   scope :warnings, -> { where(level: 'warn') }
 
-  def self.log(loggable, level, message, context: nil)
-    return unless Option.verbose_mode?
+  # @param force [Boolean] 即使 verbose_mode 关闭也写入。只保留给必须留存的少数几行
+  #   （各平台第三方 API 用量汇总），其余日志仍然遵循 Option.verbose_mode?。
+  def self.log(loggable, level, message, context: nil, force: false)
+    return unless force || Option.verbose_mode?
 
     create!(
       loggable: loggable,

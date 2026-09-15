@@ -261,6 +261,7 @@ class WechatCrawler < BaseCrawler
   end
 
   # weread 需要 mpId（MP_WXS_xxx）；若非该格式则通过已有文章 URL 自动解析
+  # （直抓微信文章页，不依赖转发服务账号池/会话）
   def self.resolve_weread_mp_id(account, crawl_task)
     mp_id = account.weread_mp_id
     return mp_id if mp_id.to_s.match?(/\AMP_WXS_/)
@@ -271,13 +272,8 @@ class WechatCrawler < BaseCrawler
     end
 
     begin
-      result = WereadApiClient.get_mp_info(article.url, crawl_task: crawl_task)
-    rescue => e
-      if [ WereadApiClient::NoAvailableAccountError ].any? { |err| e.is_a?(err) }
-        # 保留原始错误类型，交给 crawl_account 中断整个微信平台
-        raise
-      end
-
+      result = WereadNativeApiClient.get_mp_info(article.url, crawl_task: crawl_task)
+    rescue WereadNativeApiClient::ApiError => e
       raise WereadApiClient::ApiError, "解析 WeRead mpId 失败: #{e.message}"
     end
 

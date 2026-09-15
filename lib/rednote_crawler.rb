@@ -9,9 +9,36 @@ class RednoteCrawler < BaseCrawler
 
   # ── Logging ────────────────────────────────────────────
 
-  def self.log(crawl_task, level, message)
+  def self.log(crawl_task, level, message, context: nil)
     Rails.logger.send(level, "[RednoteCrawler] #{message}")
-    crawl_task&.log(level, "[RednoteCrawler] #{message}")
+    crawl_task&.log(level, "[RednoteCrawler] #{message}", context: context)
+  end
+
+  # ── API 计费 ───────────────────────────────────────────
+
+  # 记录一次被计费的 API 调用：累加到本次任务的小红书额度统计，并打一条 debug 日志。
+  # 日志页只渲染 message，所以数字要写进 message；context 里再放一份结构化的，便于以后统计。
+  def self.track_usage(crawl_task, account, label, usage)
+    crawl_task.api_usage_tally.record(account.class.name, cost: usage.cost, balance: usage.balance)
+
+    parts = []
+    parts << "消耗 #{ApiUsageTally.format_credits(usage.cost)} 积分" if usage.cost
+    parts << "余额 #{ApiUsageTally.format_credits(usage.balance)}" if usage.balance
+    detail = parts.any? ? " — #{parts.join('，')}" : ""
+    log(crawl_task, :debug, "#{account.nickname}: #{label} API 调用#{detail}",
+        context: { kind: "api_usage", endpoint: label, cost: usage.cost, balance: usage.balance })
+  end
+
+  # CrawlOrchestrator 在小红书平台所有帐号抓完后调用一次，把摘要拼到"平台抓取完成"日志行上。
+  # 无记录时返回 nil，由调用方保持原有的日志输出。
+  def self.platform_crawl_summary(crawl_task)
+    totals = crawl_task.api_usage_tally.totals_for(RednoteAccount.name)
+    return nil if totals.nil? || totals[:calls].zero?
+
+    parts = [ "共调用 API #{totals[:calls]} 次" ]
+    parts << "消耗 #{ApiUsageTally.format_credits(totals[:cost])} 积分" if totals[:cost]
+    parts << "余额 #{ApiUsageTally.format_credits(totals[:balance])}" if totals[:balance]
+    parts.join("，")
   end
 
   # Note: Rednote's API is rate-sensitive, so notes within an account are
@@ -41,7 +68,9 @@ class RednoteCrawler < BaseCrawler
         crawl_task: crawl_task,
         context: "#{account.nickname}: 笔记列表获取 (page: #{page})"
       ) do
-        RednoteApiClient.get_user_notes(account.fakeid, page: page)
+        RednoteApiClient.get_user_notes(account.fakeid, page: page) do |usage|
+          track_usage(crawl_task, account, "笔记列表第 #{page} 页", usage)
+        end
       end
 
       if data.nil?
@@ -115,7 +144,7 @@ class RednoteCrawler < BaseCrawler
 
     # Fetch full detail
     log(crawl_task, :debug, "正在获取笔记详情: #{note_id}")
-    detail_data = fetch_note_detail_with_retry(note_id, crawl_task)
+    detail_data = fetch_note_detail_with_retry(note_id, account, crawl_task)
     unless detail_data
       log(crawl_task, :warn, "笔记 #{note_id} 详情获取失败，跳过")
       return :error
@@ -164,12 +193,14 @@ class RednoteCrawler < BaseCrawler
     :error
   end
 
-  def self.fetch_note_detail_with_retry(note_id, crawl_task)
+  def self.fetch_note_detail_with_retry(note_id, account, crawl_task)
     Retryable.with_retry(
       crawl_task: crawl_task,
       context: "笔记详情获取 (#{note_id})"
     ) do
-      RednoteApiClient.get_note_detail(note_id)
+      RednoteApiClient.get_note_detail(note_id) do |usage|
+        track_usage(crawl_task, account, "笔记详情 #{note_id}", usage)
+      end
     end
   end
 end
