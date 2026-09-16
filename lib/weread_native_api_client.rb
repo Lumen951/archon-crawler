@@ -20,6 +20,9 @@ require "crawler_api_key_error"
 #   download_content(url, ...)    → html string（仅处理 weread.qq.com 正文链接）
 #   validate_key                  → bool
 #
+# 文章元数据（发布时间 / 原始 mp.weixin.qq.com 链接）来自正文页内嵌的
+# window.cgiDataNew —— /api/mp/cover 不返回发布时间，get_articles 会额外抓一次正文页。
+#
 # 公众号信息解析（get_mp_info，直抓文章页）已移至 WechatCrawler——它不依赖微信读书会话。
 #
 # 额外提供 QR 码登录功能（纯传输层，落库由 QrLogin::WereadNative 负责）:
@@ -141,7 +144,9 @@ class WereadNativeApiClient
     return { "articles" => [] } if review_id.empty?
 
     log(crawl_task, :debug, "get_articles: #{book_id} 最新文章 reviewId=#{review_id}")
-    { "articles" => [map_cover(cover, review_id)] }
+    article = map_cover(cover, review_id)
+    merge_content_page_metadata!(article, review_id, crawl_task)
+    { "articles" => [article] }
   rescue SessionExpiredError, LoginRequiredError => e
     raise e
   rescue Faraday::Error => e
@@ -178,11 +183,35 @@ class WereadNativeApiClient
       # 优先用原始 mp.weixin.qq.com 链接（若响应带），否则用微信读书正文链接。
       # 正文下载会按链接域名分派（见 WechatCrawler.download_content）。
       "link" => extract_mp_url(cover) || weread_content_url(review_id),
-      "cover" => cover["cover"] || cover["picUrl"] || cover["coverUrl"] || "",
+      "cover" => cover["cover"] || cover["picUrl"] || cover["coverUrl"] || cover["pic"] || "",
       "digest" => cover["digest"] || cover["abstract"] || "",
       "author_name" => cover["name"] || "",
       "create_time" => normalize_time_seconds(cover["time"] || cover["createTime"] || cover["publishTime"]),
     }
+  end
+
+  # 用正文页内嵌的 window.cgiDataNew 元数据覆盖 cover 数据。
+  # /api/mp/cover 不返回发布时间，原始 mp.weixin.qq.com 链接也只在正文页里有；
+  # 抓一次正文页拿权威的 link / create_time / title / desc / cdn_url / nick_name。
+  # 失败时退回 cover 数据（链接为微信读书正文页，create_time 为 0），不致命。
+  def self.merge_content_page_metadata!(article, review_id, crawl_task)
+    cgi = extract_cgi_data(fetch_content_page(review_id))
+
+    if cgi["link"].present?
+      # 保留微信读书链接供正文下载回退（WechatCrawler.download_content 按域名分派）
+      article["weread_link"] = weread_content_url(review_id)
+      article["link"] = cgi["link"]
+    end
+    article["create_time"] = parse_wechat_time(cgi["create_time"]) if cgi["create_time"].present?
+    %w[title digest cover author_name].each do |key|
+      article[key] = cgi[key] if cgi[key].present?
+    end
+    article
+  rescue SessionExpiredError, LoginRequiredError => e
+    raise e
+  rescue ApiError => e
+    log(crawl_task, :warn, "解析正文页元数据失败（退回 cover 数据）: #{e.message}")
+    article
   end
 
   # ── Article Content ───────────────────────────────────
@@ -193,22 +222,77 @@ class WereadNativeApiClient
     review_id = extract_review_id(url)
     raise DownloadError, "无法从链接解析 reviewId: #{url}" if review_id.blank?
 
-    cookie_header = build_cookie_header(load_session!)
-    resp = connection.get("/web/mp/content", { reviewId: review_id }, base_headers(cookie_header))
-    handle_session_error!(resp)
-    raise DownloadError, "下载正文失败: HTTP #{resp.status}" unless resp.status == 200
-
-    body = resp.body.to_s
-    body = body.dup.force_encoding(Encoding::UTF_8) if body.encoding == Encoding::ASCII_8BIT
-
+    body = fetch_content_page(review_id)
     inner = extract_element_html(body, "js_content")
     raise DownloadError, "正文为空（可能未登录或文章不可见）" if inner.blank?
 
     clean_content(inner)
   rescue SessionExpiredError, LoginRequiredError => e
     raise e
-  rescue Faraday::Error => e
+  rescue ApiError => e
     raise DownloadError, "下载正文失败: #{e.message}"
+  end
+
+  # 抓取微信读书正文页完整 HTML（元数据解析与正文下载共用）
+  # @return [String] 页面原始 HTML
+  def self.fetch_content_page(review_id)
+    cookie_header = build_cookie_header(load_session!)
+    resp = connection.get("/web/mp/content", { reviewId: review_id }, base_headers(cookie_header))
+    handle_session_error!(resp)
+    raise ApiError, "获取正文页失败: HTTP #{resp.status}" unless resp.status == 200
+
+    body = resp.body.to_s
+    body = body.dup.force_encoding(Encoding::UTF_8) if body.encoding == Encoding::ASCII_8BIT
+    body
+  rescue Faraday::Error => e
+    raise ApiError, "获取正文页失败: #{e.message}"
+  end
+
+  # 解析正文页内嵌的 window.cgiDataNew（JS 对象字面量而非 JSON，按行首键名逐字段取值，
+  # 避免被 content_noencode 大字符串干扰）。字符串为单引号 + \xNN / \' 转义。
+  # @return [Hash] { "link", "create_time", "title", "digest", "cover", "author_name" }
+  def self.extract_cgi_data(html)
+    segment = html.to_s[/window\.cgiDataNew\s*=\s*\{.*/m]
+    return {} unless segment
+
+    {
+      # link 里 & 被双重转义（\x26amp;），需 JS 反转义 + HTML 反转义
+      "link" => unescape_html_entities(unescape_js_string(
+        segment[/^[ \t]*link:\s*'(https:\/\/mp\.weixin\.qq\.com[^']*)'/, 1]
+      )),
+      "create_time" => segment[/^[ \t]*create_time:\s*'([^']*)'/, 1],
+      "title" => unescape_js_string(segment[/^[ \t]*title:\s*'((?:\\.|[^'\\])*)'/, 1]),
+      "digest" => unescape_js_string(segment[/^[ \t]*desc:\s*'((?:\\.|[^'\\])*)'/, 1]),
+      "cover" => segment[/^[ \t]*cdn_url:\s*'([^']*)'/, 1],
+      "author_name" => unescape_js_string(segment[/^[ \t]*nick_name:\s*'((?:\\.|[^'\\])*)'/, 1]),
+    }.compact
+  end
+
+  # URL 里的 HTML 实体还原（&amp; → &）
+  def self.unescape_html_entities(url)
+    return nil if url.nil?
+
+    CGI.unescapeHTML(url)
+  end
+
+  # JS 单引号字符串反转义：\xNN → 字符，\' / \" / \\ 还原
+  def self.unescape_js_string(str)
+    return nil if str.nil?
+
+    str.gsub(/\\x([0-9a-fA-F]{2})/) { [$1.to_i(16)].pack("U") }
+       .gsub("\\'", "'")
+       .gsub('\\"', '"')
+       .gsub("\\\\", "\\")
+  end
+
+  # 微信正文页的 create_time 形如 '2026-09-15 11:08'（北京时间）
+  # @return [Integer, nil] Unix 时间戳（秒）
+  def self.parse_wechat_time(str)
+    return nil if str.blank?
+
+    Time.find_zone("Asia/Shanghai").strptime(str.strip, "%Y-%m-%d %H:%M").to_i
+  rescue ArgumentError
+    nil
   end
 
   def self.weread_content_url?(url)

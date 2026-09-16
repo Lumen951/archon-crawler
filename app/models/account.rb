@@ -182,6 +182,14 @@ class Account < ApplicationRecord
     update_columns(last_crawled_at: at, next_crawl_at: at + interval)
   end
 
+  # Recompute next_crawl_at from the current activity tier without touching
+  # last_crawled_at. Used when historical data changes (e.g. backfilling
+  # published_at) and the tier the schedule was derived from is now stale.
+  def reschedule_crawl!
+    interval = self.class.crawl_interval_for(last_published_at: last_published_at, total_articles: total_articles)
+    update_columns(next_crawl_at: (last_crawled_at || Time.current) + interval)
+  end
+
   # Next crawl time based on the last crawl and current activity tier.
   # nil for never-crawled accounts (treated as due immediately).
   def compute_next_crawl_at
