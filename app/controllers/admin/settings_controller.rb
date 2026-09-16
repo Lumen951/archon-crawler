@@ -1,66 +1,6 @@
 class Admin::SettingsController < Admin::BaseController
   def show
-    @wechat_api_provider = Option.wechat_api_provider
-    @dajiala_api_key = Option.dajiala_api_key
-    @rednote_api_key = Option.rednote_api_key
-    @default_article_concurrency = Option.default_article_concurrency
-    @default_account_concurrency = Option.default_account_concurrency
-    @max_crawl_pages = Option.max_crawl_pages
-    @daily_crawl_budget_wechat = Option.daily_crawl_budget_for('wechat')
-    @daily_crawl_budget_rednote = Option.daily_crawl_budget_for('rednote')
-    @daily_crawl_budget_twitter = Option.daily_crawl_budget_for('twitter')
-    @daily_crawl_budget_website = Option.daily_crawl_budget_for('website')
-    @wechat_download_rate_limit = Option.wechat_download_rate_limit
-    @wechat_download_rate_window = Option.wechat_download_rate_window
-    @weread_native_list_rate_limit = Option.weread_native_list_rate_limit
-    @weread_native_list_rate_window = Option.weread_native_list_rate_window
-    @verbose_mode = Option[:crawler_verbose_mode]
-    @log_retention_days = Option[:crawler_log_retention_days]
-    @twitter_ct0 = Option.get('twitter_ct0')
-    @twitter_auth_token = Option.get('twitter_auth_token')
-    @twitter_proxy = Option.get('twitter_proxy')
-    @tikhub_api_key = Option.tikhub_api_key
-    @dajiala_key_check = Rails.cache.read('api_key_check:dajiala')
-    @rednote_key_check = Rails.cache.read('api_key_check:rednote')
-    @twitter_key_check = Rails.cache.read('api_key_check:twitter')
-    @tikhub_key_check = Rails.cache.read('api_key_check:tikhub')
-    @crawl_wechat_enabled = Option.crawl_wechat_enabled?
-    @crawl_rednote_enabled = Option.crawl_rednote_enabled?
-    @crawl_twitter_enabled = Option.crawl_twitter_enabled?
-    @crawl_website_enabled = Option.crawl_website_enabled?
-    @profile_ext_credentials = Option.profile_ext_credentials
-    @profile_ext_expired = Option.profile_ext_credentials_expired?
-    @profile_ext_updated_at = Option.profile_ext_credentials_updated_at
-    @profile_ext_age_minutes = Option.profile_ext_credentials_age_minutes
-    @profile_ext_account_bizs = ProfileExtApiClient.all_account_bizs rescue []
-    # MP Native
-    @wechat_mp_cookie = Option.wechat_mp_cookie
-    @wechat_mp_token = Option.wechat_mp_token
-    @wechat_mp_session_valid = Option.wechat_mp_session_valid?
-    @wechat_mp_login_state = Option.wechat_mp_login_state
-    @wechat_mp_expires_at = Option.wechat_mp_expires_at
-    @wechat_mp_account_info = Option.wechat_mp_account_info
-    @mp_native_key_check = Rails.cache.read('api_key_check:mp_native')
-    # WeRead
-    @weread_accounts = Option.weread_accounts
-    @weread_has_valid_accounts = Option.weread_accounts_valid?
-    @weread_blocked_accounts = Option.weread_blocked_accounts
-    @weread_today_blocked = (@weread_blocked_accounts[WereadApiClient.today_shanghai] || [])
-    @weread_key_check = Rails.cache.read('api_key_check:weread')
-    # WeRead Native (直连扫码登录)
-    @weread_native_session_valid = Option.weread_native_session_valid?
-    @weread_native_expires_at = Option.weread_native_expires_at
-    @weread_native_account_info = Option.weread_native_account_info
-    @weread_native_key_check = Rails.cache.read('api_key_check:weread_native')
-    # Feishu
-    @feishu_enabled = Option.feishu_enabled?
-    @feishu_app_id = Option.feishu_app_id
-    @feishu_app_secret = Option.feishu_app_secret
-    @feishu_receive_id = Option.feishu_receive_id
-    @feishu_receive_id_type = Option.feishu_receive_id_type
-    @feishu_encrypt_key = Option.feishu_encrypt_key
-    @feishu_login_mode = Option.feishu_login_mode
-    @feishu_callback_url = build_feishu_callback_url
+    load_settings_data
   end
 
   def update
@@ -401,9 +341,15 @@ class Admin::SettingsController < Admin::BaseController
 
   def wechat_mp_logout
     WechatMpNativeApiClient.logout
+    load_settings_data
     message = "已退出微信公众号平台登录"
     respond_to do |format|
-      format.turbo_stream { render turbo_stream: helpers.toast_stream(message, type: :success) }
+      format.turbo_stream do
+        render turbo_stream: [
+          turbo_stream.replace("mp_native_panel", partial: "admin/settings/mp_native_panel"),
+          helpers.toast_stream(message, type: :success)
+        ]
+      end
       format.html { flash[:success] = message; redirect_to admin_settings_path }
       format.json { render json: { status: "logged_out" } }
     end
@@ -420,9 +366,15 @@ class Admin::SettingsController < Admin::BaseController
     valid = WechatMpNativeApiClient.validate_session
     result = { valid: valid, checked_at: Time.current.iso8601 }
     Rails.cache.write('api_key_check:mp_native', result, expires_in: 2.hours)
+    load_settings_data
     message = valid ? "✓ MP 原生会话有效" : "✗ MP 原生会话无效或已过期"
     respond_to do |format|
-      format.turbo_stream { render turbo_stream: helpers.toast_stream(message, type: valid ? :success : :error) }
+      format.turbo_stream do
+        render turbo_stream: [
+          turbo_stream.replace("mp_native_panel", partial: "admin/settings/mp_native_panel"),
+          helpers.toast_stream(message, type: valid ? :success : :error)
+        ]
+      end
       format.html { flash[:success] = message; redirect_to admin_settings_path }
       format.json { render json: result }
     end
@@ -469,9 +421,15 @@ class Admin::SettingsController < Admin::BaseController
 
   def weread_native_logout
     Option.weread_native_session_cleared!
+    load_settings_data
     message = "已退出微信读书（直连）登录"
     respond_to do |format|
-      format.turbo_stream { render turbo_stream: helpers.toast_stream(message, type: :success) }
+      format.turbo_stream do
+        render turbo_stream: [
+          turbo_stream.replace("weread_native_panel", partial: "admin/settings/weread_native_panel"),
+          helpers.toast_stream(message, type: :success)
+        ]
+      end
       format.html { flash[:success] = message; redirect_to admin_settings_path }
       format.json { render json: { status: "logged_out" } }
     end
@@ -481,9 +439,15 @@ class Admin::SettingsController < Admin::BaseController
     valid = WereadNativeApiClient.validate_key
     result = { valid: valid, checked_at: Time.current.iso8601 }
     Rails.cache.write('api_key_check:weread_native', result, expires_in: 2.hours)
+    load_settings_data
     message = valid ? "✓ 微信读书（直连）会话有效" : "✗ 微信读书（直连）会话无效或已过期"
     respond_to do |format|
-      format.turbo_stream { render turbo_stream: helpers.toast_stream(message, type: valid ? :success : :error) }
+      format.turbo_stream do
+        render turbo_stream: [
+          turbo_stream.replace("weread_native_panel", partial: "admin/settings/weread_native_panel"),
+          helpers.toast_stream(message, type: valid ? :success : :error)
+        ]
+      end
       format.html { flash[:success] = message; redirect_to admin_settings_path }
       format.json { render json: result }
     end
@@ -554,6 +518,70 @@ class Admin::SettingsController < Admin::BaseController
   end
 
   private
+
+  def load_settings_data
+    @wechat_api_provider = Option.wechat_api_provider
+    @dajiala_api_key = Option.dajiala_api_key
+    @rednote_api_key = Option.rednote_api_key
+    @default_article_concurrency = Option.default_article_concurrency
+    @default_account_concurrency = Option.default_account_concurrency
+    @max_crawl_pages = Option.max_crawl_pages
+    @daily_crawl_budget_wechat = Option.daily_crawl_budget_for('wechat')
+    @daily_crawl_budget_rednote = Option.daily_crawl_budget_for('rednote')
+    @daily_crawl_budget_twitter = Option.daily_crawl_budget_for('twitter')
+    @daily_crawl_budget_website = Option.daily_crawl_budget_for('website')
+    @wechat_download_rate_limit = Option.wechat_download_rate_limit
+    @wechat_download_rate_window = Option.wechat_download_rate_window
+    @weread_native_list_rate_limit = Option.weread_native_list_rate_limit
+    @weread_native_list_rate_window = Option.weread_native_list_rate_window
+    @verbose_mode = Option[:crawler_verbose_mode]
+    @log_retention_days = Option[:crawler_log_retention_days]
+    @twitter_ct0 = Option.get('twitter_ct0')
+    @twitter_auth_token = Option.get('twitter_auth_token')
+    @twitter_proxy = Option.get('twitter_proxy')
+    @tikhub_api_key = Option.tikhub_api_key
+    @dajiala_key_check = Rails.cache.read('api_key_check:dajiala')
+    @rednote_key_check = Rails.cache.read('api_key_check:rednote')
+    @twitter_key_check = Rails.cache.read('api_key_check:twitter')
+    @tikhub_key_check = Rails.cache.read('api_key_check:tikhub')
+    @crawl_wechat_enabled = Option.crawl_wechat_enabled?
+    @crawl_rednote_enabled = Option.crawl_rednote_enabled?
+    @crawl_twitter_enabled = Option.crawl_twitter_enabled?
+    @crawl_website_enabled = Option.crawl_website_enabled?
+    @profile_ext_credentials = Option.profile_ext_credentials
+    @profile_ext_expired = Option.profile_ext_credentials_expired?
+    @profile_ext_updated_at = Option.profile_ext_credentials_updated_at
+    @profile_ext_age_minutes = Option.profile_ext_credentials_age_minutes
+    @profile_ext_account_bizs = ProfileExtApiClient.all_account_bizs rescue []
+    # MP Native
+    @wechat_mp_cookie = Option.wechat_mp_cookie
+    @wechat_mp_token = Option.wechat_mp_token
+    @wechat_mp_session_valid = Option.wechat_mp_session_valid?
+    @wechat_mp_login_state = Option.wechat_mp_login_state
+    @wechat_mp_expires_at = Option.wechat_mp_expires_at
+    @wechat_mp_account_info = Option.wechat_mp_account_info
+    @mp_native_key_check = Rails.cache.read('api_key_check:mp_native')
+    # WeRead
+    @weread_accounts = Option.weread_accounts
+    @weread_has_valid_accounts = Option.weread_accounts_valid?
+    @weread_blocked_accounts = Option.weread_blocked_accounts
+    @weread_today_blocked = (@weread_blocked_accounts[WereadApiClient.today_shanghai] || [])
+    @weread_key_check = Rails.cache.read('api_key_check:weread')
+    # WeRead Native (直连扫码登录)
+    @weread_native_session_valid = Option.weread_native_session_valid?
+    @weread_native_expires_at = Option.weread_native_expires_at
+    @weread_native_account_info = Option.weread_native_account_info
+    @weread_native_key_check = Rails.cache.read('api_key_check:weread_native')
+    # Feishu
+    @feishu_enabled = Option.feishu_enabled?
+    @feishu_app_id = Option.feishu_app_id
+    @feishu_app_secret = Option.feishu_app_secret
+    @feishu_receive_id = Option.feishu_receive_id
+    @feishu_receive_id_type = Option.feishu_receive_id_type
+    @feishu_encrypt_key = Option.feishu_encrypt_key
+    @feishu_login_mode = Option.feishu_login_mode
+    @feishu_callback_url = build_feishu_callback_url
+  end
 
   def qr_login_cache_key(token)
     "qr_login:#{token}"

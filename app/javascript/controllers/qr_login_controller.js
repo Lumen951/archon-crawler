@@ -84,9 +84,12 @@ export default class extends Controller {
         case "success":
           this.stopPolling()
           this.spinnerTarget.classList.add("hidden")
-          this.setStatus(`${data.message || "登录成功"}，页面即将刷新...`, "text-green-600 font-semibold")
+          this.setStatus(`${data.message || "登录成功"}，正在刷新...`, "text-green-600 font-semibold")
           this.imageTarget.style.opacity = "0.5"
-          setTimeout(() => window.location.reload(), 1500)
+          // Trigger a turbo visit to refresh the page (Turbo will handle it smoothly)
+          setTimeout(() => {
+            Turbo.visit(window.location.href, { action: "replace" })
+          }, 800)
           break
         case "expired":
           this.fail("二维码已过期，请重新获取")
