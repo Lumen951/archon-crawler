@@ -435,7 +435,7 @@ class WechatCrawler < BaseCrawler
   # 下载单篇文章正文并更新。正文下载有严格 rate limit，失败时保留文章元数据。
   # @return [Boolean] 是否成功下载
   def self.download_article_content(article, crawl_task)
-    html_content = download_with_retry(article.url, 'html', crawl_task)
+    html_content = download_content(article.url, crawl_task: crawl_task)
     markdown_content = Html2Text.convert(html_content)
 
     article.update!(
@@ -448,14 +448,5 @@ class WechatCrawler < BaseCrawler
     # 正文下载失败不算抓取失败: 文章元数据已落库，可稍后通过界面重新下载
     log(crawl_task, :warn, "下载正文失败 #{article.url}: #{e.message}")
     false
-  end
-
-  def self.download_with_retry(url, format, crawl_task)
-    Retryable.with_retry(
-      crawl_task: crawl_task,
-      context: "下载 #{url} (#{format})"
-    ) do
-      download_content(url, crawl_task: crawl_task)
-    end
   end
 end
