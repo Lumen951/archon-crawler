@@ -87,6 +87,18 @@ class WebsiteListingCrawlerTest < ActiveSupport::TestCase
     assert_equal "sitemap", @account.crawl_mode
   end
 
+  test "bare listing rule is valid on the account but fails when crawled" do
+    @account.update!(crawl_rule: { "mode" => "listing" })
+    task = CrawlTask.create!(account_ids: [ @account.id ], status: :running)
+    task.setup_account_tracking!
+
+    WebsiteCrawler.crawl_account(@account, task, article_concurrency: 1, max_pages: 1)
+
+    task_account = task.crawl_task_accounts.find_by!(account: @account)
+    assert task_account.failed?
+    assert_match "尚未生成", task_account.error_message
+  end
+
   test "listing rule rejects an entry URL outside the account site" do
     error = assert_raises(WebsiteCrawler::ListingRule::InvalidRule) do
       WebsiteCrawler::ListingRule.new(@account, listing_rule(entry_urls: [ "https://attacker.example.org/events" ]))

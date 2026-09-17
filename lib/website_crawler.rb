@@ -25,6 +25,10 @@ class WebsiteCrawler < BaseCrawler
   # and fetched per account per crawl.
   def self.crawl_account(account, crawl_task, article_concurrency:, max_pages:)
     task_account = crawl_task.crawl_task_accounts.find_by(account: account)
+    if ListingRule.unconfigured_listing?(account.crawl_rule)
+      raise ListingRule::InvalidRule, "Listing 抓取规则尚未生成或配置不完整"
+    end
+
     rule = ListingRule.new(account, account.crawl_rule)
     return crawl_listing_account(account, crawl_task, task_account: task_account, rule: rule) if rule.listing?
 
@@ -831,6 +835,14 @@ class WebsiteCrawler < BaseCrawler
     MAX_INTERVAL_SECONDS = 60
 
     class InvalidRule < StandardError; end
+
+    # Listing imports begin with this exact, valid persistence shape while a
+    # background job derives selectors. Do not treat partial rules as pending:
+    # they remain invalid and are rejected at save time.
+    def self.unconfigured_listing?(definition)
+      value = definition.respond_to?(:to_h) ? definition.to_h.deep_stringify_keys : {}
+      value == { "mode" => "listing" }
+    end
 
     attr_reader :account, :definition, :mode, :entry_urls, :item_selector,
                 :url_mapping, :title_mapping, :image_mapping, :field_mappings,

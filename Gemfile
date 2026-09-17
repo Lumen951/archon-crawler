@@ -66,6 +66,7 @@ end
 
 # Selenium WebDriver for headless browser rendering (used in production for website crawling)
 gem "selenium-webdriver"
+gem "ferrum"
 
 group :test do
   # Use system testing [https://guides.rubyonrails.org/testing.html#system-testing]

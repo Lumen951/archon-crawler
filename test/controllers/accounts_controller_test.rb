@@ -180,6 +180,18 @@ class AccountsControllerTest < ActionDispatch::IntegrationTest
     assert_equal 1, WebsiteAccount.count
   end
 
+  test "listing website import enqueues rule generation" do
+    assert_enqueued_with(job: GenerateWebsiteListingRuleJob) do
+      post import_website_accounts_path, params: {
+        urls: "Events, https://events.example.com/list",
+        crawl_mode: "listing"
+      }
+    end
+
+    account = WebsiteAccount.find_by!(fakeid: "events.example.com")
+    assert_equal({ "mode" => "listing" }, account.crawl_rule)
+  end
+
   test "updates a website listing crawl rule" do
     account = WebsiteAccount.create!(fakeid: "events.example.com", nickname: "Events", metadata: { url: "https://events.example.com" })
     rule = {

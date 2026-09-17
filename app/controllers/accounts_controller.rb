@@ -204,18 +204,22 @@ class AccountsController < ApplicationController
 
   def import_website
     lines = params[:urls].to_s.split(/\r?\n/).map(&:strip).reject(&:blank?)
+    crawl_mode = params[:crawl_mode].to_s.presence || "sitemap"
 
     if lines.empty?
       flash[:error] = "请输入至少一个网址（每行一个：名称, 网址 或仅网址）"
       redirect_to import_website_page_accounts_path and return
     end
 
-    result = Website::Importer.import_lines(lines)
+    result = Website::Importer.import_lines(lines, crawl_mode: crawl_mode)
+    result.imported_account_ids.each { |account_id| GenerateWebsiteListingRuleJob.perform_later(account_id) } if crawl_mode == "listing"
 
     if result.errors.any?
       flash[:warning] = truncate_error("部分网址导入失败：#{result.errors.join('; ')}")
     elsif result.imported_count.positive?
-      flash[:success] = success_message_for(result)
+      message = success_message_for(result)
+      message += "，正在后台生成列表抓取规则" if crawl_mode == "listing"
+      flash[:success] = message
     elsif result.skipped_count.positive?
       flash[:warning] = "没有新网站需要导入（#{result.skipped_count} 个已存在）"
     else

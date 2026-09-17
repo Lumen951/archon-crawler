@@ -79,6 +79,13 @@ class WebsiteAccount < Account
     crawl_rule.fetch("mode", "sitemap").to_s.presence_in(%w[sitemap listing]) || "sitemap"
   end
 
+  # A listing account is created before its asynchronous rule generator has
+  # produced selectors. It is intentionally runnable only after the rule is
+  # complete; WebsiteCrawler turns this state into a visible crawl failure.
+  def listing_rule_unconfigured?
+    WebsiteCrawler::ListingRule.unconfigured_listing?(crawl_rule)
+  end
+
   def max_pages
     (metadata["max_pages"] || DEFAULT_MAX_PAGES).to_i.clamp(1, MAX_PAGES_CEILING)
   end
@@ -120,6 +127,8 @@ class WebsiteAccount < Account
   private
 
   def crawl_rule_is_valid
+    return if WebsiteCrawler::ListingRule.unconfigured_listing?(crawl_rule)
+
     WebsiteCrawler::ListingRule.new(self, crawl_rule)
   rescue WebsiteCrawler::ListingRule::InvalidRule => e
     errors.add(:crawl_rule, e.message)
