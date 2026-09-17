@@ -63,15 +63,15 @@ class AccountResolver
 
   # ─── Resolve methods (search + DB create) ────────────────────────
 
-  # Resolve a WeChat account from an article URL via WereadNativeApiClient
-  # (直抓微信文章页解析，无需微信读书会话或转发服务账号).
+  # Resolve a WeChat account from an article URL via WechatCrawler.get_mp_info
+  # (直抓微信文章页解析，无需任何 API 会话).
   # Returns a Result with the found or created WechatAccount.
   def self.resolve_wechat_by_url(url)
     url = url.to_s.strip
     raise ArgumentError, "请输入微信公众号文章链接" if url.blank?
     raise ArgumentError, "请输入有效的微信公众号文章链接（包含 mp.weixin.qq.com）" unless url.include?("mp.weixin.qq.com")
 
-    mp_info_list = WereadNativeApiClient.get_mp_info(url)
+    mp_info_list = WechatCrawler.get_mp_info(url)
     unless mp_info_list.is_a?(Array) && mp_info_list.any?
       return Result.new(accounts: [], status: "error", error: "未能从该链接解析到公众号信息，请确认链接有效")
     end
@@ -108,7 +108,7 @@ class AccountResolver
       )
       Result.new(accounts: [account], status: "created", error: nil)
     end
-  rescue WereadNativeApiClient::ApiError => e
+  rescue WechatCrawler::DownloadError => e
     Result.new(accounts: [], status: "error", error: "解析失败：#{e.message}")
   rescue ActiveRecord::RecordInvalid => e
     Result.new(accounts: [], status: "error", error: "创建帐号失败：#{e.message}")

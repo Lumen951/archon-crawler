@@ -162,53 +162,7 @@
         通过扫描二维码登录微信公众号平台（mp.weixin.qq.com），登录后可使用原生 API 抓取文章。Cookie/Token 有效期<%= wechat_mp_session_ttl_label %>，失效时会通过飞书推送提醒。
       </p>
 
-      <% if @wechat_mp_session_valid %>
-        <!-- Logged in state -->
-        <div class="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm font-medium text-green-900">会话状态：✓ 已登录</p>
-              <p class="text-sm text-green-700 mt-1 font-mono">Token: <%= mask_api_key(@wechat_mp_token) %></p>
-              <% if @wechat_mp_expires_at %>
-                <p class="text-sm text-green-700 mt-1">
-                  过期时间：<%= Time.parse(@wechat_mp_expires_at).strftime('%Y-%m-%d %H:%M:%S') rescue @wechat_mp_expires_at %>
-                </p>
-              <% end %>
-              <% if @wechat_mp_account_info.present? %>
-                <% info = JSON.parse(@wechat_mp_account_info) rescue {} %>
-                <% if info['nickname'].present? %>
-                  <p class="text-sm text-green-700 mt-1">公众号：<%= info['nickname'] %></p>
-                <% end %>
-              <% end %>
-              <% if @mp_native_key_check %>
-                <p class="text-sm mt-1">
-                  上次验证：
-                  <% if @mp_native_key_check[:valid] == true %>
-                    <span class="text-green-700 font-semibold">✓ 有效</span>
-                  <% else %>
-                    <span class="text-red-700 font-semibold">✗ 无效</span>
-                  <% end %>
-                  <span class="text-gray-500 text-xs ml-1">(<%= Time.parse(@mp_native_key_check[:checked_at]).strftime('%Y-%m-%d %H:%M') %>)</span>
-                </p>
-              <% end %>
-            </div>
-            <div class="flex flex-col items-end gap-2">
-              <%= button_to "验证会话", validate_mp_native_key_admin_settings_path, method: :post,
-                  class: "text-sm px-3 py-1.5 rounded bg-green-600 text-white hover:bg-green-700 transition" %>
-              <%= button_to "退出登录", wechat_mp_logout_admin_settings_path, method: :post,
-                  class: "text-sm px-3 py-1.5 rounded bg-red-600 text-white hover:bg-red-700 transition",
-                  data: { confirm: "确定要退出微信公众号平台登录吗？" } %>
-            </div>
-          </div>
-        </div>
-      <% else %>
-        <!-- Not logged in state -->
-        <div class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-          <p class="text-sm text-yellow-800">未登录微信公众号平台。请点击下方按钮获取二维码，然后使用微信扫码登录。</p>
-        </div>
-
-        <%= render "admin/settings/qr_login", provider: "wechat_mp" %>
-      <% end %>
+      <%= render "admin/settings/mp_native_panel" %>
     </div>
 
     <!-- WeRead Panel -->
@@ -326,54 +280,7 @@
         <br>注意：微信读书网页版已下线历史列表，每个公众号每次仅能抓取「最新一篇」文章。
       </p>
 
-      <% if @weread_native_session_valid %>
-        <!-- Logged in state -->
-        <div class="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm font-medium text-green-900">会话状态：✓ 已登录</p>
-              <% if @weread_native_expires_at %>
-                <p class="text-sm text-green-700 mt-1">
-                  过期时间：<%= Time.parse(@weread_native_expires_at).strftime('%Y-%m-%d %H:%M:%S') rescue @weread_native_expires_at %>
-                </p>
-              <% end %>
-              <% if @weread_native_account_info.present? %>
-                <% info = JSON.parse(@weread_native_account_info) rescue {} %>
-                <% if info['name'].present? %>
-                  <p class="text-sm text-green-700 mt-1">账号：<%= info['name'] %></p>
-                <% elsif info['vid'].present? %>
-                  <p class="text-sm text-green-700 mt-1 font-mono">VID: <%= info['vid'] %></p>
-                <% end %>
-              <% end %>
-              <% if @weread_native_key_check %>
-                <p class="text-sm mt-1">
-                  上次验证：
-                  <% if @weread_native_key_check[:valid] == true %>
-                    <span class="text-green-700 font-semibold">✓ 有效</span>
-                  <% else %>
-                    <span class="text-red-700 font-semibold">✗ 无效</span>
-                  <% end %>
-                  <span class="text-gray-500 text-xs ml-1">(<%= Time.parse(@weread_native_key_check[:checked_at]).strftime('%Y-%m-%d %H:%M') %>)</span>
-                </p>
-              <% end %>
-            </div>
-            <div class="flex flex-col items-end gap-2">
-              <%= button_to "验证会话", validate_weread_native_key_admin_settings_path, method: :post,
-                  class: "text-sm px-3 py-1.5 rounded bg-green-600 text-white hover:bg-green-700 transition" %>
-              <%= button_to "退出登录", weread_native_logout_admin_settings_path, method: :post,
-                  class: "text-sm px-3 py-1.5 rounded bg-red-600 text-white hover:bg-red-700 transition",
-                  data: { confirm: "确定要退出微信读书（直连）登录吗？" } %>
-            </div>
-          </div>
-        </div>
-      <% else %>
-        <!-- Not logged in state -->
-        <div class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-          <p class="text-sm text-yellow-800">未登录微信读书（直连）。请点击下方按钮获取二维码，然后使用微信扫码登录。</p>
-        </div>
-
-        <%= render "admin/settings/qr_login", provider: "weread_native" %>
-      <% end %>
+      <%= render "admin/settings/weread_native_panel" %>
     </div>
   </div>
 
@@ -602,6 +509,40 @@
         </div>
         <p class="mt-1 text-sm text-gray-500">
           每次定时抓取各平台最多处理的帐号数量。按活跃度分层调度，仅抓取“到期”的帐号，超出配额的顺延到下次，避免触发反爬限制。
+        </p>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">速率限制（滑动窗口）</label>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1">微信正文下载（次数）</label>
+              <input type="number" name="wechat_download_rate_limit" value="<%= @wechat_download_rate_limit %>" min="1" max="120"
+                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1">窗口（秒）</label>
+              <input type="number" name="wechat_download_rate_window" value="<%= @wechat_download_rate_window %>" min="10" max="3600"
+                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1">微信读书直连（次数）</label>
+              <input type="number" name="weread_native_list_rate_limit" value="<%= @weread_native_list_rate_limit %>" min="1" max="120"
+                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1">窗口（秒）</label>
+              <input type="number" name="weread_native_list_rate_window" value="<%= @weread_native_list_rate_window %>" min="10" max="3600"
+                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+            </div>
+          </div>
+        </div>
+        <p class="mt-1 text-sm text-gray-500">
+          每个窗口期内最多发起 N 次请求，避免触发反爬限制。微信正文下载（直访 mp.weixin.qq.com）默认 20 次/60 秒；
+          微信读书直连列表/正文接口默认 30 次/60 秒。配置变更后立即生效，无需重启。
         </p>
       </div>
 

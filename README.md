@@ -169,7 +169,7 @@ Option (系统配置 - key-value 存储)
   · 有效期常量 WECHAT_MP_SESSION_TTL = 4.days，登录成功统一走 wechat_mp_session_started!
 - feishu_enabled / feishu_app_id / feishu_app_secret / feishu_receive_id / feishu_receive_id_type / feishu_encrypt_key (飞书推送)
 - feishu_login_mode (扫码登录推送方式：qr / card，微信读书与微信公众号平台共用；回退旧 key feishu_weread_login_mode)
-- wechat_api_provider (微信 API 提供方：mp_native / dajiala / profile_ext / weread)
+- wechat_api_provider (微信 API 提供方：mp_native / dajiala / profile_ext / weread / weread_native)
 - dajiala_api_key / tikhub_api_key / rednote_api_key
 - profile_ext_credentials (mitmproxy 凭证，约 25 分钟过期)
 - weread_platform_url / weread_accounts / weread_blocked_accounts (微信读书转发服务)
@@ -177,7 +177,8 @@ Option (系统配置 - key-value 存储)
 - default_article_concurrency / default_account_concurrency
 - max_crawl_pages / crawler_verbose_mode
 - daily_crawl_budget_wechat / daily_crawl_budget_rednote / daily_crawl_budget_twitter (各平台每日抓取配额，默认 200)
-- wechat_download_rate_limit / wechat_download_rate_window (微信正文下载限流，默认 5 次/60 秒)
+- wechat_download_rate_limit / wechat_download_rate_window (微信正文下载限流，默认 20 次/60 秒)
+- weread_native_list_rate_limit / weread_native_list_rate_window (微信读书直连限流，默认 30 次/60 秒)
 - crawl_wechat_enabled / crawl_rednote_enabled / crawl_twitter_enabled (各平台抓取开关)
 
 Tag (标签)
@@ -282,8 +283,10 @@ Doorkeeper::Application / AccessGrant / AccessToken (OAuth 2.1)
 
 **WechatCrawler** (`lib/wechat_crawler.rb`, `< BaseCrawler`)
 - 抓取单个微信公众号：分页获取文章列表并落库（只存元数据，不下载正文）
-- 按 `Option.wechat_api_provider` 路由到对应 API Client：`mp_native` / `dajiala` / `profile_ext` / `weread`
-- 正文下载由 `download_article_contents` 完成（从 `mp.weixin.qq.com` 直接抓取，`RateLimiter` 严格限流，默认 5 次/60 秒），供独立每日任务 `WechatContentDownloadJob` 批量调用
+- 按 `Option.wechat_api_provider` 路由到对应 API Client：`mp_native` / `dajiala` / `profile_ext` / `weread` / `weread_native`
+- 正文下载由 `download_article_contents` 完成（从 `mp.weixin.qq.com` 直接抓取，`RateLimiter` 严格限流，默认 20 次/60 秒），供独立每日任务 `WechatContentDownloadJob` 批量调用
+- `get_mp_info`：通过文章 URL 直抓文章页解析公众号信息（无需任何 API 会话），供 URL 导入与 weread mpId 解析使用；与 `download_content` 共用 `fetch_article_page`（同一连接 / UA / 限流）
+- 正文下载限流配置（`wechat_download_rate_limit` / `wechat_download_rate_window`）变更后即时生效（限流器与连接按配置值缓存，配置变化自动重建）
 - 使用 `Retryable` 模块处理重试；微信读书类错误（`NoAvailableAccountError` 等）会中断微信平台剩余帐号
 
 **RednoteApiClient** (`lib/rednote_api_client.rb`)
@@ -328,7 +331,7 @@ Doorkeeper::Application / AccessGrant / AccessToken (OAuth 2.1)
 - 通用滑动窗口速率限制器
 - 线程安全（Mutex）+ 协程安全（Async 兼容 — sleep 会让出 reactor）
 - 按实例隔离，不同端点可设不同限制
-- 主要用于限制微信正文下载（`Option.wechat_download_rate_limit`，默认 5 次/60 秒）及各平台文章列表请求
+- 主要用于限制微信正文下载（`Option.wechat_download_rate_limit`，默认 20 次/60 秒）及各平台文章列表请求
 
 **RateLimiterMiddleware** (`lib/rate_limiter_middleware.rb`)
 - Faraday 中间件，在每次 HTTP 请求前调用 `rate_limiter.wait`
@@ -343,7 +346,7 @@ Doorkeeper::Application / AccessGrant / AccessToken (OAuth 2.1)
 
 **AccountResolver** (`app/services/account_resolver.rb`)
 - 统一的多平台帐号解析/搜索服务
-- 微信：关键字搜索（`WechatMpNativeApiClient`）、文章 URL 解析（`WereadApiClient.get_mp_info`）
+- 微信：关键字搜索（`WechatMpNativeApiClient`）、文章 URL 解析（`WechatCrawler.get_mp_info`，直抓文章页，无需会话）
 - 小红书：关键字搜索（`TikHubApiClient`）、按 ID 查找（`RednoteApiClient`）
 - Twitter：按用户名查找（`TwitterApiClient`）
 - 搜索结果先查数据库，命中则复用，否则创建新帐号
@@ -831,7 +834,7 @@ end
 - 失败帐号可在任务结束后通过手动重试恢复（更新密钥后）
 
 ### 限流 (429)
-- **预防**：`RateLimiter` + `RateLimiterMiddleware` 在 HTTP 层主动限流（如微信正文下载默认 5 次/60 秒、微信读书文章列表 2 次/分钟），避免触发 429
+- **预防**：`RateLimiter` + `RateLimiterMiddleware` 在 HTTP 层主动限流（如微信正文下载默认 20 次/60 秒、微信读书文章列表 2 次/分钟），避免触发 429
 - **兜底**：若仍收到应用层频率限制（如响应体 `ret: 200013`），`Retryable` 模块自动重试，指数退避（2s → 4s → 8s）
 - 超过重试次数后该帐号标记为失败，任务继续
 - API 密钥错误不重试，立即标记帐号失败（由 `CrawlerApiKeyError` mixin 统一识别）；微信 `RateLimitError` 不重试
@@ -941,8 +944,9 @@ mp-crawler/
 
 ### API 限制
 - 微信：每请求最多 20 篇文章，需翻页
-- 微信正文下载：默认 5 次/60 秒（`wechat_download_rate_limit` 可配置），由 `RateLimiterMiddleware` 主动限流
+- 微信正文下载：默认 20 次/60 秒（`wechat_download_rate_limit` 可配置），由 `RateLimiterMiddleware` 主动限流
 - 微信读书（WeRead）：文章列表 2 次/分钟；429 限流的账号当天进入黑名单
+- 微信读书直连（weread_native）：列表/正文接口默认 30 次/60 秒（`weread_native_list_rate_limit` 可配置）
 - 小红书：分页获取，每页间隔 1 秒
 - 各 API 均可能有频率限制，超出时自动重试
 

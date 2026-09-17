@@ -18,8 +18,12 @@ require "crawler_api_key_error"
 # 提供与其它 API Client 相同的接口:
 #   get_articles(identifier, ...) → { "articles" => [...] }
 #   download_content(url, ...)    → html string（仅处理 weread.qq.com 正文链接）
-#   get_mp_info(url, ...)         → [{id, cover, name, intro, updateTime}]（直抓文章页，无需会话）
 #   validate_key                  → bool
+#
+# 文章元数据（发布时间 / 原始 mp.weixin.qq.com 链接）来自正文页内嵌的
+# window.cgiDataNew —— /api/mp/cover 不返回发布时间，get_articles 会额外抓一次正文页。
+#
+# 公众号信息解析（get_mp_info，直抓文章页）已移至 WechatCrawler——它不依赖微信读书会话。
 #
 # 额外提供 QR 码登录功能（纯传输层，落库由 QrLogin::WereadNative 负责）:
 #   request_qr_code                    → { uuid:, scan_url:, cookie_jar: }
@@ -33,19 +37,17 @@ class WereadNativeApiClient
 
   USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36".freeze
 
-  # 直连微信读书的保守限流（30 次/60 秒）
-  LIST_RATE_LIMITER = RateLimiter.new(30, 60)
-
-  # 微信文章页（mp.weixin.qq.com）抓取专用连接：与微信读书接口无关，
-  # 用于 get_mp_info（无需微信读书登录会话）
-  MP_BASE_URL = "https://mp.weixin.qq.com"
-
-  # get_mp_info 实测可用的 Windows Chrome UA（脚本 script/get_mp_info.rb 验证；
-  # 非浏览器 UA 会被 302 到环境验证页）
-  MP_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36".freeze
-
-  # 微信文章页抓取的保守限流（10 次/60 秒）
-  MP_PAGE_RATE_LIMITER = RateLimiter.new(10, 60)
+  # 直连微信读书的限流: 请求数/窗口秒数由 Option 配置（默认 30 次/60 秒）。
+  # 按当前 Option 值缓存——配置变更后返回新实例（滑动窗口随之重置），
+  # connection 会检测到实例变化并重建连接（中间件在构建时持有 limiter 引用）。
+  def self.list_rate_limiter
+    config = [Option.weread_native_list_rate_limit, Option.weread_native_list_rate_window]
+    if @list_rate_limiter.nil? || @list_rate_config != config
+      @list_rate_config = config
+      @list_rate_limiter = RateLimiter.new(*config)
+    end
+    @list_rate_limiter
+  end
 
   # ── Error classes ──────────────────────────────────────
 
@@ -65,31 +67,24 @@ class WereadNativeApiClient
 
   # 文章列表 / 正文 / 订阅接口：带限流与重试
   def self.connection
-    @connection ||= Faraday.new(url: BASE_URL) do |f|
-      f.request :rate_limiter, LIST_RATE_LIMITER
-      f.request :retry, max: 3, interval: 1, backoff_factor: 2,
-                exceptions: [Faraday::TimeoutError, Faraday::ConnectionFailed]
-      f.options.timeout = 20
-      f.options.open_timeout = 10
-      f.adapter Faraday.default_adapter
+    limiter = list_rate_limiter
+    if @connection.nil? || @connection_limiter != limiter
+      @connection_limiter = limiter
+      @connection = Faraday.new(url: BASE_URL) do |f|
+        f.request :rate_limiter, limiter
+        f.request :retry, max: 3, interval: 1, backoff_factor: 2,
+                  exceptions: [Faraday::TimeoutError, Faraday::ConnectionFailed]
+        f.options.timeout = 20
+        f.options.open_timeout = 10
+        f.adapter Faraday.default_adapter
+      end
     end
+    @connection
   end
 
   # 登录流程专用连接：不限流、不缓存（扫码状态需要较频繁轮询）
   def self.login_connection
     @login_connection ||= Faraday.new(url: BASE_URL) do |f|
-      f.options.timeout = 20
-      f.options.open_timeout = 10
-      f.adapter Faraday.default_adapter
-    end
-  end
-
-  # 微信文章页抓取连接（get_mp_info 用，直访 mp.weixin.qq.com，与微信读书会话无关）
-  def self.mp_connection
-    @mp_connection ||= Faraday.new(url: MP_BASE_URL) do |f|
-      f.request :rate_limiter, MP_PAGE_RATE_LIMITER
-      f.request :retry, max: 3, interval: 1, backoff_factor: 2,
-                exceptions: [Faraday::TimeoutError, Faraday::ConnectionFailed]
       f.options.timeout = 20
       f.options.open_timeout = 10
       f.adapter Faraday.default_adapter
@@ -149,7 +144,9 @@ class WereadNativeApiClient
     return { "articles" => [] } if review_id.empty?
 
     log(crawl_task, :debug, "get_articles: #{book_id} 最新文章 reviewId=#{review_id}")
-    { "articles" => [map_cover(cover, review_id)] }
+    article = map_cover(cover, review_id)
+    merge_content_page_metadata!(article, review_id, crawl_task)
+    { "articles" => [article] }
   rescue SessionExpiredError, LoginRequiredError => e
     raise e
   rescue Faraday::Error => e
@@ -186,11 +183,35 @@ class WereadNativeApiClient
       # 优先用原始 mp.weixin.qq.com 链接（若响应带），否则用微信读书正文链接。
       # 正文下载会按链接域名分派（见 WechatCrawler.download_content）。
       "link" => extract_mp_url(cover) || weread_content_url(review_id),
-      "cover" => cover["cover"] || cover["picUrl"] || cover["coverUrl"] || "",
+      "cover" => cover["cover"] || cover["picUrl"] || cover["coverUrl"] || cover["pic"] || "",
       "digest" => cover["digest"] || cover["abstract"] || "",
       "author_name" => cover["name"] || "",
       "create_time" => normalize_time_seconds(cover["time"] || cover["createTime"] || cover["publishTime"]),
     }
+  end
+
+  # 用正文页内嵌的 window.cgiDataNew 元数据覆盖 cover 数据。
+  # /api/mp/cover 不返回发布时间，原始 mp.weixin.qq.com 链接也只在正文页里有；
+  # 抓一次正文页拿权威的 link / create_time / title / desc / cdn_url / nick_name。
+  # 失败时退回 cover 数据（链接为微信读书正文页，create_time 为 0），不致命。
+  def self.merge_content_page_metadata!(article, review_id, crawl_task)
+    cgi = extract_cgi_data(fetch_content_page(review_id))
+
+    if cgi["link"].present?
+      # 保留微信读书链接供正文下载回退（WechatCrawler.download_content 按域名分派）
+      article["weread_link"] = weread_content_url(review_id)
+      article["link"] = cgi["link"]
+    end
+    article["create_time"] = parse_wechat_time(cgi["create_time"]) if cgi["create_time"].present?
+    %w[title digest cover author_name].each do |key|
+      article[key] = cgi[key] if cgi[key].present?
+    end
+    article
+  rescue SessionExpiredError, LoginRequiredError => e
+    raise e
+  rescue ApiError => e
+    log(crawl_task, :warn, "解析正文页元数据失败（退回 cover 数据）: #{e.message}")
+    article
   end
 
   # ── Article Content ───────────────────────────────────
@@ -201,22 +222,77 @@ class WereadNativeApiClient
     review_id = extract_review_id(url)
     raise DownloadError, "无法从链接解析 reviewId: #{url}" if review_id.blank?
 
-    cookie_header = build_cookie_header(load_session!)
-    resp = connection.get("/web/mp/content", { reviewId: review_id }, base_headers(cookie_header))
-    handle_session_error!(resp)
-    raise DownloadError, "下载正文失败: HTTP #{resp.status}" unless resp.status == 200
-
-    body = resp.body.to_s
-    body = body.dup.force_encoding(Encoding::UTF_8) if body.encoding == Encoding::ASCII_8BIT
-
+    body = fetch_content_page(review_id)
     inner = extract_element_html(body, "js_content")
     raise DownloadError, "正文为空（可能未登录或文章不可见）" if inner.blank?
 
     clean_content(inner)
   rescue SessionExpiredError, LoginRequiredError => e
     raise e
-  rescue Faraday::Error => e
+  rescue ApiError => e
     raise DownloadError, "下载正文失败: #{e.message}"
+  end
+
+  # 抓取微信读书正文页完整 HTML（元数据解析与正文下载共用）
+  # @return [String] 页面原始 HTML
+  def self.fetch_content_page(review_id)
+    cookie_header = build_cookie_header(load_session!)
+    resp = connection.get("/web/mp/content", { reviewId: review_id }, base_headers(cookie_header))
+    handle_session_error!(resp)
+    raise ApiError, "获取正文页失败: HTTP #{resp.status}" unless resp.status == 200
+
+    body = resp.body.to_s
+    body = body.dup.force_encoding(Encoding::UTF_8) if body.encoding == Encoding::ASCII_8BIT
+    body
+  rescue Faraday::Error => e
+    raise ApiError, "获取正文页失败: #{e.message}"
+  end
+
+  # 解析正文页内嵌的 window.cgiDataNew（JS 对象字面量而非 JSON，按行首键名逐字段取值，
+  # 避免被 content_noencode 大字符串干扰）。字符串为单引号 + \xNN / \' 转义。
+  # @return [Hash] { "link", "create_time", "title", "digest", "cover", "author_name" }
+  def self.extract_cgi_data(html)
+    segment = html.to_s[/window\.cgiDataNew\s*=\s*\{.*/m]
+    return {} unless segment
+
+    {
+      # link 里 & 被双重转义（\x26amp;），需 JS 反转义 + HTML 反转义
+      "link" => unescape_html_entities(unescape_js_string(
+        segment[/^[ \t]*link:\s*'(https:\/\/mp\.weixin\.qq\.com[^']*)'/, 1]
+      )),
+      "create_time" => segment[/^[ \t]*create_time:\s*'([^']*)'/, 1],
+      "title" => unescape_js_string(segment[/^[ \t]*title:\s*'((?:\\.|[^'\\])*)'/, 1]),
+      "digest" => unescape_js_string(segment[/^[ \t]*desc:\s*'((?:\\.|[^'\\])*)'/, 1]),
+      "cover" => segment[/^[ \t]*cdn_url:\s*'([^']*)'/, 1],
+      "author_name" => unescape_js_string(segment[/^[ \t]*nick_name:\s*'((?:\\.|[^'\\])*)'/, 1]),
+    }.compact
+  end
+
+  # URL 里的 HTML 实体还原（&amp; → &）
+  def self.unescape_html_entities(url)
+    return nil if url.nil?
+
+    CGI.unescapeHTML(url)
+  end
+
+  # JS 单引号字符串反转义：\xNN → 字符，\' / \" / \\ 还原
+  def self.unescape_js_string(str)
+    return nil if str.nil?
+
+    str.gsub(/\\x([0-9a-fA-F]{2})/) { [$1.to_i(16)].pack("U") }
+       .gsub("\\'", "'")
+       .gsub('\\"', '"')
+       .gsub("\\\\", "\\")
+  end
+
+  # 微信正文页的 create_time 形如 '2026-09-15 11:08'（北京时间）
+  # @return [Integer, nil] Unix 时间戳（秒）
+  def self.parse_wechat_time(str)
+    return nil if str.blank?
+
+    Time.find_zone("Asia/Shanghai").strptime(str.strip, "%Y-%m-%d %H:%M").to_i
+  rescue ArgumentError
+    nil
   end
 
   def self.weread_content_url?(url)
@@ -235,100 +311,6 @@ class WereadNativeApiClient
     nil
   rescue URI::InvalidURIError
     nil
-  end
-
-  # ── MP Info Lookup ────────────────────────────────────
-
-  # 通过微信文章 URL 解析公众号信息。
-  # 与 WereadApiClient#get_mp_info（转发服务 wxs2mp）不同：直接抓取文章页
-  # HTML 提取（script/get_mp_info.rb 验证过的做法），无需微信读书登录会话。
-  # 文章页的 __biz base64 解码即账号数字 id（见 normalize_book_id），
-  # 由此拼出微信读书 book_id（MP_WXS_<数字>），保证与转发服务返回的 id 同构。
-  # 文章页没有公众号简介，intro 恒为空串。
-  # @param url [String] 微信公众号文章链接
-  # @return [Array<Hash>] [{id, cover, name, intro, updateTime}]
-  def self.get_mp_info(url, crawl_task: nil)
-    url = url.to_s.strip.gsub("&amp;", "&")
-    raise ApiError, "无效的微信公众号文章链接" unless url.include?("mp.weixin.qq.com")
-
-    log(crawl_task, :debug, "get_mp_info: #{url[0..60]}...")
-
-    html = fetch_mp_page(url)
-    check_mp_page_error!(html)
-
-    biz = extract_mp_biz(html)
-    return [] if biz.blank?
-
-    fakeid = Base64.decode64(biz).gsub(/[^0-9]/, "")
-    return [] if fakeid.empty?
-
-    [{
-      "id" => "MP_WXS_#{fakeid}",
-      "cover" => extract_mp_var(html, "ori_head_img_url").to_s,
-      "name" => extract_mp_nickname(html).to_s,
-      "intro" => "",
-      "updateTime" => extract_mp_var(html, "create_time").to_i,
-    }]
-  rescue Faraday::Error => e
-    raise ApiError, "获取公众号信息失败: #{e.message}"
-  end
-
-  # 抓取文章页 HTML（桌面 Chrome UA + 手动跟随重定向）
-  def self.fetch_mp_page(url)
-    headers = {
-      "User-Agent" => MP_UA,
-      "Accept" => "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-      "Accept-Language" => "zh-CN,zh;q=0.9,en;q=0.8",
-    }
-
-    resp = mp_connection.get(url, {}, headers)
-    3.times do
-      break unless [ 301, 302 ].include?(resp.status)
-      location = resp.headers["Location"].to_s
-      break if location.blank?
-      location = "#{MP_BASE_URL}#{location}" if location.start_with?("/")
-      resp = mp_connection.get(location, {}, headers)
-    end
-    raise ApiError, "获取文章页失败: HTTP #{resp.status}" unless resp.status == 200
-
-    body = resp.body.to_s
-    body = body.dup.force_encoding(Encoding::UTF_8) if body.encoding == Encoding::ASCII_8BIT
-    body
-  end
-
-  # 文章页反爬/状态检查（对齐 script/get_mp_info.rb 与 WechatCrawler.check_content_error）
-  def self.check_mp_page_error!(html)
-    if html.include?("当前环境异常") || html.include?("secitptpage/verify.html") ||
-         html.include?("该内容已被发布者删除")
-      raise ApiError, "微信文章页无法访问（环境验证/内容已删除），无法解析公众号信息"
-    end
-  end
-
-  # 提取文章页 JS 变量（var xxx = "..." / htmlDecode("...") / "xxx" * 1 等形式）
-  def self.extract_mp_var(html, var_name)
-    patterns = [
-      /var\s+#{Regexp.escape(var_name)}\s*=\s*htmlDecode\(["']([^"']*)["']\)/,
-      /var\s+#{Regexp.escape(var_name)}\s*=\s*["']([^"']*)["']/,
-      /var\s+#{Regexp.escape(var_name)}\s*=\s*["']?(\d+)/,
-    ]
-    patterns.each do |pattern|
-      match = html.match(pattern)
-      return CGI.unescapeHTML(match[1]) if match
-    end
-    nil
-  end
-
-  # 公众号名称（var nickname = htmlDecode("...") 为主，兜底宽松匹配）
-  def self.extract_mp_nickname(html)
-    extract_mp_var(html, "nickname") ||
-      html[/nickname["']?\s*[:=]\s*["']([^"']+)["']/, 1]
-  end
-
-  # 提取 __biz（URL 参数形式，可能是 URL 编码的 %3D%3D 填充；
-  # 排除 ${window.biz} 之类的 JS 模板占位符）
-  def self.extract_mp_biz(html)
-    biz = html[/__biz=([A-Za-z0-9%+\/=]+)/, 1]
-    CGI.unescape(biz) if biz
   end
 
   # ── QR Code Login (transport only) ─────────────────────
