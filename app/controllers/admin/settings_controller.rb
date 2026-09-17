@@ -26,6 +26,19 @@ class Admin::SettingsController < Admin::BaseController
       message = "TikHub API 密钥更新成功"
     end
 
+    message = nil
+
+    if params[:scrapingant_api_key].present?
+      Option.scrapingant_api_key = params[:scrapingant_api_key].to_s.strip
+      message = "ScrapingAnt API Key 更新成功"
+    end
+
+    if params.key?(:website_render_fallbacks)
+      fallbacks = params[:website_render_fallbacks].is_a?(Array) ? params[:website_render_fallbacks] : []
+      Option.website_render_fallbacks = fallbacks
+      message = "渲染兜底配置更新成功"
+    end
+
     if params[:twitter_ct0].present?
       Option.set('twitter_ct0', params[:twitter_ct0])
       message = "Twitter ct0 cookie 更新成功"
@@ -540,6 +553,8 @@ class Admin::SettingsController < Admin::BaseController
     @twitter_auth_token = Option.get('twitter_auth_token')
     @twitter_proxy = Option.get('twitter_proxy')
     @tikhub_api_key = Option.tikhub_api_key
+    @scrapingant_api_key = Option.scrapingant_api_key
+    @website_render_fallbacks = Option.website_render_fallbacks
     @dajiala_key_check = Rails.cache.read('api_key_check:dajiala')
     @rednote_key_check = Rails.cache.read('api_key_check:rednote')
     @twitter_key_check = Rails.cache.read('api_key_check:twitter')

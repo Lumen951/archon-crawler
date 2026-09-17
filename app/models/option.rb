@@ -278,6 +278,66 @@ class Option < ApplicationRecord
       set("openai_proxy_url", val)
     end
 
+    # ── 官网列表抓取的渲染兜底（本地浏览器 / ScrapingAnt）────────
+    # 只有一种情况会用到渲染兜底：直连 HTTP 拿到了响应，但 crawl_rule 一条内容都
+    # 提取不出来（JS 渲染页面的典型特征），此时按配置的 provider 顺序依次尝试重新渲染。
+    # 密钥仅存于 Option，切勿硬编码到代码中；未配置则只是没有这个兜底，其余抓取不受影响。
+    # 见 WebsiteCrawler::RenderFallbackChain / LocalHeadlessBrowserFetcher / ScrapingAntFetcher。
+
+    # 可用的渲染兜底 provider（顺序敏感：推荐本地优先，ScrapingAnt 兜底）
+    WEBSITE_RENDER_FALLBACK_PROVIDERS = %w[local_headless scrapingant].freeze
+    WEBSITE_RENDER_FALLBACKS_DEFAULT = %w[local_headless scrapingant].freeze
+
+    def scrapingant_api_key
+      get("scrapingant_api_key")
+    end
+
+    def scrapingant_api_key=(val)
+      set("scrapingant_api_key", val)
+    end
+
+    # 渲染兜底 provider 配置：返回归一化的 provider 列表（去重、过滤非法值、保留顺序）
+    def website_render_fallbacks
+      raw = get("website_render_fallbacks")
+      # 支持 JSON 数组或逗号分隔字符串
+      list = if raw.present?
+        if raw.start_with?("[")
+          begin
+            JSON.parse(raw)
+          rescue JSON::ParserError
+            []
+          end
+        else
+          raw.split(",").map(&:strip)
+        end
+      else
+        WEBSITE_RENDER_FALLBACKS_DEFAULT
+      end
+      # 归一化：只保留已知 provider，去重，保留用户指定的顺序
+      list.map(&:to_s).select { |p| WEBSITE_RENDER_FALLBACK_PROVIDERS.include?(p) }.uniq
+    end
+
+    def website_render_fallbacks=(val)
+      # 接受数组或逗号分隔字符串
+      normalized = case val
+      when Array
+        val.map(&:to_s).select { |p| WEBSITE_RENDER_FALLBACK_PROVIDERS.include?(p) }.uniq
+      when String
+        val.split(",").map(&:strip).select { |p| WEBSITE_RENDER_FALLBACK_PROVIDERS.include?(p) }.uniq
+      else
+        []
+      end
+      set("website_render_fallbacks", normalized.to_json)
+    end
+
+    def website_render_fallback_local_enabled?
+      website_render_fallbacks.include?("local_headless")
+    end
+
+    def website_render_fallback_scrapingant_enabled?
+      website_render_fallbacks.include?("scrapingant")
+    end
+
     # Per-platform crawl toggle helpers
     def crawl_wechat_enabled?
       get("crawl_wechat_enabled") != "false"

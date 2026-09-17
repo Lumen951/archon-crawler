@@ -64,10 +64,12 @@ group :development do
   gem "annotaterb", "~> 4.22"
 end
 
+# Selenium WebDriver for headless browser rendering (used in production for website crawling)
+gem "selenium-webdriver"
+
 group :test do
   # Use system testing [https://guides.rubyonrails.org/testing.html#system-testing]
   gem "capybara"
-  gem "selenium-webdriver"
 end
 gem "async", "~> 2.41"
 gem "nokogiri", "~> 1.16"

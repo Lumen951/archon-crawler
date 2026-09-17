@@ -12,10 +12,10 @@ require "llm_client"
 # BaseCrawler): discover pages worth monitoring, fetch them over plain HTTP,
 # detect content changes, and sync listing items into Articles.
 #
-# This is the deliberately minimal, stable core of website monitoring — HTTP
-# only (no headless browser), no separate runner/adapter layers. Every helper
-# class it needs lives in this one file instead of being spread across
-# lib/website_monitor/*.
+# This is the deliberately minimal, stable core of website monitoring — direct
+# HTTP first, with optional render fallback (local headless browser / ScrapingAnt)
+# only for crawl_rule pages that extract nothing. Every helper class it needs
+# lives in this one file instead of being spread across lib/website_monitor/*.
 class WebsiteCrawler < BaseCrawler
   # `max_pages:` here is BaseCrawler's listing-pagination-depth argument
   # (other platforms fetch a single page of results by default); it doesn't
@@ -64,12 +64,15 @@ class WebsiteCrawler < BaseCrawler
     crawl_task.log(:info, "开始抓取官网列表: #{account.nickname} (#{account.url})")
     fill_placeholder_profile(account, crawl_task)
 
-    result = ListingCrawler.new.crawl(account: account, rule: rule, crawl_task: crawl_task)
+    render_fetcher = RenderFallbackChain.build
+    result = ListingCrawler.new(render_fetcher: render_fetcher).crawl(account: account, rule: rule, crawl_task: crawl_task)
     entry_unavailable = result.entry_errors.positive? && result.candidates_count.zero?
     error = if entry_unavailable
       "列表页抓取失败（#{result.entry_errors} 个入口不可用）"
     elsif result.candidates_count.zero?
-      "未从列表页发现可抓取内容，请检查 crawl_rule"
+      message = "未从列表页发现可抓取内容，请检查 crawl_rule"
+      message += "；未配置可用的渲染兜底（本地 headless browser / ScrapingAnt）" if render_fetcher.nil?
+      message
     end
 
     account.mark_checked!(changed: result.created_count.positive?, error: error)
@@ -114,7 +117,7 @@ class WebsiteCrawler < BaseCrawler
       crawl_task.log(capture[:changed] ? :info : :debug, capture[:changed] ? "检测到变化：#{page.url}" : "页面无变化：#{page.url}")
     end
 
-    [changed, errors]
+    [ changed, errors ]
   end
 
   def self.discover_pages(account, crawl_task)
@@ -309,7 +312,7 @@ class WebsiteCrawler < BaseCrawler
       @connection ||= Faraday.new do |faraday|
         faraday.proxy = proxy_url if proxy_url
         faraday.request :retry, max: 2, interval: 0.5, backoff_factor: 2,
-                                 exceptions: [Faraday::TimeoutError, Faraday::ConnectionFailed]
+                                 exceptions: [ Faraday::TimeoutError, Faraday::ConnectionFailed ]
         faraday.options.timeout = @timeout
         faraday.options.open_timeout = @timeout
         faraday.adapter Faraday.default_adapter
@@ -354,6 +357,233 @@ class WebsiteCrawler < BaseCrawler
         body = body.dup.force_encoding(Encoding::UTF_8)
       end
       body.valid_encoding? ? body : body.scrub
+    end
+  end
+
+  # Fetcher that renders one page in a local headless Chrome/Chromium browser
+  # using Selenium WebDriver, returning the rendered DOM.
+  #
+  # This is a *fallback* transport like ScrapingAntFetcher: ListingCrawler only
+  # reaches for it when plain HTTP came back with a response the crawl rule
+  # could extract nothing from (JS-rendered shell). Never used for sitemap
+  # discovery, placeholder profile fill, or monitor page crawls.
+  #
+  # Returns the same FetchResult contract as Fetcher. Uses a conservative
+  # timeout (30s default) and always quits the driver in an ensure block to
+  # avoid leaking browser processes.
+  class LocalHeadlessBrowserFetcher < Fetcher
+    def self.configured?
+      # Selenium available and browser likely present; graceful when not
+      require "selenium-webdriver"
+      true
+    rescue LoadError
+      false
+    end
+
+    def self.build
+      new if configured?
+    rescue StandardError
+      nil
+    end
+
+    def initialize(timeout: 30)
+      super(timeout: timeout)
+      @timeout = timeout
+    end
+
+    def fetch(url)
+      uri = URI.parse(url)
+      return FetchResult.failure(url: url, kind: :unsupported, error: "Only HTTP(S) URLs are supported") unless %w[http https].include?(uri.scheme)
+
+      driver = create_driver
+      driver.get(url)
+      html = driver.page_source
+      FetchResult.success(url: url, html: html, status: 200)
+    rescue Selenium::WebDriver::Error::TimeoutError => e
+      FetchResult.failure(url: url, kind: :timeout, error: "本地浏览器渲染超时: #{e.message}")
+    rescue Selenium::WebDriver::Error::WebDriverError => e
+      FetchResult.failure(url: url, kind: :unsupported, error: "本地浏览器错误: #{e.message}")
+    rescue URI::Error => e
+      FetchResult.failure(url: url, kind: :unsupported, error: e.message)
+    rescue StandardError => e
+      FetchResult.failure(url: url, kind: :unsupported, error: "本地浏览器渲染失败: #{e.message}")
+    ensure
+      driver&.quit
+    end
+
+    private
+
+    def create_driver
+      options = Selenium::WebDriver::Chrome::Options.new
+      options.add_argument("--headless")
+      options.add_argument("--disable-gpu")
+      options.add_argument("--no-sandbox")
+      options.add_argument("--disable-dev-shm-usage")
+      options.add_argument("--disable-blink-features=AutomationControlled")
+      driver = Selenium::WebDriver.for(:chrome, options: options)
+      driver.manage.timeouts.page_load = @timeout
+      driver
+    end
+  end
+
+  # Wraps an ordered list of render fallback providers (LocalHeadlessBrowserFetcher,
+  # ScrapingAntFetcher, etc.) and tries them in sequence until one succeeds.
+  #
+  # Built from Option.website_render_fallbacks, which returns an ordered array
+  # like ["local_headless", "scrapingant"]. Each provider is built only if
+  # configured (e.g. ScrapingAnt requires an API key, local browser requires
+  # Selenium). If no providers are configured/available, .build returns nil.
+  #
+  # Same FetchResult contract as Fetcher. Logs which provider succeeded/failed.
+  class RenderFallbackChain
+    def self.build
+      providers = Option.website_render_fallbacks.filter_map do |key|
+        case key
+        when "local_headless"
+          LocalHeadlessBrowserFetcher.build
+        when "scrapingant"
+          ScrapingAntFetcher.build
+        end
+      end
+      providers.any? ? new(providers) : nil
+    end
+
+    def initialize(providers)
+      @providers = providers
+    end
+
+    def fetch(url)
+      last_result = nil
+      @providers.each do |provider|
+        result = provider.fetch(url)
+        return result if result.success?
+        last_result = result
+      end
+      # All providers failed; return the last failure
+      last_result || FetchResult.failure(url: url, kind: :unsupported, error: "无可用的渲染兜底")
+    end
+  end
+
+  # Fetcher that reads one page through ScrapingAnt's general endpoint, which
+  # loads it in a real browser and returns the rendered HTML.
+  #
+  # This is a *fallback* transport, not a second way to crawl: ListingCrawler
+  # only reaches for it when plain HTTP came back with a response the crawl
+  # rule could extract nothing from (the signature of a JS-rendered shell), and
+  # never for fetching that isn't driven by a crawl rule. Every request costs
+  # credits, so it must stay off the happy path — see
+  # ListingCrawler#rendered_fetch.
+  #
+  # Same FetchResult contract as Fetcher, but the transport differs in three
+  # ways: the response is always 200 once the request was accepted — the
+  # *page's* status arrives in the ant-page-status-code header — failures come
+  # back as a JSON {"detail"}, and every request consumes API credits (see the
+  # ant-credits-cost header).
+  class ScrapingAntFetcher < Fetcher
+    BASE_URL = "https://api.scrapingant.com".freeze
+    GENERAL_PATH = "/v2/general".freeze
+    API_KEY_HEADER = "x-api-key".freeze
+    PAGE_STATUS_HEADER = "ant-page-status-code".freeze
+
+    def self.configured?
+      Option.scrapingant_api_key.present?
+    end
+
+    # nil when unconfigured, so callers can read "no render API" as "no
+    # fallback available" without asking about keys themselves.
+    def self.build
+      new if configured?
+    end
+
+    # ScrapingAnt renders the page in a browser before answering, so the read
+    # timeout has to cover the rendering wait, not just the transfer.
+    def initialize(api_key: Option.scrapingant_api_key, timeout: 90)
+      super(timeout: timeout)
+      @api_key = api_key
+    end
+
+    def fetch(url)
+      return FetchResult.failure(url: url, kind: :blocked, error: "未配置 ScrapingAnt API Key（scrapingant_api_key）") if @api_key.blank?
+
+      uri = URI.parse(url)
+      return FetchResult.failure(url: url, kind: :unsupported, error: "Only HTTP(S) URLs are supported") unless %w[http https].include?(uri.scheme)
+
+      response = render(url)
+      return api_failure(url, response) unless response.success?
+
+      body = response.body.to_s
+      if non_html_resource?(response, body)
+        return FetchResult.failure(url: url, kind: :unsupported, status: response.status, error: "非 HTML 资源（#{content_type(response)}）")
+      end
+
+      status = page_status(response)
+      if status && !status.between?(200, 299)
+        return FetchResult.failure(url: url, kind: status_kind(status), status: status, error: "HTTP #{status}")
+      end
+
+      FetchResult.success(url: url, html: decode_body(response, body), status: status || response.status)
+    rescue Faraday::TimeoutError, Faraday::ConnectionFailed => e
+      FetchResult.failure(url: url, kind: :timeout, error: e.message)
+    rescue URI::Error => e
+      FetchResult.failure(url: url, kind: :unsupported, error: e.message)
+    end
+
+    private
+
+    def render(url)
+      connection.get(GENERAL_PATH) do |request|
+        request.params["url"] = url
+        # A page that is not JS-rendered still costs credits, so always ask for
+        # the browser pass: the rendered DOM is a superset of the source.
+        request.params["browser"] = "true"
+        request.headers[API_KEY_HEADER] = @api_key
+        request.headers["Accept"] = "text/html,application/xhtml+xml"
+      end
+    end
+
+    # The page's own status code, when the service managed to reach the site at
+    # all — a blocked or missing page is otherwise indistinguishable from a
+    # successful fetch, since the envelope is 200 either way.
+    def page_status(response)
+      value = response.headers[PAGE_STATUS_HEADER].to_s
+      value.match?(/\A\d+\z/) ? value.to_i : nil
+    end
+
+    def api_failure(url, response)
+      FetchResult.failure(
+        url: url,
+        kind: status_kind(response.status),
+        status: response.status,
+        error: "ScrapingAnt API 错误 #{response.status}: #{api_error_detail(response)}"
+      )
+    end
+
+    def api_error_detail(response)
+      detail = JSON.parse(response.body.to_s)["detail"]
+      detail.to_s.strip.truncate(200).presence || response.body.to_s[0, 200]
+    rescue JSON::ParserError, TypeError
+      response.body.to_s[0, 200]
+    end
+
+    def status_kind(status)
+      case status
+      when 401, 402, 403 then :blocked # 密钥无效 / 额度耗尽 / 请求被拒绝，重试无意义
+      when 429 then :rate_limited
+      when 500..599 then :server_error
+      else :unsupported
+      end
+    end
+
+    # Requests go straight to ScrapingAnt — it is the outbound proxy — so this
+    # connection intentionally ignores Option.twitter_proxy, unlike Fetcher's.
+    def connection
+      @connection ||= Faraday.new(url: BASE_URL) do |faraday|
+        faraday.request :retry, max: 2, interval: 0.5, backoff_factor: 2,
+                                 exceptions: [ Faraday::TimeoutError, Faraday::ConnectionFailed ]
+        faraday.options.timeout = @timeout
+        faraday.options.open_timeout = @timeout
+        faraday.adapter Faraday.default_adapter
+      end
     end
   end
 
@@ -522,14 +752,14 @@ class WebsiteCrawler < BaseCrawler
     def analyze(page:, previous_content:, current_content:, diff: nil, crawl_task: nil)
       diff ||= diff(previous_content, current_content)
       fallback = fallback_analysis(diff)
-      return [fallback, :fallback] unless LlmClient.configured?
+      return [ fallback, :fallback ] unless LlmClient.configured?
 
       response = @client.generate_json(prompt(page, previous_content, current_content, diff))
-      [sanitize(response, fallback), :completed]
+      [ sanitize(response, fallback), :completed ]
     rescue StandardError => e
       message = "变更分析失败：#{e.class}: #{e.message}"
       crawl_task ? crawl_task.log(:warn, message) : Rails.logger.warn("[WebsiteCrawler::Analyzer] #{message}")
-      [fallback, :fallback]
+      [ fallback, :fallback ]
     end
 
     private
@@ -780,16 +1010,8 @@ class WebsiteCrawler < BaseCrawler
       @content_extractor = content_extractor
     end
 
-    def sync(account:, candidate:, detail_result:, rule:, crawl_task:)
-      extracted = if detail_result&.success?
-        @content_extractor.extract_article(
-          detail_result.html,
-          candidate.url,
-          selector: rule.detail_selector,
-          allow_body_fallback: false,
-          minimum_text_length: Extractor::LISTING_MIN_ARTICLE_TEXT_LENGTH
-        )
-      end
+    def sync(account:, candidate:, detail_result:, rule:, crawl_task:, extracted: nil)
+      extracted ||= extract_content(candidate, detail_result, rule)
 
       Article.transaction(requires_new: true) do
         article = Article.find_or_initialize_by(url: candidate.url)
@@ -824,6 +1046,27 @@ class WebsiteCrawler < BaseCrawler
       :error
     end
 
+    # Pulled out of `sync` because ListingCrawler has to make the same call
+    # before deciding whether a page is worth re-fetching through the render
+    # API — it needs to know what came out before it can know what's missing.
+    def extract_content(candidate, detail_result, rule)
+      return nil unless detail_result&.success?
+
+      @content_extractor.extract_article(
+        detail_result.html,
+        candidate.url,
+        selector: rule.detail_selector,
+        allow_body_fallback: false,
+        minimum_text_length: Extractor::LISTING_MIN_ARTICLE_TEXT_LENGTH
+      )
+    end
+
+    # Whether an extraction counts as real content: an image-only detail page
+    # (no text, but media) is content, an empty shell is not.
+    def self.usable_content?(extracted)
+      extracted&.html.present? && (extracted.markdown.present? || extracted.media_count.to_i.positive?)
+    end
+
     private
 
     def merged_raw_data(article, candidate, detail_result, extracted)
@@ -850,7 +1093,7 @@ class WebsiteCrawler < BaseCrawler
     end
 
     def content_available?(extracted)
-      extracted&.html.present? && (extracted.markdown.present? || extracted.media_count.to_i.positive?)
+      self.class.usable_content?(extracted)
     end
   end
 
@@ -890,8 +1133,12 @@ class WebsiteCrawler < BaseCrawler
   class ListingCrawler
     Result = Data.define(:candidates_count, :created_count, :entry_errors, :detail_errors)
 
-    def initialize(fetcher: Fetcher.new, host_rate_limiter: DEFAULT_LISTING_HOST_RATE_LIMITER)
+    # `render_fetcher` is optional and only ever used as a fallback, so it is
+    # injected rather than defaulted: no render fetcher means "plain HTTP only",
+    # which is also what every test gets.
+    def initialize(fetcher: Fetcher.new, render_fetcher: nil, host_rate_limiter: DEFAULT_LISTING_HOST_RATE_LIMITER)
       @fetcher = fetcher
+      @render_fetcher = render_fetcher
       @host_rate_limiter = host_rate_limiter
     end
 
@@ -912,7 +1159,17 @@ class WebsiteCrawler < BaseCrawler
           next
         end
 
-        candidates.concat(extractor.extract(result.html, entry_url))
+        extracted = extractor.extract(result.html, entry_url)
+        if extracted.empty?
+          # Plain HTTP answered but the rule matched nothing — the usual reason
+          # is a client-side-rendered shell. Give the render API one shot at it.
+          rendered = rendered_fetch(entry_url, rule, crawl_task)
+          if rendered
+            entry_errors += 1 unless rendered.success?
+            extracted = extractor.extract(rendered.html, entry_url) if rendered.success?
+          end
+        end
+        candidates.concat(extracted)
       rescue StandardError => e
         entry_errors += 1
         crawl_task&.increment_error_count!(account.class.name)
@@ -936,7 +1193,21 @@ class WebsiteCrawler < BaseCrawler
           break if host_blocked?(detail_result)
         end
 
-        status = synchronizer.sync(account: account, candidate: candidate, detail_result: detail_result, rule: rule, crawl_task: crawl_task)
+        extracted = synchronizer.extract_content(candidate, detail_result, rule)
+        if detail_result.success? && !ListingArticleSynchronizer.usable_content?(extracted)
+          # Same rule as the entry pages: only a successful response that the
+          # rule could not turn into content is worth paying to re-render.
+          rendered = rendered_fetch(candidate.url, rule, crawl_task)
+          if rendered
+            detail_errors += 1 unless rendered.success?
+            if rendered.success?
+              detail_result = rendered
+              extracted = synchronizer.extract_content(candidate, rendered, rule)
+            end
+          end
+        end
+
+        status = synchronizer.sync(account: account, candidate: candidate, detail_result: detail_result, rule: rule, crawl_task: crawl_task, extracted: extracted)
         created_count += 1 if status == :created
       rescue StandardError => e
         detail_errors += 1
@@ -948,6 +1219,19 @@ class WebsiteCrawler < BaseCrawler
     end
 
     private
+
+    # The render API is a paid fallback for one situation only: the rule
+    # extracted nothing from a response we did get. Returns nil when no render
+    # API is configured, which leaves the caller on its existing path.
+    def rendered_fetch(url, rule, crawl_task)
+      return nil unless @render_fetcher
+
+      @host_rate_limiter.wait(url, interval_seconds: rule.interval_seconds)
+      crawl_task&.log(:info, "直连未提取到内容，改用渲染 API 重试：#{url}")
+      result = @render_fetcher.fetch(url)
+      crawl_task&.log(:warn, "渲染 API 重试失败 #{url}：#{result.error}") unless result.success?
+      result
+    end
 
     def host_blocked?(result)
       result.kind.in?([ :blocked, :rate_limited ])

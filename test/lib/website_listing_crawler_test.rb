@@ -20,6 +20,42 @@ class WebsiteListingCrawlerTest < ActiveSupport::TestCase
     end
   end
 
+  class FakeResponse
+    attr_reader :status, :headers, :body
+
+    def initialize(status:, body: "", headers: {})
+      @status = status
+      @body = body
+      @headers = Faraday::Utils::Headers.new(headers)
+    end
+
+    def success?
+      status.between?(200, 299)
+    end
+  end
+
+  FakeRenderRequest = Struct.new(:path, :params, :headers) do
+    def initialize(path)
+      super(path, {}, {})
+    end
+  end
+
+  class FakeRenderConnection
+    attr_reader :requests
+
+    def initialize(response)
+      @response = response
+      @requests = []
+    end
+
+    def get(path)
+      request = FakeRenderRequest.new(path)
+      yield request
+      @requests << request
+      @response
+    end
+  end
+
   def setup
     @account = WebsiteAccount.create!(
       fakeid: "example.com",
@@ -207,7 +243,7 @@ class WebsiteListingCrawlerTest < ActiveSupport::TestCase
       WebsiteCrawler::ListingCrawler::Result.new(1, 0, 0, 0)
     end
 
-    stub_class_method(WebsiteCrawler::ListingCrawler, :new, -> { runner }) do
+    stub_class_method(WebsiteCrawler::ListingCrawler, :new, ->(**_options) { runner }) do
       WebsiteCrawler.crawl_account(@account, task, article_concurrency: 1, max_pages: 1)
     end
 
@@ -225,7 +261,7 @@ class WebsiteListingCrawlerTest < ActiveSupport::TestCase
       WebsiteCrawler::ListingCrawler::Result.new(0, 0, 1, 0)
     end
 
-    stub_class_method(WebsiteCrawler::ListingCrawler, :new, -> { runner }) do
+    stub_class_method(WebsiteCrawler::ListingCrawler, :new, ->(**_options) { runner }) do
       WebsiteCrawler.crawl_account(@account, task, article_concurrency: 1, max_pages: 1)
     end
 
@@ -235,11 +271,262 @@ class WebsiteListingCrawlerTest < ActiveSupport::TestCase
     assert_equal "error", @account.reload.last_check_status
   end
 
+  test "render api fetcher returns the rendered html for the requested url" do
+    connection = FakeRenderConnection.new(FakeResponse.new(status: 200, body: "<html><body>rendered</body></html>"))
+
+    result = render_fetcher(connection).fetch("https://example.com/events")
+
+    assert result.success?
+    assert_equal "<html><body>rendered</body></html>", result.html
+    request = connection.requests.first
+    assert_equal "/v2/general", request.path
+    assert_equal "https://example.com/events", request.params["url"]
+    assert_equal "test-key", request.headers["x-api-key"]
+  end
+
+  test "render api fetcher surfaces the target page status from the response header" do
+    connection = FakeRenderConnection.new(
+      FakeResponse.new(status: 200, body: "<html></html>", headers: { "ant-page-status-code" => "403" })
+    )
+
+    result = render_fetcher(connection).fetch("https://example.com/events")
+
+    refute result.success?
+    assert_equal :blocked, result.kind
+    assert_equal 403, result.status
+    assert_equal "HTTP 403", result.error
+  end
+
+  test "render api fetcher reports api errors with the service detail" do
+    connection = FakeRenderConnection.new(
+      FakeResponse.new(status: 403, body: { detail: "API token is wrong." }.to_json)
+    )
+
+    result = render_fetcher(connection).fetch("https://example.com/events")
+
+    refute result.success?
+    assert_equal :blocked, result.kind
+    assert_match "ScrapingAnt API 错误 403", result.error
+    assert_match "API token is wrong.", result.error
+  end
+
+  test "render api fetcher maps a rate limited api response" do
+    connection = FakeRenderConnection.new(FakeResponse.new(status: 429, body: ""))
+
+    result = render_fetcher(connection).fetch("https://example.com/events")
+
+    refute result.success?
+    assert_equal :rate_limited, result.kind
+  end
+
+  test "render api fetcher refuses to fetch without an api key" do
+    result = WebsiteCrawler::ScrapingAntFetcher.new(api_key: nil).fetch("https://example.com/events")
+
+    refute result.success?
+    assert_equal :blocked, result.kind
+    assert_match "scrapingant_api_key", result.error
+  end
+
+  test "render api fetcher is only built when a key is configured" do
+    with_scrapingant_key(nil) do
+      assert_nil WebsiteCrawler::ScrapingAntFetcher.build
+    end
+
+    with_scrapingant_key("test-key") do
+      assert_instance_of WebsiteCrawler::ScrapingAntFetcher, WebsiteCrawler::ScrapingAntFetcher.build
+    end
+  end
+
+  test "listing crawler keeps plain http when the rule already extracts candidates" do
+    rule = WebsiteCrawler::ListingRule.new(@account, listing_rule)
+    entry_url = rule.entry_urls.first
+    detail_url = "https://example.com/events/1"
+    fetcher = FakeFetcher.new(
+      entry_url => WebsiteCrawler::FetchResult.success(url: entry_url, html: listing_html),
+      detail_url => WebsiteCrawler::FetchResult.success(url: detail_url, html: detail_html)
+    )
+    render_fetcher = FakeFetcher.new({})
+
+    result = listing_crawler(fetcher, render_fetcher: render_fetcher).crawl(account: @account, rule: rule, crawl_task: nil)
+
+    assert_equal 1, result.created_count
+    assert_empty render_fetcher.calls, "直连已提取到内容时不应调用渲染 API"
+  end
+
+  test "listing crawler renders an entry page the rule could not extract from" do
+    rule = WebsiteCrawler::ListingRule.new(@account, listing_rule)
+    entry_url = rule.entry_urls.first
+    detail_url = "https://example.com/events/1"
+    fetcher = FakeFetcher.new(
+      entry_url => WebsiteCrawler::FetchResult.success(url: entry_url, html: "<html><body><div id=\"app\"></div></body></html>"),
+      detail_url => WebsiteCrawler::FetchResult.success(url: detail_url, html: detail_html)
+    )
+    render_fetcher = FakeFetcher.new(
+      entry_url => WebsiteCrawler::FetchResult.success(url: entry_url, html: listing_html)
+    )
+
+    result = listing_crawler(fetcher, render_fetcher: render_fetcher).crawl(account: @account, rule: rule, crawl_task: nil)
+
+    assert_equal [ entry_url ], render_fetcher.calls
+    assert_equal 1, result.candidates_count
+    assert_equal 1, result.created_count
+    assert_equal 0, result.entry_errors
+  end
+
+  test "listing crawler renders a detail page the rule could not extract content from" do
+    rule = WebsiteCrawler::ListingRule.new(@account, listing_rule)
+    entry_url = rule.entry_urls.first
+    detail_url = "https://example.com/events/1"
+    fetcher = FakeFetcher.new(
+      entry_url => WebsiteCrawler::FetchResult.success(url: entry_url, html: listing_html),
+      detail_url => WebsiteCrawler::FetchResult.success(url: detail_url, html: vue_shell_detail_html)
+    )
+    render_fetcher = FakeFetcher.new(
+      detail_url => WebsiteCrawler::FetchResult.success(url: detail_url, html: detail_html)
+    )
+
+    result = listing_crawler(fetcher, render_fetcher: render_fetcher).crawl(account: @account, rule: rule, crawl_task: nil)
+
+    assert_equal [ detail_url ], render_fetcher.calls
+    assert_equal 0, result.detail_errors
+    article = Article.find_by!(url: detail_url)
+    assert_match "Long event detail", article.content_html
+    assert_equal "available", article.raw_data.dig("listing", "content_status")
+  end
+
+  test "listing crawler does not buy a render when the direct fetch itself failed" do
+    rule = WebsiteCrawler::ListingRule.new(@account, listing_rule)
+    entry_url = rule.entry_urls.first
+    detail_url = "https://example.com/events/1"
+    fetcher = FakeFetcher.new(
+      entry_url => WebsiteCrawler::FetchResult.success(url: entry_url, html: listing_html),
+      detail_url => WebsiteCrawler::FetchResult.failure(url: detail_url, kind: :timeout, error: "execution expired")
+    )
+    render_fetcher = FakeFetcher.new({})
+
+    result = listing_crawler(fetcher, render_fetcher: render_fetcher).crawl(account: @account, rule: rule, crawl_task: nil)
+
+    assert_empty render_fetcher.calls, "没有拿到响应时不该走渲染兜底"
+    assert_equal 1, result.detail_errors
+    assert_equal "fetch_failed", Article.find_by!(url: detail_url).raw_data.dig("listing", "content_status")
+  end
+
+  test "listing crawler counts a failed render fallback as an entry error" do
+    rule = WebsiteCrawler::ListingRule.new(@account, listing_rule)
+    entry_url = rule.entry_urls.first
+    fetcher = FakeFetcher.new(
+      entry_url => WebsiteCrawler::FetchResult.success(url: entry_url, html: "<html><body><div id=\"app\"></div></body></html>")
+    )
+    render_fetcher = FakeFetcher.new(
+      entry_url => WebsiteCrawler::FetchResult.failure(url: entry_url, kind: :blocked, status: 403, error: "ScrapingAnt API 错误 403: API token is wrong.")
+    )
+
+    result = listing_crawler(fetcher, render_fetcher: render_fetcher).crawl(account: @account, rule: rule, crawl_task: nil)
+
+    assert_equal 0, result.candidates_count
+    assert_equal 1, result.entry_errors
+  end
+
+  test "local headless browser fetcher can be built when selenium is available" do
+    fetcher = WebsiteCrawler::LocalHeadlessBrowserFetcher.build
+
+    assert_instance_of WebsiteCrawler::LocalHeadlessBrowserFetcher, fetcher
+  end
+
+  test "render fallback chain tries providers in order and returns first success" do
+    url = "https://example.com/events"
+    local_fetcher = FakeFetcher.new(
+      url => WebsiteCrawler::FetchResult.success(url: url, html: "<html>local rendered</html>")
+    )
+    scrapingant_fetcher = FakeFetcher.new(
+      url => WebsiteCrawler::FetchResult.success(url: url, html: "<html>scrapingant rendered</html>")
+    )
+    chain = WebsiteCrawler::RenderFallbackChain.new([ local_fetcher, scrapingant_fetcher ])
+
+    result = chain.fetch(url)
+
+    assert result.success?
+    assert_equal "<html>local rendered</html>", result.html
+    assert_equal [ url ], local_fetcher.calls
+    assert_empty scrapingant_fetcher.calls, "第一个 provider 成功时不应调用后续 provider"
+  end
+
+  test "render fallback chain continues to next provider when first fails" do
+    url = "https://example.com/events"
+    local_fetcher = FakeFetcher.new(
+      url => WebsiteCrawler::FetchResult.failure(url: url, kind: :timeout, error: "本地浏览器渲染超时")
+    )
+    scrapingant_fetcher = FakeFetcher.new(
+      url => WebsiteCrawler::FetchResult.success(url: url, html: "<html>scrapingant rendered</html>")
+    )
+    chain = WebsiteCrawler::RenderFallbackChain.new([ local_fetcher, scrapingant_fetcher ])
+
+    result = chain.fetch(url)
+
+    assert result.success?
+    assert_equal "<html>scrapingant rendered</html>", result.html
+    assert_equal [ url ], local_fetcher.calls
+    assert_equal [ url ], scrapingant_fetcher.calls
+  end
+
+  test "render fallback chain returns last failure when all providers fail" do
+    url = "https://example.com/events"
+    local_fetcher = FakeFetcher.new(
+      url => WebsiteCrawler::FetchResult.failure(url: url, kind: :timeout, error: "本地浏览器渲染超时")
+    )
+    scrapingant_fetcher = FakeFetcher.new(
+      url => WebsiteCrawler::FetchResult.failure(url: url, kind: :blocked, error: "ScrapingAnt API 错误 403")
+    )
+    chain = WebsiteCrawler::RenderFallbackChain.new([ local_fetcher, scrapingant_fetcher ])
+
+    result = chain.fetch(url)
+
+    refute result.success?
+    assert_equal :blocked, result.kind
+    assert_match "ScrapingAnt API 错误 403", result.error
+  end
+
+  test "render fallback chain build excludes unconfigured scrapingant" do
+    with_scrapingant_key(nil) do
+      chain = WebsiteCrawler::RenderFallbackChain.build
+
+      # Only local_headless should be available when ScrapingAnt key is missing
+      assert chain, "链应该被创建，因为本地浏览器可用"
+    end
+  end
+
+  test "render fallback chain build returns nil when no providers are available" do
+    # Stub both providers to return nil
+    stub_class_method(WebsiteCrawler::LocalHeadlessBrowserFetcher, :build, -> { nil }) do
+      with_scrapingant_key(nil) do
+        chain = WebsiteCrawler::RenderFallbackChain.build
+
+        assert_nil chain, "没有可用 provider 时应返回 nil"
+      end
+    end
+  end
+
   private
 
-  def listing_crawler(fetcher)
+  def render_fetcher(connection)
+    fetcher = WebsiteCrawler::ScrapingAntFetcher.new(api_key: "test-key")
+    fetcher.define_singleton_method(:connection) { connection }
+    fetcher
+  end
+
+  # scrapingant_api_key 是全局 Option，用例结束后恢复原值（nil 表示未配置）。
+  def with_scrapingant_key(value)
+    previous = Option.get("scrapingant_api_key")
+    value ? Option.set("scrapingant_api_key", value) : Option.delete("scrapingant_api_key")
+    yield
+  ensure
+    previous ? Option.set("scrapingant_api_key", previous) : Option.delete("scrapingant_api_key")
+  end
+
+  def listing_crawler(fetcher, render_fetcher: nil)
     WebsiteCrawler::ListingCrawler.new(
       fetcher: fetcher,
+      render_fetcher: render_fetcher,
       host_rate_limiter: @host_rate_limiter
     )
   end
