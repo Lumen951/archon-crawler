@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_09_000003) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_15_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -19,6 +19,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_09_000003) do
     t.integer "articles_count", default: 0, null: false
     t.integer "articles_last_30_days", default: 0, null: false
     t.integer "articles_last_7_days", default: 0, null: false
+    t.jsonb "crawl_rule", default: {}, null: false
     t.datetime "created_at", null: false
     t.string "fakeid", null: false
     t.datetime "last_crawled_at"

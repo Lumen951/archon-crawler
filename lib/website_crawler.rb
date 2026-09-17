@@ -25,6 +25,9 @@ class WebsiteCrawler < BaseCrawler
   # and fetched per account per crawl.
   def self.crawl_account(account, crawl_task, article_concurrency:, max_pages:)
     task_account = crawl_task.crawl_task_accounts.find_by(account: account)
+    rule = ListingRule.new(account, account.crawl_rule)
+    return crawl_listing_account(account, crawl_task, task_account: task_account, rule: rule) if rule.listing?
+
     task_account&.mark_running!
 
     crawl_task.log(:info, "开始检查官网: #{account.nickname} (#{account.url})")
@@ -52,6 +55,40 @@ class WebsiteCrawler < BaseCrawler
     crawl_task.increment_error_count!(account.class.name)
     crawl_task.log(:error, "#{account.nickname}: 检查出错 - #{e.message}")
     crawl_task.log(:error, "#{account.nickname}: 异常 backtrace: #{e.backtrace&.first(5)&.join(' | ')}")
+  end
+
+  # Listing pages are discovery inputs only. They do not become MonitorPages
+  # or MonitorPageVersions; each extracted detail URL is synced to an Article.
+  def self.crawl_listing_account(account, crawl_task, task_account:, rule:)
+    task_account&.mark_running!
+    crawl_task.log(:info, "开始抓取官网列表: #{account.nickname} (#{account.url})")
+    fill_placeholder_profile(account, crawl_task)
+
+    result = ListingCrawler.new.crawl(account: account, rule: rule, crawl_task: crawl_task)
+    entry_unavailable = result.entry_errors.positive? && result.candidates_count.zero?
+    error = if entry_unavailable
+      "列表页抓取失败（#{result.entry_errors} 个入口不可用）"
+    elsif result.candidates_count.zero?
+      "未从列表页发现可抓取内容，请检查 crawl_rule"
+    end
+
+    account.mark_checked!(changed: result.created_count.positive?, error: error)
+    if error
+      crawl_task.log(:warn, "#{account.nickname}: #{error}")
+    else
+      crawl_task.log(:info, "#{account.nickname}: 列表抓取完成（发现 #{result.candidates_count} 条，新增 #{result.created_count} 条）")
+    end
+
+    if entry_unavailable
+      task_account&.mark_failed!(error)
+    else
+      task_account&.mark_completed!
+    end
+    result.to_h.merge(changed: result.created_count.positive?, error: error)
+  rescue StandardError => e
+    task_account&.mark_failed!(e.message)
+    crawl_task.increment_error_count!(account.class.name)
+    crawl_task.log(:error, "#{account.nickname}: 列表抓取出错 - #{e.message}")
   end
 
   # Fetches every active page, runs change detection + article sync on each,
@@ -190,7 +227,9 @@ class WebsiteCrawler < BaseCrawler
       # avoids the "0 sources" failure where all interesting links live on a
       # subdomain (e.g. api-docs.deepseek.com/updates).
       def same_site?(a, b)
-        base_domain(a) == base_domain(b)
+        first = base_domain(a)
+        second = base_domain(b)
+        first.present? && second.present? && first == second
       end
 
       def base_domain(url)
@@ -328,9 +367,11 @@ class WebsiteCrawler < BaseCrawler
     BASE_REMOVE = %w[script style nav footer header noscript iframe svg].freeze
     ARTICLE_REMOVE = (BASE_REMOVE + %w[form aside]).freeze
     MIN_ARTICLE_TEXT_LENGTH = 80
+    LISTING_MIN_ARTICLE_TEXT_LENGTH = 200
+    TEMPLATE_MARKUP_PATTERN = /\{\{.*?\}\}|\bv-(?:if|else|for|html|on:|bind:)\b|<\s*(?:el-|template\b)/im
 
     Result = Struct.new(:title, :content, :links, keyword_init: true)
-    ArticleResult = Struct.new(:title, :html, :markdown, :text_length, keyword_init: true)
+    ArticleResult = Struct.new(:title, :html, :markdown, :text_length, :media_count, :reason, keyword_init: true)
 
     def extract(html, base_url = nil)
       doc = Nokogiri::HTML(html.to_s)
@@ -364,30 +405,74 @@ class WebsiteCrawler < BaseCrawler
     # for Article#clean_content_html. This intentionally does not reuse the
     # page-level `content` string, because articles should remain readable in
     # the UI and preserve links/images from the source page.
-    def extract_article(html, base_url = nil)
+    def extract_article(html, base_url = nil, selector: nil, allow_body_fallback: true, minimum_text_length: MIN_ARTICLE_TEXT_LENGTH)
       doc = Nokogiri::HTML(html.to_s)
 
-      ARTICLE_REMOVE.each { |tag| doc.css(tag).remove }
-      container = doc.at("article") || doc.at("main") || doc.at("body")
-      return ArticleResult.new(title: doc.at("title")&.text.to_s.strip, html: nil, markdown: nil, text_length: 0) unless container
+      container = selector.present? ? doc.at_css(selector) : nil
+      container ||= doc.at("article") || doc.at("main")
+      container ||= doc.at("body") if allow_body_fallback
+      return article_result(doc, reason: "content_not_found") unless container
 
-      container.css("[data-src]").each do |node|
+      fragment = content_fragment(container)
+      ARTICLE_REMOVE.each { |tag| fragment.css(tag).remove }
+      inner_html = fragment.to_html.strip
+      return article_result(doc, reason: "template_markup") if inner_html.match?(TEMPLATE_MARKUP_PATTERN)
+
+      fragment.css("[data-src]").each do |node|
         node["src"] = node["data-src"] if node["src"].to_s.empty?
       end
-      absolutize_attributes(container, base_url)
-      text = normalized_text(container)
-      return ArticleResult.new(title: doc.at("title")&.text.to_s.strip, html: nil, markdown: nil, text_length: text.length) if text.length < MIN_ARTICLE_TEXT_LENGTH
+      absolutize_attributes(fragment, base_url)
+      text = normalized_text(fragment)
+      media_count = fragment.css("img[src], video[src], audio[src]").size
+      return article_result(doc, text_length: text.length, media_count: media_count, reason: "content_too_short") if text.length < minimum_text_length && media_count.zero?
 
-      inner_html = container.inner_html.strip
+      inner_html = fragment.to_html.strip
+      markdown = Html2Text.convert(inner_html, wrap_links: false).strip
+      image_markdown = media_markdown(fragment)
+      if image_markdown.present? && fragment.css("img[src]").any? { |image| !markdown.include?(image["src"]) }
+        markdown = [ markdown, image_markdown ].reject(&:blank?).join("\n\n")
+      end
       ArticleResult.new(
         title: doc.at("title")&.text.to_s.strip,
         html: inner_html,
-        markdown: Html2Text.convert(inner_html, wrap_links: false).strip,
-        text_length: text.length
+        markdown: markdown,
+        text_length: text.length,
+        media_count: media_count,
+        reason: nil
       )
     end
 
     private
+
+    def article_result(doc, text_length: 0, media_count: 0, reason: nil)
+      ArticleResult.new(
+        title: doc.at("title")&.text.to_s.strip,
+        html: nil,
+        markdown: nil,
+        text_length: text_length,
+        media_count: media_count,
+        reason: reason
+      )
+    end
+
+    # Some server-rendered activity pages keep rich text in an inert Vue
+    # template and render it into the visible DOM only after page load.
+    def content_fragment(container)
+      if container.name == "script" && container["type"].to_s.casecmp?("x-template")
+        Nokogiri::HTML.fragment(container.content)
+      else
+        Nokogiri::HTML.fragment(container.inner_html)
+      end
+    end
+
+    def media_markdown(fragment)
+      fragment.css("img[src]").filter_map do |image|
+        src = image["src"].to_s.strip
+        next if src.empty?
+
+        "![#{image["alt"].to_s.strip}](#{src})"
+      end.join("\n")
+    end
 
     def normalized_text(container)
       text_container = Nokogiri::HTML.fragment(container.to_html)
@@ -502,6 +587,374 @@ class WebsiteCrawler < BaseCrawler
     def array_of_strings(value, default)
       result = Array(value).filter_map { |item| item.to_s.strip.presence }.first(20)
       result.presence || default
+    end
+  end
+
+  # A small declarative DSL for websites whose public HTML exposes a listing
+  # instead of a sitemap. It deliberately accepts CSS selectors and bounded
+  # values only; no executable code, arbitrary headers, or cross-site URLs.
+  class ListingRule
+    MAX_ENTRY_URLS = 10
+    MAX_ITEMS = 50
+    MAX_FIELDS = 20
+    MAX_SELECTOR_LENGTH = 500
+    MAX_INTERVAL_SECONDS = 60
+
+    class InvalidRule < StandardError; end
+
+    attr_reader :account, :definition, :mode, :entry_urls, :item_selector,
+                :url_mapping, :title_mapping, :image_mapping, :field_mappings,
+                :detail_selector, :max_items, :interval_seconds, :allow_path_prefixes,
+                :strip_query_params
+
+    def self.from_json(account, value)
+      parsed = value.is_a?(String) ? JSON.parse(value) : value
+      new(account, parsed)
+    end
+
+    def initialize(account, definition)
+      @account = account
+      definition = definition.presence || {}
+      raise InvalidRule, "规则必须是对象" unless definition.is_a?(Hash)
+
+      @definition = definition.deep_stringify_keys
+      @mode = @definition.fetch("mode", "sitemap").to_s
+      raise InvalidRule, "mode 只能是 sitemap 或 listing" unless %w[sitemap listing].include?(@mode)
+
+      return unless listing?
+
+      @entry_urls = validate_entry_urls
+      @item_selector = validate_selector(@definition["item_selector"], "item_selector")
+      @url_mapping = validate_mapping(@definition["url"], "url")
+      @title_mapping = validate_mapping(@definition["title"], "title")
+      @image_mapping = validate_mapping(@definition["image"], "image", required: false)
+      @field_mappings = validate_fields
+      @detail_selector = validate_optional_selector(@definition.dig("detail", "content_selector"), "detail.content_selector")
+      @max_items = bounded_integer(@definition.dig("limits", "max_items"), default: 20, min: 1, max: MAX_ITEMS, label: "limits.max_items")
+      @interval_seconds = bounded_integer(@definition.dig("limits", "interval_seconds"), default: 1, min: 0, max: MAX_INTERVAL_SECONDS, label: "limits.interval_seconds")
+      @allow_path_prefixes = Array(@definition.dig("url_policy", "allow_path_prefixes")).filter_map { |path| path.to_s.strip.presence }.first(20)
+      unless @allow_path_prefixes.all? { |path| path.start_with?("/") }
+        raise InvalidRule, "url_policy.allow_path_prefixes 必须以 / 开头"
+      end
+      @strip_query_params = Array(@definition.dig("url_policy", "strip_query_params")).filter_map { |key| key.to_s.strip.presence }.first(20)
+    end
+
+    def sitemap?
+      mode == "sitemap"
+    end
+
+    def listing?
+      mode == "listing"
+    end
+
+    def canonical_url(base_url, href)
+      url = Fetcher.normalize(base_url, href)
+      return nil unless url && Fetcher.same_site?(account.url, url)
+
+      uri = URI.parse(url)
+      if uri.query.present? && strip_query_params.any?
+        params = URI.decode_www_form(uri.query).reject { |key, _| strip_query_params.include?(key) }
+        uri.query = params.empty? ? nil : URI.encode_www_form(params)
+      end
+      return nil if allow_path_prefixes.any? && !allow_path_prefixes.any? { |prefix| uri.path.start_with?(prefix) }
+
+      uri.to_s
+    rescue URI::Error
+      nil
+    end
+
+    private
+
+    def validate_entry_urls
+      values = Array(@definition["entry_urls"]).filter_map { |value| value.to_s.strip.presence }.first(MAX_ENTRY_URLS)
+      raise InvalidRule, "listing 模式至少需要一个 entry_urls" if values.empty?
+
+      values.map do |url|
+        uri = URI.parse(url)
+        unless %w[http https].include?(uri.scheme) && uri.host.present? && Fetcher.same_site?(account.url, url)
+          raise InvalidRule, "entry_urls 只能包含同站 HTTP(S) 地址"
+        end
+        url
+      rescue URI::Error
+        raise InvalidRule, "entry_urls 包含无效地址"
+      end
+    end
+
+    def validate_mapping(value, label, required: true)
+      hash = value.respond_to?(:to_h) ? value.to_h.deep_stringify_keys : {}
+      raise InvalidRule, "#{label}.selector 必填" if required && hash["selector"].blank?
+      return nil if !required && hash.empty?
+
+      selector = validate_selector(hash["selector"], "#{label}.selector")
+      attribute = hash["attribute"].to_s.strip.presence
+      raise InvalidRule, "#{label}.attribute 过长" if attribute && attribute.length > 80
+
+      { "selector" => selector, "attribute" => attribute }
+    end
+
+    def validate_fields
+      fields = @definition["fields"] || {}
+      raise InvalidRule, "fields 必须是对象" unless fields.is_a?(Hash)
+      raise InvalidRule, "fields 最多 #{MAX_FIELDS} 项" if fields.size > MAX_FIELDS
+
+      fields.each_with_object({}) do |(key, value), result|
+        name = key.to_s
+        raise InvalidRule, "fields 名称只能使用小写字母、数字和下划线" unless name.match?(/\A[a-z][a-z0-9_]{0,63}\z/)
+
+        result[name] = validate_mapping(value, "fields.#{name}")
+      end
+    end
+
+    def validate_optional_selector(value, label)
+      return nil if value.blank?
+
+      validate_selector(value, label)
+    end
+
+    def validate_selector(value, label)
+      selector = value.to_s.strip
+      raise InvalidRule, "#{label} 必填" if selector.empty?
+      raise InvalidRule, "#{label} 过长" if selector.length > MAX_SELECTOR_LENGTH
+
+      Nokogiri::CSS::Parser.new.parse(selector)
+      selector
+    rescue Nokogiri::CSS::SyntaxError
+      raise InvalidRule, "#{label} 不是有效的 CSS selector"
+    end
+
+    def bounded_integer(value, default:, min:, max:, label:)
+      return default if value.blank?
+
+      parsed = Integer(value)
+      raise InvalidRule, "#{label} 必须介于 #{min} 和 #{max}" unless parsed.between?(min, max)
+
+      parsed
+    rescue ArgumentError, TypeError
+      raise InvalidRule, "#{label} 必须是整数"
+    end
+  end
+
+  class ListingExtractor
+    Candidate = Data.define(:url, :title, :image, :fields, :entry_url)
+
+    def initialize(rule)
+      @rule = rule
+    end
+
+    def extract(html, entry_url, limit: @rule.max_items)
+      doc = Nokogiri::HTML(html.to_s)
+      doc.css(@rule.item_selector).first(limit).filter_map do |item|
+        href = value_for(item, @rule.url_mapping)
+        url = @rule.canonical_url(entry_url, href)
+        next unless url
+
+        fields = @rule.field_mappings.transform_values { |mapping| value_for(item, mapping) }.compact
+        Candidate.new(
+          url: url,
+          title: value_for(item, @rule.title_mapping).presence || url,
+          image: value_for(item, @rule.image_mapping, absolute: true, base_url: entry_url),
+          fields: fields,
+          entry_url: entry_url
+        )
+      end.uniq(&:url)
+    end
+
+    private
+
+    def value_for(item, mapping, absolute: false, base_url: nil)
+      return nil unless mapping
+
+      node = item.at_css(mapping.fetch("selector"))
+      return nil unless node
+
+      value = mapping["attribute"].present? ? node[mapping["attribute"]] : node.text
+      value = value.to_s.strip.presence
+      return value unless absolute && value
+
+      Fetcher.normalize(base_url, value) || value
+    end
+  end
+
+  class ListingArticleSynchronizer
+    def initialize(content_extractor: Extractor.new)
+      @content_extractor = content_extractor
+    end
+
+    def sync(account:, candidate:, detail_result:, rule:, crawl_task:)
+      extracted = if detail_result&.success?
+        @content_extractor.extract_article(
+          detail_result.html,
+          candidate.url,
+          selector: rule.detail_selector,
+          allow_body_fallback: false,
+          minimum_text_length: Extractor::LISTING_MIN_ARTICLE_TEXT_LENGTH
+        )
+      end
+
+      Article.transaction(requires_new: true) do
+        article = Article.find_or_initialize_by(url: candidate.url)
+        return :foreign_account if article.persisted? && article.account_id != account.id
+
+        created = article.new_record?
+        attributes = {
+          account: account,
+          crawl_task: crawl_task,
+          title: candidate.title.presence || extracted&.title,
+          cover_url: candidate.image.presence || article.cover_url,
+          published_at: article.published_at || Time.current,
+          raw_data: merged_raw_data(article, candidate, detail_result, extracted)
+        }
+        if content_available?(extracted)
+          attributes[:content_html] = extracted.html
+          attributes[:content_markdown] = extracted.markdown
+        elsif detail_result&.success?
+          # A successful response with no trustworthy article body must not
+          # leave an earlier page shell visible as if it were real content.
+          attributes[:content_html] = nil
+          attributes[:content_markdown] = nil
+        end
+
+        article.assign_attributes(attributes)
+        article.save!
+        crawl_task&.increment_progress! if created
+        created ? :created : :updated
+      end
+    rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotUnique => e
+      crawl_task&.log(:warn, "文章保存失败 #{candidate.url}: #{e.message}")
+      :error
+    end
+
+    private
+
+    def merged_raw_data(article, candidate, detail_result, extracted)
+      (article.raw_data || {}).merge(
+        "source_kind" => "website_listing",
+        "listing" => {
+          "entry_url" => candidate.entry_url,
+          "fields" => candidate.fields,
+          "fetched_at" => Time.current.iso8601,
+          "detail_status" => detail_result&.status,
+          "detail_error" => detail_result&.error,
+          "content_status" => content_status(detail_result, extracted),
+          "content_error" => extracted&.reason || detail_result&.error,
+          "content_text_length" => extracted&.text_length
+        }
+      )
+    end
+
+    def content_status(detail_result, extracted)
+      return "available" if content_available?(extracted)
+      return "unavailable" if detail_result&.success?
+
+      "fetch_failed"
+    end
+
+    def content_available?(extracted)
+      extracted&.html.present? && (extracted.markdown.present? || extracted.media_count.to_i.positive?)
+    end
+  end
+
+  # Lightweight, process-local protection for listing crawls. It reserves a
+  # request slot per host before any list or detail request. The durable,
+  # cross-process cooldown design lives in tmp/doc/website_host_throttling_plan.md.
+  class ListingHostRateLimiter
+    MIN_INTERVAL_SECONDS = 5
+
+    def initialize(clock: -> { Process.clock_gettime(Process::CLOCK_MONOTONIC) }, sleeper: ->(seconds) { sleep seconds })
+      @clock = clock
+      @sleeper = sleeper
+      @next_request_at = {}
+      @mutex = Mutex.new
+    end
+
+    def wait(url, interval_seconds:)
+      host = URI.parse(url).host.to_s.downcase
+      return if host.blank?
+
+      interval = [ interval_seconds.to_f, MIN_INTERVAL_SECONDS ].max
+      now = @clock.call
+      scheduled_at = @mutex.synchronize do
+        slot = [ now, @next_request_at.fetch(host, now) ].max
+        @next_request_at[host] = slot + interval
+        slot
+      end
+
+      @sleeper.call(scheduled_at - now) if scheduled_at > now
+    rescue URI::Error
+      nil
+    end
+  end
+
+  DEFAULT_LISTING_HOST_RATE_LIMITER = ListingHostRateLimiter.new
+
+  class ListingCrawler
+    Result = Data.define(:candidates_count, :created_count, :entry_errors, :detail_errors)
+
+    def initialize(fetcher: Fetcher.new, host_rate_limiter: DEFAULT_LISTING_HOST_RATE_LIMITER)
+      @fetcher = fetcher
+      @host_rate_limiter = host_rate_limiter
+    end
+
+    def crawl(account:, rule:, crawl_task:)
+      extractor = ListingExtractor.new(rule)
+      candidates = []
+      entry_errors = 0
+
+      rule.entry_urls.each_with_index do |entry_url, index|
+        break if stopped?(crawl_task)
+        @host_rate_limiter.wait(entry_url, interval_seconds: rule.interval_seconds)
+
+        result = @fetcher.fetch(entry_url)
+        unless result.success?
+          entry_errors += 1
+          crawl_task&.increment_error_count!(account.class.name)
+          crawl_task&.log(:warn, "列表页抓取失败 #{entry_url}: #{result.error}")
+          next
+        end
+
+        candidates.concat(extractor.extract(result.html, entry_url))
+      rescue StandardError => e
+        entry_errors += 1
+        crawl_task&.increment_error_count!(account.class.name)
+        crawl_task&.log(:warn, "列表页解析失败 #{entry_url}: #{e.message}")
+      end
+
+      candidates = candidates.uniq(&:url).first(rule.max_items)
+      synchronizer = ListingArticleSynchronizer.new
+      created_count = 0
+      detail_errors = 0
+
+      candidates.each_with_index do |candidate, index|
+        break if stopped?(crawl_task)
+        @host_rate_limiter.wait(candidate.url, interval_seconds: rule.interval_seconds)
+
+        detail_result = @fetcher.fetch(candidate.url)
+        unless detail_result.success?
+          detail_errors += 1
+          crawl_task&.increment_error_count!(account.class.name)
+          crawl_task&.log(:warn, "详情页抓取失败 #{candidate.url}: #{detail_result.error}")
+          break if host_blocked?(detail_result)
+        end
+
+        status = synchronizer.sync(account: account, candidate: candidate, detail_result: detail_result, rule: rule, crawl_task: crawl_task)
+        created_count += 1 if status == :created
+      rescue StandardError => e
+        detail_errors += 1
+        crawl_task&.increment_error_count!(account.class.name)
+        crawl_task&.log(:warn, "列表项处理失败 #{candidate.url}: #{e.message}")
+      end
+
+      Result.new(candidates.size, created_count, entry_errors, detail_errors)
+    end
+
+    private
+
+    def host_blocked?(result)
+      result.kind.in?([ :blocked, :rate_limited ])
+    end
+
+    def stopped?(crawl_task)
+      crawl_task && (crawl_task.reload.paused? || crawl_task.reload.failed?)
     end
   end
 

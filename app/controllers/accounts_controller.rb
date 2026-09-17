@@ -235,9 +235,13 @@ class AccountsController < ApplicationController
 
     crawl_task = nil
     begin
-      @account.monitor_pages.destroy_all
+      @account.monitor_pages.destroy_all if @account.crawl_mode == "sitemap"
       crawl_task = @account.crawl!
-      flash[:success] = "已清空 #{@account.nickname} 的监控页面并启动重新发现"
+      flash[:success] = if @account.crawl_mode == "sitemap"
+        "已清空 #{@account.nickname} 的监控页面并启动重新发现"
+      else
+        "已为 #{@account.nickname} 启动列表抓取"
+      end
     rescue StandardError => e
       flash[:error] = "启动重新发现失败：#{e.message}"
     end
@@ -247,6 +251,20 @@ class AccountsController < ApplicationController
     else
       redirect_to account_path(@account)
     end
+  end
+
+  def update_crawl_rule
+    @account = Account.find(params[:id])
+    require_website_account!(@account)
+
+    rule = WebsiteCrawler::ListingRule.from_json(@account, params[:crawl_rule_json])
+    @account.update!(crawl_rule: rule.definition)
+    flash[:success] = "官网抓取规则已更新"
+    redirect_to account_path(@account)
+  rescue ActiveRecord::RecordNotFound
+    redirect_to accounts_path, flash: { error: "帐号不存在" }
+  rescue WebsiteCrawler::ListingRule::InvalidRule, JSON::ParserError => e
+    redirect_to account_path(@account), flash: { error: "抓取规则无效：#{e.message}" }
   end
 
   def crawl
@@ -695,6 +713,12 @@ class AccountsController < ApplicationController
     params.require(:account).permit(:nickname)
   end
 
+  def require_website_account!(account)
+    return if account.website?
+
+    raise WebsiteCrawler::ListingRule::InvalidRule, "只有官网帐号可以配置抓取规则"
+  end
+
   def success_message_for(result)
     message = "成功导入 #{result.imported_count} 个帐号（#{result.skipped_count} 个重复已跳过）"
     return message if result.invalid_count.zero?
@@ -722,5 +746,3 @@ class AccountsController < ApplicationController
     end
   end
 end
-
-

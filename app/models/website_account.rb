@@ -12,6 +12,7 @@
 #  articles_count        :integer          default(0), not null
 #  articles_last_30_days :integer          default(0), not null
 #  articles_last_7_days  :integer          default(0), not null
+#  crawl_rule            :jsonb            not null
 #  fakeid                :string           not null
 #  last_crawled_at       :datetime
 #  last_published_at     :datetime
@@ -42,6 +43,8 @@ class WebsiteAccount < Account
   has_many :monitor_pages, dependent: :destroy, foreign_key: :account_id
   has_many :monitor_changes, dependent: :destroy, foreign_key: :account_id
 
+  validate :crawl_rule_is_valid
+
   DEFAULT_MAX_PAGES = 50
   # Hard ceiling regardless of metadata — unlike other platforms' max_pages
   # (listing pagination depth), this bounds how many distinct URLs
@@ -68,6 +71,12 @@ class WebsiteAccount < Account
   # Entry URL from import time; falls back to https://<fakeid>.
   def url
     metadata["url"].presence || "https://#{fakeid}"
+  end
+
+  # Website accounts either use the established sitemap monitor or a bounded
+  # listing rule. A missing rule deliberately preserves the sitemap behavior.
+  def crawl_mode
+    crawl_rule.fetch("mode", "sitemap").to_s.presence_in(%w[sitemap listing]) || "sitemap"
   end
 
   def max_pages
@@ -106,5 +115,13 @@ class WebsiteAccount < Account
     update_columns(metadata: meta)
     refresh_activity_counters!
     mark_crawled!(at: now)
+  end
+
+  private
+
+  def crawl_rule_is_valid
+    WebsiteCrawler::ListingRule.new(self, crawl_rule)
+  rescue WebsiteCrawler::ListingRule::InvalidRule => e
+    errors.add(:crawl_rule, e.message)
   end
 end

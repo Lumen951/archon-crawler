@@ -234,6 +234,28 @@
 
   <!-- Website Monitor Section (WebsiteAccount only) -->
   <% if @account.website? %>
+    <section class="bg-bg-card border border-border-primary rounded-xl p-6 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+      <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <h3 class="text-lg font-semibold text-text-primary">抓取规则</h3>
+        <span class="text-xs text-text-muted font-mono"><%= @account.crawl_mode %></span>
+      </div>
+      <%= form_with url: update_crawl_rule_account_path(@account), method: :patch, local: true do %>
+        <div class="grid gap-4">
+          <div>
+            <label class="block text-sm font-medium text-text-secondary mb-1" for="crawl_rule_json">规则 JSON</label>
+            <%= text_area_tag :crawl_rule_json, JSON.pretty_generate(@account.crawl_rule.presence || { "mode" => "sitemap" }),
+                id: "crawl_rule_json", rows: 14, spellcheck: false,
+                class: "w-full px-3 py-2 rounded-lg border border-border-primary bg-bg-secondary text-xs text-text-primary font-mono leading-5 focus:outline-none focus:ring-2 focus:ring-brand/30" %>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <button type="submit" class="h-9 px-4 rounded-lg bg-brand text-white hover:bg-brand-dark text-sm font-semibold transition">
+              保存规则
+            </button>
+          </div>
+        </div>
+      <% end %>
+    </section>
+
     <div class="bg-bg-card border border-border-primary rounded-xl p-6 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
       <div class="flex items-center justify-between mb-4">
         <h3 class="text-lg font-semibold text-text-primary">监控页面</h3>
@@ -289,7 +311,7 @@
         </div>
       <% else %>
         <p class="text-sm text-text-secondary">
-          尚未发现监控页面 — 点击「立即抓取」，系统会自动发现博客、研究、公告等页面并建立基线。
+          <%= @account.crawl_mode == "listing" ? "列表模式不创建监控页面；抓取结果会显示在最近文章中。" : "尚未发现监控页面 — 点击「立即抓取」，系统会自动发现博客、研究、公告等页面并建立基线。" %>
         </p>
       <% end %>
     </div>

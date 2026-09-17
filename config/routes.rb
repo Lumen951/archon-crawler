@@ -60,6 +60,7 @@ Rails.application.routes.draw do
       post :toggle_status
       post :resolve_weread_mp_id
       post :rediscover
+      patch :update_crawl_rule
     end
   end
 
