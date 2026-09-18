@@ -66,7 +66,7 @@ FROM base
 
 # Local rendered-page fallback for WebsiteCrawler
 RUN apt-get update -qq && \
-    apt-get install --no-install-recommends -y chromium chromium-driver libdbus-1-3 fonts-liberation && \
+    apt-get install --no-install-recommends -y chromium chromium-driver chromium-sandbox libdbus-1-3 fonts-liberation && \
     rm -rf /var/lib/apt/lists /var/cache/apt/archives
 
 # Run and own only the runtime files as a non-root user for security
