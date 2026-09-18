@@ -7,6 +7,7 @@
 #  articles_count        :integer          default(0), not null
 #  articles_last_30_days :integer          default(0), not null
 #  articles_last_7_days  :integer          default(0), not null
+#  crawl_rule            :jsonb            not null
 #  fakeid                :string           not null
 #  last_crawled_at       :datetime
 #  last_published_at     :datetime

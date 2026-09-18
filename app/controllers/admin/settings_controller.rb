@@ -26,6 +26,19 @@ class Admin::SettingsController < Admin::BaseController
       message = "TikHub API 密钥更新成功"
     end
 
+    message = nil
+
+    if params[:scrapingant_api_key].present?
+      Option.scrapingant_api_key = params[:scrapingant_api_key].to_s.strip
+      message = "ScrapingAnt API Key 更新成功"
+    end
+
+    if params.key?(:website_render_fallbacks)
+      fallbacks = params[:website_render_fallbacks].is_a?(Array) ? params[:website_render_fallbacks] : []
+      Option.website_render_fallbacks = fallbacks
+      message = "渲染兜底配置更新成功"
+    end
+
     if params[:twitter_ct0].present?
       Option.set('twitter_ct0', params[:twitter_ct0])
       message = "Twitter ct0 cookie 更新成功"
@@ -168,6 +181,22 @@ class Admin::SettingsController < Admin::BaseController
     if params.key?(:feishu_login_mode)
       Option.feishu_login_mode = params[:feishu_login_mode] == "card" ? "card" : "qr"
       message = "飞书扫码登录推送方式已更新"
+    end
+
+    # OpenAI settings
+    if params[:openai_api_key].present?
+      Option.openai_api_key = params[:openai_api_key].to_s.strip
+      message = "OpenAI API 密钥更新成功"
+    end
+
+    if params[:openai_model].present?
+      Option.openai_model = params[:openai_model].to_s.strip
+      message = "OpenAI 模型更新成功"
+    end
+
+    if params[:openai_proxy_url].present?
+      Option.openai_proxy_url = params[:openai_proxy_url].to_s.strip
+      message = "OpenAI 代理 URL 更新成功"
     end
 
     respond_to do |format|
@@ -540,6 +569,8 @@ class Admin::SettingsController < Admin::BaseController
     @twitter_auth_token = Option.get('twitter_auth_token')
     @twitter_proxy = Option.get('twitter_proxy')
     @tikhub_api_key = Option.tikhub_api_key
+    @scrapingant_api_key = Option.scrapingant_api_key
+    @website_render_fallbacks = Option.website_render_fallbacks
     @dajiala_key_check = Rails.cache.read('api_key_check:dajiala')
     @rednote_key_check = Rails.cache.read('api_key_check:rednote')
     @twitter_key_check = Rails.cache.read('api_key_check:twitter')
@@ -581,6 +612,10 @@ class Admin::SettingsController < Admin::BaseController
     @feishu_encrypt_key = Option.feishu_encrypt_key
     @feishu_login_mode = Option.feishu_login_mode
     @feishu_callback_url = build_feishu_callback_url
+    # OpenAI
+    @openai_api_key = Option.openai_api_key
+    @openai_model = Option.openai_model
+    @openai_proxy_url = Option.openai_proxy_url
   end
 
   def qr_login_cache_key(token)

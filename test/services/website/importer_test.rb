@@ -40,6 +40,30 @@ class Website::ImporterTest < ActiveSupport::TestCase
     assert_equal "https://deepseek.com", account.metadata["url"]
   end
 
+  test "creates a bare listing rule for asynchronous generation" do
+    result = Website::Importer.import_lines([ "Events, https://events.example.com/list" ], crawl_mode: "listing")
+
+    assert_equal 1, result.imported_count
+    account = WebsiteAccount.find_by!(fakeid: "events.example.com")
+    assert_equal({ "mode" => "listing" }, account.crawl_rule)
+    assert account.listing_rule_unconfigured?
+    assert_predicate account, :inactive?
+    assert_equal [ account.id ], result.imported_account_ids
+  end
+
+  test "imports sitemap accounts as active" do
+    result = Website::Importer.import_lines([ "Example, https://example.com" ])
+
+    assert_equal 1, result.imported_count
+    assert_predicate WebsiteAccount.find(result.imported_account_ids.first), :active?
+  end
+
+  test "rejects unsupported crawl modes" do
+    assert_raises(ArgumentError) do
+      Website::Importer.import_lines([ "https://example.com" ], crawl_mode: "browser")
+    end
+  end
+
   test "reports invalid lines" do
     result = Website::Importer.import_lines(["not a url"])
 

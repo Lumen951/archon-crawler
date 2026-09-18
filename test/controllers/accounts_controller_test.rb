@@ -179,4 +179,42 @@ class AccountsControllerTest < ActionDispatch::IntegrationTest
     assert_match "部分网址导入失败", response.body
     assert_equal 1, WebsiteAccount.count
   end
+
+  test "listing website import enqueues rule generation" do
+    assert_enqueued_with(job: GenerateWebsiteListingRuleJob) do
+      post import_website_accounts_path, params: {
+        urls: "Events, https://events.example.com/list",
+        crawl_mode: "listing"
+      }
+    end
+
+    account = WebsiteAccount.find_by!(fakeid: "events.example.com")
+    assert_equal({ "mode" => "listing" }, account.crawl_rule)
+  end
+
+  test "updates a website listing crawl rule" do
+    account = WebsiteAccount.create!(fakeid: "events.example.com", nickname: "Events", metadata: { url: "https://events.example.com" })
+    rule = {
+      mode: "listing",
+      entry_urls: [ "https://events.example.com/events" ],
+      item_selector: ".event-card",
+      url: { selector: "a", attribute: "href" },
+      title: { selector: "a" }
+    }
+
+    patch update_crawl_rule_account_path(account), params: { crawl_rule_json: rule.to_json }
+
+    assert_redirected_to account_path(account)
+    assert_equal "listing", account.reload.crawl_mode
+    assert_equal [ "https://events.example.com/events" ], account.crawl_rule["entry_urls"]
+  end
+
+  test "rejects invalid website crawl rule JSON" do
+    account = WebsiteAccount.create!(fakeid: "rules.example.com", nickname: "Rules", metadata: { url: "https://rules.example.com" })
+
+    patch update_crawl_rule_account_path(account), params: { crawl_rule_json: "{" }
+
+    assert_redirected_to account_path(account)
+    assert_equal "sitemap", account.reload.crawl_mode
+  end
 end

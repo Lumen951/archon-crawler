@@ -6,14 +6,17 @@ module Website
   # first crawl. One account per site (keyed by host with the leading www.
   # stripped).
   class Importer
-    Result = Struct.new(:imported_count, :skipped_count, :invalid_count, :errors, keyword_init: true)
+    Result = Struct.new(:imported_count, :skipped_count, :invalid_count, :errors, :imported_account_ids, keyword_init: true)
 
-    def self.import_lines(lines)
-      new.import_lines(lines)
+    def self.import_lines(lines, crawl_mode: "sitemap")
+      new.import_lines(lines, crawl_mode: crawl_mode)
     end
 
-    def import_lines(lines)
-      result = Result.new(imported_count: 0, skipped_count: 0, invalid_count: 0, errors: [])
+    def import_lines(lines, crawl_mode: "sitemap")
+      crawl_mode = crawl_mode.to_s
+      raise ArgumentError, "抓取模式只能是 sitemap 或 listing" unless %w[sitemap listing].include?(crawl_mode)
+
+      result = Result.new(imported_count: 0, skipped_count: 0, invalid_count: 0, errors: [], imported_account_ids: [])
       seen = {}
 
       Array(lines).each do |line|
@@ -35,11 +38,13 @@ module Website
         if account.new_record?
           account.nickname = name.presence || fakeid
           account.metadata = { "url" => url }
-          account.status = :active
+          account.crawl_rule = { "mode" => crawl_mode }
+          account.status = crawl_mode == "listing" ? :inactive : :active
           account.total_articles = 0
 
           if account.save
             result.imported_count += 1
+            result.imported_account_ids << account.id
           else
             result.errors << "#{fakeid}: #{account.errors.full_messages.join(', ')}"
           end
