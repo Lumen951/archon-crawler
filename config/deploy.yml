@@ -8,8 +8,8 @@ image: mp_crawler
 servers:
   web:
     - mp-crawler.miracleplus.com
-  options:
-    "cap-add": SYS_ADMIN
+    options:
+      cap-add: SYS_ADMIN
   # job:
   #   hosts:
   #     - 192.168.0.1
