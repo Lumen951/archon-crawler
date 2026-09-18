@@ -237,7 +237,9 @@
     <section class="bg-bg-card border border-border-primary rounded-xl p-6 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
       <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
         <h3 class="text-lg font-semibold text-text-primary">抓取规则</h3>
-        <span class="text-xs text-text-muted font-mono"><%= @account.crawl_mode %></span>
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-text-muted font-mono"><%= @account.crawl_mode %></span>
+        </div>
       </div>
       <% if @account.listing_rule_unconfigured? %>
         <p class="mb-4 text-sm text-amber-700">Listing 抓取规则尚未生成；在规则完整前执行抓取会失败。</p>
@@ -250,10 +252,18 @@
                 id: "crawl_rule_json", rows: 14, spellcheck: false,
                 class: "w-full px-3 py-2 rounded-lg border border-border-primary bg-bg-secondary text-xs text-text-primary font-mono leading-5 focus:outline-none focus:ring-2 focus:ring-brand/30" %>
           </div>
-          <div class="flex flex-wrap items-center gap-2">
+          <div class="flex flex-wrap items-center justify-between gap-2">
             <button type="submit" class="h-9 px-4 rounded-lg bg-brand text-white hover:bg-brand-dark text-sm font-semibold transition">
               保存规则
             </button>
+            <% if @account.crawl_mode == "listing" %>
+              <div class="flex items-center gap-2">
+                <button type="submit" formaction="<%= generate_crawl_rule_account_path(@account) %>" formmethod="post" class="h-9 px-4 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-sm font-semibold transition">
+                  生成规则
+                </button>
+                <p class="text-sm text-text-muted">生成规则仅适用于 Listing 抓取模式</p>
+              </div>
+            <% end %>
           </div>
         </div>
       <% end %>

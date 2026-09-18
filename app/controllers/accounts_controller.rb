@@ -271,6 +271,26 @@ class AccountsController < ApplicationController
     redirect_to account_path(@account), flash: { error: "抓取规则无效：#{e.message}" }
   end
 
+  def generate_crawl_rule
+    @account = Account.find(params[:id])
+    require_website_account!(@account)
+
+    unless @account.crawl_mode == "listing"
+      flash[:error] = "仅支持 listing 模式的网站生成抓取规则"
+      redirect_to account_path(@account) and return
+    end
+
+    rule = Website::ListingRuleGenerator.new.generate(@account)
+    @account.update!(crawl_rule: rule, status: :active)
+    flash[:success] = "抓取规则生成完成"
+    redirect_to account_path(@account)
+  rescue ActiveRecord::RecordNotFound
+    redirect_to accounts_path, flash: { error: "帐号不存在" }
+  rescue StandardError => e
+    flash[:error] = "规则生成失败：#{e.message}"
+    redirect_to account_path(@account)
+  end
+
   def crawl
     @account = Account.find(params[:id])
 

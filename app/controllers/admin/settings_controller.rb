@@ -183,6 +183,22 @@ class Admin::SettingsController < Admin::BaseController
       message = "飞书扫码登录推送方式已更新"
     end
 
+    # OpenAI settings
+    if params[:openai_api_key].present?
+      Option.openai_api_key = params[:openai_api_key].to_s.strip
+      message = "OpenAI API 密钥更新成功"
+    end
+
+    if params[:openai_model].present?
+      Option.openai_model = params[:openai_model].to_s.strip
+      message = "OpenAI 模型更新成功"
+    end
+
+    if params[:openai_proxy_url].present?
+      Option.openai_proxy_url = params[:openai_proxy_url].to_s.strip
+      message = "OpenAI 代理 URL 更新成功"
+    end
+
     respond_to do |format|
       format.turbo_stream { render turbo_stream: helpers.toast_stream(message || "设置已更新") }
       format.html { flash[:success] = message; redirect_to admin_settings_path }
@@ -596,6 +612,10 @@ class Admin::SettingsController < Admin::BaseController
     @feishu_encrypt_key = Option.feishu_encrypt_key
     @feishu_login_mode = Option.feishu_login_mode
     @feishu_callback_url = build_feishu_callback_url
+    # OpenAI
+    @openai_api_key = Option.openai_api_key
+    @openai_model = Option.openai_model
+    @openai_proxy_url = Option.openai_proxy_url
   end
 
   def qr_login_cache_key(token)

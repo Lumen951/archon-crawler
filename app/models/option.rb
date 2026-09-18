@@ -22,6 +22,11 @@ class Option < ApplicationRecord
   # WechatMpNativeApiClient.validate_session 的实时探测（每日由
   # FeishuLoginReminderJob 体检）。
   WECHAT_MP_SESSION_TTL = 4.days
+  # ── OpenAI / LLM 配置（Website Monitor 语义分析）─────
+  # 通过 MiraclePlus OpenAI 代理调用 Responses API。密钥仅存于 Option，
+  # 切勿硬编码到代码中。见 LlmClient。
+  OPENAI_DEFAULT_PROXY_URL = "https://openai-proxy.miracleplus.com/v1"
+  OPENAI_DEFAULT_MODEL = "gpt-5.4"
 
   validates :opt_key, presence: true, uniqueness: true
 
@@ -243,12 +248,6 @@ class Option < ApplicationRecord
       return true if expires_at.blank?
       Time.parse(expires_at).future? rescue false
     end
-
-    # ── OpenAI / LLM 配置（Website Monitor 语义分析）─────
-    # 通过 MiraclePlus OpenAI 代理调用 Responses API。密钥仅存于 Option，
-    # 切勿硬编码到代码中。见 LlmClient。
-    OPENAI_DEFAULT_PROXY_URL = "https://openai-proxy.miracleplus.com/v1"
-    OPENAI_DEFAULT_MODEL = "openai/gpt-5.2"
 
     def openai_api_key
       get("openai_api_key")
