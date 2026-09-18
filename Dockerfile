@@ -33,7 +33,7 @@ FROM base AS build
 
 # Install packages needed to build gems and Python dependencies
 RUN apt-get update -qq && \
-    apt-get install --no-install-recommends -y build-essential git libvips libpq-dev libyaml-dev pkg-config python3-pip chromium chromium-driver libdbus-1-3 ration && \
+    apt-get install --no-install-recommends -y build-essential git libvips libpq-dev libyaml-dev pkg-config python3-pip chromium chromium-driver libdbus-1-3 fonts-liberation && \
     rm -rf /var/lib/apt/lists /var/cache/apt/archives
 
 # Install application gems
@@ -63,11 +63,6 @@ RUN SECRET_KEY_BASE_DUMMY=1 ./bin/rails assets:precompile
 
 # Final stage for app image
 FROM base
-
-# Local rendered-page fallback for WebsiteCrawler
-RUN apt-get update -qq && \
-    apt-get install --no-install-recommends -y chromium chromium-driver libdbus-1-3 fonts-liberation && \
-    rm -rf /var/lib/apt/lists /var/cache/apt/archives
 
 # Run and own only the runtime files as a non-root user for security
 RUN groupadd --system --gid 1000 rails && \
