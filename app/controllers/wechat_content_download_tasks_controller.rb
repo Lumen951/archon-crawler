@@ -29,6 +29,41 @@ class WechatContentDownloadTasksController < ApplicationController
     redirect_to wechat_content_download_tasks_path
   end
 
+  def retry
+    @task = WechatContentDownloadTask.find(params[:id])
+
+    unless @task.failed?
+      flash[:error] = "只能重试失败的任务"
+      redirect_to wechat_content_download_task_path(@task) and return
+    end
+
+    if WechatContentDownloadTask.alive.exists?
+      flash[:warning] = "已有正在运行的正文下载任务，请等待其完成后再重试"
+      redirect_to wechat_content_download_task_path(@task) and return
+    end
+
+    WechatContentDownloadJob.perform_later
+    flash[:success] = "已提交重试任务"
+    redirect_to wechat_content_download_tasks_path
+  end
+
+  def fail
+    @task = WechatContentDownloadTask.find(params[:id])
+
+    unless @task.running?
+      flash[:error] = "只能标记运行中的任务为失败"
+      redirect_to wechat_content_download_task_path(@task) and return
+    end
+
+    @task.update!(
+      status: :failed,
+      finished_at: Time.current,
+      error_message: "手动标记失败"
+    )
+    flash[:success] = "正文下载任务已标记为失败"
+    redirect_to wechat_content_download_tasks_path
+  end
+
   def poll
     @task = WechatContentDownloadTask.find(params[:id])
     @recent_logs = @task.crawl_logs.recent.where.not(level: :debug).limit(50)

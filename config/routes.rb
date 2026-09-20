@@ -90,6 +90,8 @@ Rails.application.routes.draw do
       post :run
     end
     member do
+      post :retry
+      post :fail
       get :logs
       get :poll
     end

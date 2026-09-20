@@ -416,6 +416,9 @@ class WechatCrawler < BaseCrawler
     barrier = Async::Barrier.new
 
     articles.each do |article|
+      # Check if task was marked as failed before starting each article
+      break if crawl_task.reload.failed?
+
       barrier.async do
         semaphore.acquire do
           ok = download_article_content(article, crawl_task)
@@ -445,6 +448,11 @@ class WechatCrawler < BaseCrawler
     log(crawl_task, :debug, "已下载正文: #{article.title}")
     true
   rescue StandardError => e
+    # WeChat platform blocking - stop immediately
+    if e.message =~ /当前环境异常.*需要验证/
+      log(crawl_task, :error, "微信平台环境异常，需要验证，停止正文下载: #{e.message}")
+      raise WechatMpNativeApiClient::RateLimitError, "微信平台环境异常，需要验证"
+    end
     # 正文下载失败不算抓取失败: 文章元数据已落库，可稍后通过界面重新下载
     log(crawl_task, :warn, "下载正文失败 #{article.url}: #{e.message}")
     false

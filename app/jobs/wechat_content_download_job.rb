@@ -40,6 +40,9 @@ class WechatContentDownloadJob < ApplicationJob
       semaphore = Async::Semaphore.new(article_concurrency)
 
       ids.each_slice(BATCH_SIZE) do |id_batch|
+        # Check if task was marked as failed (e.g., via manual fail button)
+        break if task.reload.failed?
+
         articles = Article.where(id: id_batch).order(published_at: :desc)
         WechatCrawler.download_article_contents(
           articles, task, semaphore,

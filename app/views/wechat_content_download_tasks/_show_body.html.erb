@@ -12,6 +12,11 @@
       </div>
       <div class="flex items-center space-x-3">
         <%= render 'shared/status_badge', status: task.status %>
+        <% if task.running? %>
+          <%= button_to "标记失败", fail_wechat_content_download_task_path(task), method: :post, data: { turbo_confirm: "确定要将此任务标记为失败吗？" }, class: "btn btn-danger" %>
+        <% elsif task.failed? %>
+          <%= button_to "重试下载", retry_wechat_content_download_task_path(task), method: :post, class: "btn btn-primary" %>
+        <% end %>
         <% if task.completed? || task.failed? || task.stale? %>
           <%= button_to "删除任务", wechat_content_download_task_path(task), method: :delete, data: { turbo_confirm: "确定要删除此正文下载任务吗？关联的日志将被删除。" }, class: "btn btn-danger" %>
         <% end %>
