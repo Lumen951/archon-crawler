@@ -109,6 +109,7 @@ class WechatArticleBrowserFetcher
       profile_dir = BrowserLogin.profile_dir_for(PROFILE_PROVIDER)
       lock = BrowserLogin::ProfileLock.acquire(profile_dir, timeout: 5)
       begin
+        BrowserLogin::Launcher.clear_stale_chrome_locks(profile_dir)
         # 有界面模式与登录浏览器保持同一指纹（UA/窗口），避免「登录时有界面
         # 通过验证、抓取时 headless 又被拦」的不一致
         port, pid, xvfb_pid = BrowserLogin::Launcher.launch(
@@ -135,10 +136,22 @@ class WechatArticleBrowserFetcher
     # Session#frame 导出的快照回灌；逐条注入，单条失败不影响其余。
     def restore_cookies!(page, profile_dir, crawl_task)
       entries = BrowserLogin::CookieExport.load(profile_dir)
+      WechatCrawler.log(crawl_task, :info,
+                        "读取 Cookie 快照：#{profile_dir}/#{BrowserLogin::CookieExport::FILENAME}（#{entries.size} 条）")
       return if entries.empty?
 
-      entries.each { |entry| quietly { page.cookies.set(entry) } }
-      WechatCrawler.log(crawl_task, :info, "已向独立浏览器回灌 Cookie 快照（#{entries.size} 条）")
+      restored = 0
+      failures = Hash.new(0)
+      entries.each do |entry|
+        page.cookies.set(entry)
+        restored += 1
+      rescue StandardError => e
+        failures[e.class.name] += 1
+      end
+
+      failure_summary = failures.map { |error, count| "#{error}=#{count}" }.join(", ")
+      suffix = failure_summary.present? ? "，失败：#{failure_summary}" : ""
+      WechatCrawler.log(crawl_task, :info, "Cookie 快照回灌结果：成功 #{restored}/#{entries.size} 条#{suffix}")
     end
 
     def quietly

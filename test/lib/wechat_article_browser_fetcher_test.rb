@@ -105,6 +105,8 @@ class WechatArticleBrowserFetcherTest < ActiveSupport::TestCase
       profile_dir = File.join(tmp_root, "wechat_mp")
       launched = {}
       killed = []
+      FileUtils.mkdir_p(profile_dir)
+      FileUtils.ln_s("old-container-host-123", File.join(profile_dir, "SingletonLock"))
 
       stub_class_method(BrowserLogin::Session, :active_record, ->(_key) { nil }) do
         stub_class_method(BrowserLogin, :profile_dir_for, ->(_key) { profile_dir }) do
@@ -126,6 +128,8 @@ class WechatArticleBrowserFetcherTest < ActiveSupport::TestCase
           end
         end
       end
+
+      assert_not File.exist?(File.join(profile_dir, "SingletonLock")), "spawn 前必须清掉跨容器残锁"
 
       # 锁已释放：能再次获取
       lock = BrowserLogin::ProfileLock.acquire(profile_dir, timeout: 0)

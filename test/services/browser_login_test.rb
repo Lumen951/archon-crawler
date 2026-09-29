@@ -569,4 +569,91 @@ class BrowserLoginTest < ActiveSupport::TestCase
       end
     end
   end
+
+  # ── Chrome Singleton 残锁清理 ─────────────────────────
+  # Chrome 被 SIGKILL/容器重启后会在 profile 里留下 Singleton* 残锁，内容含
+  # 当时容器的主机名；Kamal 重新部署换容器主机名后，新 Chrome 视为「profile
+  # 被另一台机器占用」直接拒绝启动（生产踩过：浏览器秒退、启动接口 504）。
+
+  test "clear_stale_chrome_locks removes singleton leftovers and keeps other files" do
+    Dir.mktmpdir do |profile_dir|
+      FileUtils.ln_s("old-container-host-123", File.join(profile_dir, "SingletonLock"))
+      FileUtils.touch(File.join(profile_dir, "SingletonSocket"))
+      FileUtils.touch(File.join(profile_dir, "SingletonCookie"))
+      File.write(File.join(profile_dir, "Local State"), "{}")
+
+      BrowserLogin::Launcher.clear_stale_chrome_locks(profile_dir)
+
+      %w[SingletonLock SingletonSocket SingletonCookie].each do |name|
+        assert_not File.exist?(File.join(profile_dir, name)), "#{name} 残锁应被清理"
+      end
+      assert File.exist?(File.join(profile_dir, "Local State")), "其他 profile 文件不得被动"
+    end
+  end
+
+  test "session start restores the cookie snapshot before showing the login page" do
+    Dir.mktmpdir do |tmp_root|
+      profile_dir = File.join(tmp_root, "wechat_mp")
+      cookie = SnapshotCookie.new("wappoc", "verified", ".qq.com", "/", 0, true, true, "Lax")
+      fake_page = Object.new
+      restored = []
+      fake_page.define_singleton_method(:cookies) do
+        Struct.new(:all) do
+          define_method(:set) { |entry| restored << entry }
+        end.new({})
+      end
+      fake_page.define_singleton_method(:refresh) { restored << :refreshed }
+
+      FileUtils.mkdir_p(profile_dir)
+      BrowserLogin::CookieExport.save(profile_dir, BrowserLogin::CookieExport.serialize([ cookie ]))
+
+      stub_class_method(BrowserLogin, :profile_dir_for, ->(_key) { profile_dir }) do
+        stub_class_method(BrowserLogin::Launcher, :launch,
+                          ->(profile_dir:, url:, headed:) { [ 4003, 424242, nil ] }) do
+          stub_class_method(BrowserLogin::Launcher, :attach, ->(_port) { Object.new }) do
+            stub_class_method(BrowserLogin::Launcher, :first_page, ->(_browser) { fake_page }) do
+              stub_class_method(BrowserLogin::Launcher, :pin_viewport, ->(_page) { nil }) do
+                stub_class_method(BrowserLogin::Launcher, :process_alive?, ->(_pid) { true }) do
+                  stub_class_method(BrowserLogin::Launcher, :cdp_ready?, ->(_port) { true }) do
+                    stub_class_method(BrowserLogin::Launcher, :kill_process_tree, ->(_pid) { nil }) do
+                      with_memory_cache do
+                        result = BrowserLogin::Session.start("wechat_mp")
+                        assert_equal "verified", restored.first["value"]
+                        assert_equal :refreshed, restored.last
+                        BrowserLogin::Session.stop(result[:session_id])
+                      end
+                    end
+                  end
+                end
+              end
+            end
+          end
+        end
+      end
+    end
+  end
+
+  test "session start clears stale chrome locks from the profile before launching" do
+    Dir.mktmpdir do |tmp_root|
+      profile_dir = File.join(tmp_root, "wechat_mp")
+      FileUtils.mkdir_p(profile_dir)
+      FileUtils.ln_s("old-container-host-123", File.join(profile_dir, "SingletonLock"))
+
+      stub_class_method(BrowserLogin, :profile_dir_for, ->(_key) { profile_dir }) do
+        stub_class_method(BrowserLogin::Launcher, :launch,
+                          ->(profile_dir:, url:, headed:) { [ 4003, 424242, nil ] }) do
+          stub_class_method(BrowserLogin::Launcher, :kill_process_tree, ->(_pid) { nil }) do
+            stub_class_method(BrowserLogin::Launcher, :kill_process, ->(_pid) { nil }) do
+              with_memory_cache do
+                result = BrowserLogin::Session.start("wechat_mp")
+                BrowserLogin::Session.stop(result[:session_id])
+              end
+            end
+          end
+        end
+      end
+
+      assert_not File.exist?(File.join(profile_dir, "SingletonLock")), "spawn 前必须清掉跨容器残锁"
+    end
+  end
 end

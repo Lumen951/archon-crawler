@@ -48,6 +48,20 @@ module BrowserLogin
       end
     end
 
+    # 清掉 Chrome 非正常退出（SIGKILL、容器重启）残留在 profile 里的 Singleton*
+    # 锁。Chrome 自己能接管「同主机 + 已死 pid」的残锁，但残锁里的主机名随
+    # Kamal 重新部署而改变，跨主机的锁它无法远程核实，会直接拒绝启动
+    # （exit 21），表现为浏览器秒退、启动请求 504。调用方必须已持有该
+    # profile 的 ProfileLock，此刻不存在合法使用它的 Chrome，清锁才是安全的。
+    def clear_stale_chrome_locks(profile_dir)
+      %w[SingletonLock SingletonSocket SingletonCookie].each do |name|
+        File.delete(File.join(profile_dir, name))
+      rescue StandardError
+        # 不存在（此前正常退出）或删不掉（异常权限）都不应阻塞启动
+        nil
+      end
+    end
+
     # 启动参数（纯函数，便于测试）。headless_flag 为 nil 表示有界面模式。
     def args(profile_dir:, port:, url:, headless_flag:)
       [

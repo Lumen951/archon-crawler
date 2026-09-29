@@ -339,12 +339,37 @@ module BrowserLogin
         headed = Option.browser_login_headed? && !Gem.win_platform?
         profile_dir = BrowserLogin.profile_dir_for(provider.key)
         FileUtils.mkdir_p(profile_dir)
+        Launcher.clear_stale_chrome_locks(profile_dir)
 
         port, pid, xvfb_pid = Launcher.launch(profile_dir: profile_dir, url: provider.login_url, headed: headed)
+        restore_cookie_snapshot!(provider, port)
         record = spawn_browser_record(provider.key, port, pid, xvfb_pid)
         record["headed"] = headed
         persist_flag(record)
         record
+      end
+
+      def restore_cookie_snapshot!(provider, port)
+        entries = CookieExport.load(profile_dir_for(provider.key))
+        return if entries.empty?
+
+        browser = Launcher.attach(port)
+        begin
+          page = Launcher.first_page(browser)
+          Launcher.pin_viewport(page)
+          entries.each { |entry| quietly { page.cookies.set(entry) } }
+          page.refresh
+        ensure
+          quietly { browser.quit }
+        end
+      rescue StandardError => e
+        Rails.logger.warn("[BrowserLogin] #{provider.key} Cookie 快照回灌失败: #{e.class}: #{e.message}")
+      end
+
+      def quietly
+        yield
+      rescue StandardError
+        nil
       end
 
       def spawn_browser_record(provider_key, port, pid, xvfb_pid)
@@ -423,10 +448,20 @@ module BrowserLogin
       # 浏览器进程退出即丢；快照让 WechatArticleBrowserFetcher 在会话结束后
       # 拉起独立浏览器时仍能回灌这些状态，人工验证成果因此可留存。
       def snapshot_cookies!(record, provider, cookies)
-        json = CookieExport.serialize(cookies, domain_pattern: provider.cookie_domain_pattern)
+        current = JSON.parse(CookieExport.serialize(cookies, domain_pattern: provider.cookie_domain_pattern))
+        puts ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>" + current.to_s
+        return if current.empty?
+
+        profile_dir = profile_dir_for(record["provider"])
+        previous = CookieExport.load(profile_dir)
+        merged = (previous + current).map do |entry|
+          key = [ entry["name"], entry["domain"], entry["path"] ]
+          [ key, entry ]
+        end.to_h.values
+        json = JSON.generate(merged)
         return if @last_snapshot[record["session_id"]] == json
 
-        CookieExport.save(profile_dir_for(record["provider"]), json)
+        CookieExport.save(profile_dir, json)
         @last_snapshot[record["session_id"]] = json
       rescue StandardError => e
         Rails.logger.warn("[BrowserLogin] #{record['provider']} Cookie 快照写入失败: #{e.class}: #{e.message}")
