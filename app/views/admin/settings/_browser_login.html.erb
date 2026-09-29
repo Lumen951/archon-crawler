@@ -1,0 +1,81 @@
+<%#
+  远程浏览器登录区块（BrowserLogin 各平台共用）。
+
+  点击按钮后在服务端容器里的受管 Chromium 中打开平台登录页，下方模态框
+  轮询截图展示，并把点击 / 滚动 / 键盘事件转发过去，"遥控"完成登录。
+  登录态的探测与 Cookie 落库都在服务端自动完成（BrowserLogin::Session#frame）。
+
+  locals:
+    provider_key - BrowserLogin::PROVIDERS 的键（wechat_mp / rednote_web / weread_native）
+    button_label - 按钮文案，默认「远程浏览器登录」
+    hint         - 按钮下的说明文字
+%>
+<% button_label = local_assigns.fetch(:button_label, "远程浏览器登录") %>
+
+<div data-controller="browser-login"
+     data-browser-login-provider-value="<%= provider_key %>"
+     data-browser-login-start-url-value="<%= browser_login_start_admin_settings_path %>"
+     data-browser-login-frame-url-value="<%= browser_login_frame_admin_settings_path %>"
+     data-browser-login-interact-url-value="<%= browser_login_interact_admin_settings_path %>"
+     data-browser-login-stop-url-value="<%= browser_login_stop_admin_settings_path %>">
+
+  <button type="button" class="btn btn-secondary" data-browser-login-target="openButton"
+          data-action="browser-login#open">
+    <%= button_label %>
+  </button>
+  <% if local_assigns[:hint] %>
+    <p class="text-xs text-gray-500 mt-1"><%= hint %></p>
+  <% end %>
+
+  <%# 远程浏览器模态框 %>
+  <div class="fixed inset-0 z-50 hidden" data-browser-login-target="viewer">
+    <div class="absolute inset-0 bg-black/60" data-action="click->browser-login#close"></div>
+
+    <div class="relative mx-auto mt-6 w-[min(960px,95vw)] max-h-[92vh] overflow-auto rounded-lg bg-white shadow-xl">
+      <div class="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+        <p class="text-sm font-medium text-gray-900">远程浏览器 · <%= provider_key %></p>
+        <div class="flex items-center gap-2 shrink-0">
+          <button type="button" class="text-sm px-3 py-1.5 rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition"
+                  data-action="browser-login#refresh">刷新页面</button>
+          <button type="button" class="text-sm px-3 py-1.5 rounded bg-green-600 text-white hover:bg-green-700 transition"
+                  data-action="browser-login#save">保存登录态</button>
+          <button type="button" class="text-sm px-3 py-1.5 rounded bg-red-600 text-white hover:bg-red-700 transition"
+                  data-action="browser-login#close">结束会话</button>
+        </div>
+      </div>
+
+      <div class="border-b border-gray-200 px-4 py-2">
+        <div class="flex items-center gap-2">
+          <%= text_field_tag nil, nil, placeholder: "粘贴文章或验证页链接，回车/「前往」在远程浏览器打开并完成环境验证",
+                class: "flex-1 px-3 py-1.5 text-xs font-mono border border-gray-300 rounded focus:ring-2 focus:ring-primary focus:border-transparent",
+                autocomplete: "off", spellcheck: false,
+                data: { browser_login_target: "urlInput", action: "keydown.enter->browser-login#goTo" } %>
+          <button type="button" class="text-sm px-3 py-1.5 rounded bg-primary text-white hover:opacity-90 transition shrink-0"
+                  data-action="browser-login#goTo">前往</button>
+        </div>
+      </div>
+
+      <div class="bg-gray-100">
+        <img data-browser-login-target="screen" src="" alt="远程浏览器画面"
+             class="w-full block cursor-crosshair select-none touch-none" draggable="false"
+             data-action="pointerdown->browser-login#onScreenPointerDown wheel->browser-login#onScreenWheel">
+      </div>
+
+      <div class="border-t border-gray-200 px-4 py-3 space-y-2">
+        <p class="text-sm text-gray-500" data-browser-login-target="status">等待打开...</p>
+        <div class="flex items-center gap-2">
+          <%= text_field_tag nil, nil, placeholder: "在此输入文字后点「输入」，用于中文等输入法内容；点击页面输入框后也可直接键盘打字",
+                class: "flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-primary focus:border-transparent",
+                data: { browser_login_target: "textInput" } %>
+          <button type="button" class="text-sm px-3 py-1.5 rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition"
+                  data-action="browser-login#sendText">输入</button>
+          <button type="button" class="text-sm px-3 py-1.5 rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition"
+                  data-action="browser-login#sendEnter">Enter</button>
+        </div>
+        <p class="text-xs text-gray-400">
+          截图约每秒刷新；点击 = 直接点击，按住拖动 = 拖动滑块（滑块会跟手移动，拖动期间画面加速刷新）；检测到登录态后自动保存 Cookie。
+        </p>
+      </div>
+    </div>
+  </div>
+</div>

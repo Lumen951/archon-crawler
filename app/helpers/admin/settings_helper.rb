@@ -18,5 +18,10 @@ module Admin
     def weread_native_session_ttl_label
       Option.weread_native_session_ttl_label
     end
+
+    # 小红书网页版 Cookie 有效期文案（唯一来源是 Option::REDNOTE_WEB_SESSION_TTL）
+    def rednote_web_session_ttl_label
+      Option.rednote_web_session_ttl_label
+    end
   end
 end

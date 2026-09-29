@@ -148,6 +148,21 @@ class Admin::SettingsController < Admin::BaseController
       end
     end
 
+    if params.key?(:wechat_content_browser_fallback)
+      Option.set("wechat_content_browser_fallback", params[:wechat_content_browser_fallback] == "1")
+      message = "正文下载浏览器兜底开关已更新"
+    end
+
+    if params.key?(:browser_login_headed)
+      Option.browser_login_headed = params[:browser_login_headed] == "1"
+      message = "远程浏览器模式已更新（下次打开登录浏览器时生效）"
+    end
+
+    if params.key?(:browser_login_proxy)
+      Option.browser_login_proxy = params[:browser_login_proxy].to_s.strip.presence
+      message = "远程浏览器代理已更新（下次打开登录浏览器时生效）"
+    end
+
     if params.key?(:feishu_enabled)
       Option.set("feishu_enabled", params[:feishu_enabled] == "1")
     end
@@ -368,6 +383,66 @@ class Admin::SettingsController < Admin::BaseController
     render json: { status: "error", message: e.message }
   end
 
+  # ── 远程浏览器登录（BrowserLogin）─────────────────────
+  #
+  # 在服务端受管理的 Chromium（持久化 profile）里打开登录页，设置页轮询截图
+  # 并转发点击/键盘事件，用户在浏览器里"遥控"完成登录；成功后 Cookie 由
+  # provider 写入 Option 会话槽位。会话状态在 Rails.cache + profile pid 文件，
+  # 应用重启不影响进行中的登录。见 BrowserLogin::Session。
+
+  def browser_login_start
+    render json: BrowserLogin::Session.start(params.require(:provider))
+  rescue BrowserLogin::Error => e
+    render json: { error: e.message }, status: :unprocessable_entity
+  rescue StandardError => e
+    Rails.logger.error("[BrowserLogin] start error (#{params[:provider]}): #{e.class}: #{e.message}")
+    render json: { error: "启动登录浏览器失败：#{e.message[0..200]}" }, status: :unprocessable_entity
+  end
+
+  def browser_login_frame
+    render json: BrowserLogin::Session.frame(
+      params[:session_id],
+      force_save: params[:force_save] == "1"
+    )
+  rescue BrowserLogin::Session::NotFoundError => e
+    render json: { status: "expired", error: e.message }
+  rescue StandardError => e
+    Rails.logger.error("[BrowserLogin] frame error: #{e.class}: #{e.message}")
+    render json: { error: "获取登录页面截图失败：#{e.message[0..200]}" }, status: :unprocessable_entity
+  end
+
+  def browser_login_interact
+    event = params[:event] || {}
+    render json: BrowserLogin::Session.interact(params[:session_id], event)
+  rescue BrowserLogin::Session::NotFoundError => e
+    render json: { status: "expired", error: e.message }
+  rescue StandardError => e
+    Rails.logger.error("[BrowserLogin] interact error: #{e.class}: #{e.message}")
+    render json: { error: "操作登录浏览器失败：#{e.message[0..200]}" }, status: :unprocessable_entity
+  end
+
+  def browser_login_stop
+    render json: BrowserLogin::Session.stop(params[:session_id])
+  rescue StandardError => e
+    Rails.logger.error("[BrowserLogin] stop error: #{e.class}: #{e.message}")
+    render json: { error: "结束登录会话失败：#{e.message[0..200]}" }, status: :unprocessable_entity
+  end
+
+  def rednote_web_logout
+    Option.rednote_web_session_cleared!
+    message = "已清除小红书网页版 Cookie"
+    respond_to do |format|
+      format.turbo_stream do
+        render turbo_stream: [
+          turbo_stream.replace("rednote_web_panel", partial: "admin/settings/rednote_web_panel"),
+          helpers.toast_stream(message, type: :success)
+        ]
+      end
+      format.html { flash[:success] = message; redirect_to admin_settings_path }
+      format.json { render json: { status: "logged_out" } }
+    end
+  end
+
   def wechat_mp_logout
     WechatMpNativeApiClient.logout
     load_settings_data
@@ -561,6 +636,7 @@ class Admin::SettingsController < Admin::BaseController
     @daily_crawl_budget_website = Option.daily_crawl_budget_for('website')
     @wechat_download_rate_limit = Option.wechat_download_rate_limit
     @wechat_download_rate_window = Option.wechat_download_rate_window
+    @wechat_content_browser_fallback = Option.wechat_content_browser_fallback_enabled?
     @weread_native_list_rate_limit = Option.weread_native_list_rate_limit
     @weread_native_list_rate_window = Option.weread_native_list_rate_window
     @verbose_mode = Option[:crawler_verbose_mode]
@@ -584,6 +660,8 @@ class Admin::SettingsController < Admin::BaseController
     @profile_ext_updated_at = Option.profile_ext_credentials_updated_at
     @profile_ext_age_minutes = Option.profile_ext_credentials_age_minutes
     @profile_ext_account_bizs = ProfileExtApiClient.all_account_bizs rescue []
+    @browser_login_headed = Option.browser_login_headed?
+    @browser_login_proxy = Option.browser_login_proxy
     # MP Native
     @wechat_mp_cookie = Option.wechat_mp_cookie
     @wechat_mp_token = Option.wechat_mp_token
@@ -603,6 +681,10 @@ class Admin::SettingsController < Admin::BaseController
     @weread_native_expires_at = Option.weread_native_expires_at
     @weread_native_account_info = Option.weread_native_account_info
     @weread_native_key_check = Rails.cache.read('api_key_check:weread_native')
+    # RedNote Web (远程浏览器登录的 Cookie 会话)
+    @rednote_web_session_valid = Option.rednote_web_session_valid?
+    @rednote_web_expires_at = Option.rednote_web_expires_at
+    @rednote_web_account_info = Option.rednote_web_account_info
     # Feishu
     @feishu_enabled = Option.feishu_enabled?
     @feishu_app_id = Option.feishu_app_id

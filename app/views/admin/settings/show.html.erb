@@ -13,6 +13,7 @@
       <a href="#twitter" class="px-3 py-1.5 text-sm rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition">Twitter</a>
       <a href="#tikhub" class="px-3 py-1.5 text-sm rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition">TikHub</a>
       <a href="#website-render" class="px-3 py-1.5 text-sm rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition">官网渲染兜底</a>
+      <a href="#browser-login" class="px-3 py-1.5 text-sm rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition">远程浏览器登录</a>
       <a href="#openai" class="px-3 py-1.5 text-sm rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition">OpenAI / LLM</a>
       <a href="#crawl" class="px-3 py-1.5 text-sm rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition">抓取设置</a>
       <a href="#logging" class="px-3 py-1.5 text-sm rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition">日志设置</a>
@@ -165,6 +166,12 @@
       </p>
 
       <%= render "admin/settings/mp_native_panel" %>
+
+      <div class="border-t border-gray-200 my-4 pt-4">
+        <p class="text-sm font-medium text-gray-700 mb-2">二维码获取失败时的备用方式</p>
+        <%= render "admin/settings/browser_login", provider_key: "wechat_mp",
+              hint: "在服务端打开远程浏览器并显示登录页，直接在本页面扫码；二维码接口异常时仍可用。" %>
+      </div>
     </div>
 
     <!-- WeRead Panel -->
@@ -283,6 +290,12 @@
       </p>
 
       <%= render "admin/settings/weread_native_panel" %>
+
+      <div class="border-t border-gray-200 my-4 pt-4">
+        <p class="text-sm font-medium text-gray-700 mb-2">备用登录方式</p>
+        <%= render "admin/settings/browser_login", provider_key: "weread_native",
+              hint: "远程浏览器的 profile 会记住 Cookie，会话过期后重开多数时候免扫码。" %>
+      </div>
     </div>
   </div>
 
@@ -328,6 +341,19 @@
         <button type="submit" class="btn btn-primary">保存小红书密钥</button>
       </div>
     <% end %>
+
+    <!-- 网页版 Cookie（远程浏览器登录，为直连抓取预留） -->
+    <div class="border-t border-gray-200 my-4 pt-4">
+      <h3 class="text-lg font-semibold text-gray-800 mb-2">网页版登录态（Cookie）</h3>
+      <p class="text-sm text-gray-500 mb-3">
+        当前抓取走付费 API，无需登录；这里保存的网页版 Cookie 为后续免付费直连抓取预留。本地有效期<%= rednote_web_session_ttl_label %>，过期后重新登录即可。
+      </p>
+
+      <%= render "admin/settings/rednote_web_panel" %>
+
+      <%= render "admin/settings/browser_login", provider_key: "rednote_web",
+            hint: "打开远程浏览器后，用小红书 App 扫描页面上的二维码；扫码成功后请点弹窗里的「保存登录态」完成保存。" %>
+    </div>
   </div>
 
   <!-- Twitter Cookies -->
@@ -629,6 +655,21 @@
         </p>
       </div>
 
+      <div>
+        <label class="flex items-start space-x-3 cursor-pointer">
+          <input type="hidden" name="wechat_content_browser_fallback" value="0">
+          <input type="checkbox" name="wechat_content_browser_fallback" value="1" <%= 'checked' if @wechat_content_browser_fallback %>
+                 class="mt-0.5 w-5 h-5 text-primary border-gray-300 rounded focus:ring-2 focus:ring-primary">
+          <div>
+            <span class="text-sm font-medium text-gray-700">环境验证拦截时改用真实浏览器下载</span>
+            <p class="text-xs text-gray-500 mt-1">
+              正文下载遇到「当前环境异常，需要验证」时，自动改用服务端的真实 Chromium 打开文章页抓取（复用远程浏览器登录环境里的人工验证结果）。
+              浏览器路径更慢且串行，仅作兜底；若浏览器内仍被拦截，请到设置页「远程浏览器登录」完成一次环境验证后重试。
+            </p>
+          </div>
+        </label>
+      </div>
+
       <button type="submit" class="btn btn-primary">更新设置</button>
     <% end %>
   </div>
@@ -660,6 +701,42 @@
       </div>
 
       <button type="submit" class="btn btn-primary">更新日志设置</button>
+    <% end %>
+  </div>
+
+  <!-- Remote Browser Login -->
+  <div class="card" id="browser-login">
+    <h2 class="text-xl font-bold text-gray-900 mb-4">远程浏览器登录</h2>
+    <p class="text-sm text-gray-500 mb-4">
+      在服务端容器里启动真实 Chromium，用于扫码登录微信公众号平台、小红书网页版、微信读书直连。
+      设置页会轮询截图并转发点击/键盘操作，登录成功后 Cookie 自动写入对应会话槽位。
+    </p>
+
+    <%= form_with url: admin_settings_path, method: :patch, class: "space-y-3" do |f| %>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">登录浏览器代理（可选）</label>
+        <input type="text" name="browser_login_proxy" value="<%= @browser_login_proxy %>" autocomplete="off"
+               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+               placeholder="例如 http://127.0.0.1:7890 或 socks5://192.168.1.10:1080，留空直连">
+        <p class="text-xs text-gray-500 mt-1">
+          服务器机房 IP 常被小红书等平台风控标记（登录时报 300012「IP 存在风险」）。给登录浏览器配置住宅/本地代理可绕开，
+          对所有平台的登录浏览器生效，保存后需重新打开登录会话。带账号密码的代理请先在本地转为无认证入口。
+        </p>
+      </div>
+
+      <label class="flex items-center space-x-3 cursor-pointer">
+        <input type="hidden" name="browser_login_headed" value="0">
+        <input type="checkbox" name="browser_login_headed" value="1" <%= 'checked' if @browser_login_headed %>
+               class="w-5 h-5 text-primary border-gray-300 rounded focus:ring-2 focus:ring-primary">
+        <div>
+          <span class="text-sm font-medium text-gray-700">有界面模式（Xvfb 虚拟显示）</span>
+          <p class="text-xs text-gray-500">
+            默认 headless（UA 已自动伪装成正常 Chrome）。若登录页仍提示环境异常或被风控，开启此项进一步降低自动化特征。
+          </p>
+        </div>
+      </label>
+
+      <button type="submit" class="btn btn-primary">保存</button>
     <% end %>
   </div>
 
@@ -888,6 +965,7 @@
       <li>• <strong>Dajiala</strong>：使用公众号名称抓取文章，无需 fakeid；如遇频率限制可切换回 MP 原生</li>
       <li>• <strong>Profile Ext</strong>：使用 mitmproxy 抓包凭证，有效期约 25 分钟，过期需重新抓包</li>
       <li>• 搜索导入功能需要先扫码登录 MP 原生</li>
+      <li>• <strong>远程浏览器登录</strong>：在服务端容器里打开真实 Chromium，设置页轮询截图并转发操作，适合扫码接口失效时兜底；Cookie 会写入对应会话槽位（含小红书网页版）</li>
       <li>• 更高的并发数 = 更快的抓取速度，但可能触发速率限制</li>
     </ul>
   </div>

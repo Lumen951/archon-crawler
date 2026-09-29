@@ -1,0 +1,164 @@
+require "test_helper"
+require "tmpdir"
+
+module Admin
+  class SettingsBrowserLoginTest < ActionDispatch::IntegrationTest
+    setup do
+      Option.delete_all
+
+      @admin = User.create!(
+        email_address: "browser-admin@example.com",
+        password: "password123",
+        password_confirmation: "password123",
+        role: :admin,
+        email_confirmed_at: Time.current
+      )
+      post session_path, params: { email_address: @admin.email_address, password: "password123" }
+    end
+
+    test "settings page renders one remote-browser login block per platform" do
+      get admin_settings_path
+
+      assert_response :success
+      assert_match 'data-browser-login-provider-value="wechat_mp"', response.body
+      assert_match 'data-browser-login-provider-value="rednote_web"', response.body
+      assert_match 'data-browser-login-provider-value="weread_native"', response.body
+    end
+
+    test "start returns the session handle from the session manager" do
+      start = ->(provider) do
+        { session_id: "s1", provider: provider, label: "微信公众号平台",
+          resumed: false, logged_in: false, viewport: { width: 1280, height: 800 } }
+      end
+
+      stub_class_method(BrowserLogin::Session, :start, start) do
+        post browser_login_start_admin_settings_path, params: { provider: "wechat_mp" }
+      end
+
+      assert_response :success
+      body = response.parsed_body
+      assert_equal "s1", body["session_id"]
+      assert_equal false, body["resumed"]
+    end
+
+    test "start reports provider failures as 422 instead of 500" do
+      boom = ->(_provider) { raise BrowserLogin::Error, "未找到 Chrome/Chromium 可执行文件" }
+
+      stub_class_method(BrowserLogin::Session, :start, boom) do
+        post browser_login_start_admin_settings_path, params: { provider: "wechat_mp" }
+      end
+
+      assert_response :unprocessable_entity
+      assert_match "未找到 Chrome", response.parsed_body["error"]
+    end
+
+    test "unknown provider is rejected before any browser is touched" do
+      post browser_login_start_admin_settings_path, params: { provider: "nope" }
+
+      assert_response :unprocessable_entity
+      assert_match "未知的远程登录平台", response.parsed_body["error"]
+    end
+
+    test "frame returns the screenshot and login status" do
+      frame = lambda do |session_id, force_save: false|
+        { session_id: session_id, image: "FRAMEDATA", image_mime: "image/jpeg",
+          url: "https://mp.weixin.qq.com/", logged_in: true, saved: force_save,
+          identity: "测试号", save_error: nil, message: "已保存登录态（测试号）" }
+      end
+
+      stub_class_method(BrowserLogin::Session, :frame, frame) do
+        get browser_login_frame_admin_settings_path, params: { session_id: "s1", force_save: "1" }
+      end
+
+      assert_response :success
+      body = response.parsed_body
+      assert_equal "FRAMEDATA", body["image"]
+      assert_equal true, body["saved"], "force_save=1 应透传给 Session.frame"
+    end
+
+    test "frame without a live session reports expired rather than erroring" do
+      get browser_login_frame_admin_settings_path, params: { session_id: "does-not-exist" }
+
+      assert_response :success
+      assert_equal "expired", response.parsed_body["status"]
+    end
+
+    test "interact forwards the mapped event to the session" do
+      seen = []
+      interact = lambda do |_session_id, event|
+        seen << event
+        { ok: true }
+      end
+
+      stub_class_method(BrowserLogin::Session, :interact, interact) do
+        post browser_login_interact_admin_settings_path,
+             params: { session_id: "s1", event: { type: "click", x: 12.5, y: 33.5 } }.to_json,
+             headers: { "Content-Type" => "application/json" }
+      end
+
+      assert_response :success
+      assert_equal "click", seen.last[:type]
+      assert_in_delta 12.5, seen.last[:x], 0.001
+    end
+
+    test "non-admins cannot drive the browser login endpoints" do
+      delete session_path
+      plain = User.create!(
+        email_address: "browser-plain@example.com",
+        password: "password123",
+        password_confirmation: "password123",
+        role: :user,
+        email_confirmed_at: Time.current
+      )
+      post session_path, params: { email_address: plain.email_address, password: "password123" }
+
+      post browser_login_start_admin_settings_path, params: { provider: "wechat_mp" }
+      assert_response :redirect
+      assert_not_equal admin_settings_path, path
+    end
+
+    test "rednote_web_logout clears the stored cookie session" do
+      Option.rednote_web_session_started!(cookie: "web_session=abc")
+
+      post rednote_web_logout_admin_settings_path
+
+      assert_response :redirect
+      assert_nil Option.rednote_web_cookie
+      assert_not Option.rednote_web_session_valid?
+    end
+
+    test "headed mode toggle is persisted through the settings form" do
+      patch admin_settings_path, params: { browser_login_headed: "1" }
+      assert Option.browser_login_headed?
+
+      patch admin_settings_path, params: { browser_login_headed: "0" }
+      assert_not Option.browser_login_headed?
+    end
+
+    test "login browser proxy is persisted and clearable" do
+      patch admin_settings_path, params: { browser_login_proxy: "http://127.0.0.1:7890" }
+      assert_equal "http://127.0.0.1:7890", Option.browser_login_proxy
+
+      patch admin_settings_path, params: { browser_login_proxy: "" }
+      assert_nil Option.browser_login_proxy
+    end
+
+    test "content download browser fallback toggle is persisted" do
+      patch admin_settings_path, params: { wechat_content_browser_fallback: "0" }
+      assert_not Option.wechat_content_browser_fallback_enabled?
+
+      patch admin_settings_path, params: { wechat_content_browser_fallback: "1" }
+      assert Option.wechat_content_browser_fallback_enabled?
+    end
+
+    test "browser login section and rednote web panel render on the settings page" do
+      get admin_settings_path
+
+      assert_response :success
+      assert_match "远程浏览器登录", response.body
+      assert_match 'id="browser-login"', response.body
+      assert_match 'id="rednote_web_panel"', response.body
+      assert_match 'name="wechat_content_browser_fallback"', response.body
+    end
+  end
+end

@@ -64,4 +64,60 @@ class OptionTest < ActiveSupport::TestCase
     assert_equal "qr", Option.feishu_login_mode
     assert_not Option.feishu_login_card_mode?
   end
+
+  # ── 小红书网页版 Cookie 会话（远程浏览器登录写入）──────
+
+  test "rednote_web_session_started! writes the whole session and reports valid" do
+    Option.rednote_web_session_started!(cookie: "web_session=abc", account_info: { "nickname" => "某人" })
+
+    assert_equal "web_session=abc", Option.rednote_web_cookie
+    assert_equal "success", Option.rednote_web_login_state
+    assert Option.rednote_web_expires_at.present?
+    assert Option.rednote_web_session_valid?
+    assert_equal "某人", JSON.parse(Option.rednote_web_account_info)["nickname"]
+  end
+
+  test "rednote_web_session_cleared! wipes every session key" do
+    Option.rednote_web_session_started!(cookie: "web_session=abc")
+    Option.rednote_web_session_cleared!
+
+    assert_nil Option.rednote_web_cookie
+    assert_nil Option.rednote_web_expires_at
+    assert_nil Option.rednote_web_login_state
+    assert_not Option.rednote_web_session_valid?
+  end
+
+  test "rednote_web_session_valid? expires with the stored timestamp" do
+    Option.rednote_web_cookie = "web_session=abc"
+    Option.rednote_web_expires_at = 1.minute.ago.iso8601
+
+    assert_not Option.rednote_web_session_valid?
+  end
+
+  test "browser_login_headed flag round-trips" do
+    assert_not Option.browser_login_headed?
+
+    Option.browser_login_headed = "1"
+    assert Option.browser_login_headed?
+
+    Option.browser_login_headed = false
+    assert_not Option.browser_login_headed?
+  end
+
+  test "browser_login_proxy round-trips and blanks out" do
+    assert_nil Option.browser_login_proxy
+
+    Option.browser_login_proxy = "http://127.0.0.1:7890"
+    assert_equal "http://127.0.0.1:7890", Option.browser_login_proxy
+
+    Option.browser_login_proxy = ""
+    assert_nil Option.browser_login_proxy, "空字符串应按未配置处理"
+  end
+
+  test "wechat content browser fallback is enabled by default and can be disabled" do
+    assert Option.wechat_content_browser_fallback_enabled?
+
+    Option.set("wechat_content_browser_fallback", "false")
+    assert_not Option.wechat_content_browser_fallback_enabled?
+  end
 end

@@ -64,9 +64,11 @@ RUN SECRET_KEY_BASE_DUMMY=1 ./bin/rails assets:precompile
 # Final stage for app image
 FROM base
 
-# Local rendered-page fallback for WebsiteCrawler
+# Local rendered-page fallback for WebsiteCrawler, and the remote-browser
+# login stack (BrowserLogin): Xvfb for headful mode, CJK fonts so login
+# pages render readable screenshots.
 RUN apt-get update -qq && \
-    apt-get install --no-install-recommends -y chromium chromium-driver chromium-sandbox libdbus-1-3 fonts-liberation && \
+    apt-get install --no-install-recommends -y chromium chromium-driver chromium-sandbox libdbus-1-3 fonts-liberation xvfb fonts-noto-cjk && \
     rm -rf /var/lib/apt/lists /var/cache/apt/archives
 
 # Run and own only the runtime files as a non-root user for security

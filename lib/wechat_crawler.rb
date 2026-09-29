@@ -101,7 +101,23 @@ class WechatCrawler < BaseCrawler
 
     log(crawl_task, :debug, "下载文章: #{normalize_article_url(url)[0..80]}..., 速率限制: #{download_rate_limiter.remaining}/#{Option.wechat_download_rate_limit}")
 
-    clean_rich_media_content(fetch_article_page(url))
+    begin
+      clean_rich_media_content(fetch_article_page(url))
+    rescue DownloadError => e
+      raise unless browser_fallback_enabled? && e.message.include?("当前环境异常")
+
+      # HTTP 被环境验证拦截 → 用真实浏览器（复用远程登录环境里的人工验证
+      # Cookie）再试一次；仍未通过则抛带指引的 CaptchaRequiredError（保留
+      # 「当前环境异常，需要验证」字样，download_article_content 依赖它终止整批）。
+      clean_rich_media_content(WechatArticleBrowserFetcher.fetch(url, crawl_task: crawl_task))
+    end
+  end
+
+  # 正文下载被「环境验证」拦截时，改用真实浏览器抓取（见
+  # WechatArticleBrowserFetcher）。默认开启；浏览器路径更慢且串行，
+  # 仅作为 HTTP 被拦截时的兜底，其余失败路径（删除/审核中）不受影响。
+  def self.browser_fallback_enabled?
+    Option.wechat_content_browser_fallback_enabled?
   end
 
   # 将各种格式的微信文章链接统一为可直接请求的 URL
@@ -217,9 +233,13 @@ class WechatCrawler < BaseCrawler
 
   # 提取 __biz（URL 参数形式，可能是 URL 编码的 %3D%3D 填充；
   # 排除 ${window.biz} 之类的 JS 模板占位符）
+  # 部分新版文章页不在任何链接里内联 __biz，只声明 var biz = "..."，
+  # 故再兜底匹配该形式（限长防误捕短字符串）。
   def self.extract_mp_biz(html)
     biz = html[/__biz=([A-Za-z0-9%+\/=]+)/, 1]
-    CGI.unescape(biz) if biz
+    biz = CGI.unescape(biz) if biz
+    biz ||= html[/\bvar\s+biz\s*=\s*["']([A-Za-z0-9+\/=]{10,})["']/, 1]
+    biz
   end
 
   # ── Logging ────────────────────────────────────────────

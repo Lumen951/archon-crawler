@@ -139,6 +139,13 @@ class Option < ApplicationRecord
       set('wechat_download_rate_window', val)
     end
 
+    # 正文下载被「当前环境异常，需要验证」拦截时，改用真实浏览器抓取
+    # （WechatArticleBrowserFetcher，复用远程登录环境里的人工验证 Cookie）。
+    # 默认开启（与其他 crawl_* 开关同约定：非 "false" 即开启）。
+    def wechat_content_browser_fallback_enabled?
+      get("wechat_content_browser_fallback") != "false"
+    end
+
     # WeRead Native（直连）文章列表限流参数：请求数 / 窗口秒数（默认 30 次/60 秒）
     def weread_native_list_rate_limit
       (get('weread_native_list_rate_limit') || 30).to_i
@@ -501,6 +508,101 @@ class Option < ApplicationRecord
       expires_at = weread_native_expires_at
       return true if expires_at.blank?
       Time.parse(expires_at).future? rescue false
+    end
+
+    # ── 小红书网页版（xiaohongshu.com）Cookie 会话 ──
+    #
+    # 与 mp_native / weread_native 同构：通过远程浏览器登录后写入一套 Cookie，
+    # 单会话槽位。TTL 仅为本地时间戳启发式（小红书 web_session 通常可用数月），
+    # 真正的会话状态以浏览器内重新登录为准。当前抓取走 RednoteApiClient/TikHub
+    # 付费 API；这份 Cookie 是为后续直连抓取预留的凭据。
+    REDNOTE_WEB_SESSION_TTL = 30.days
+
+    def rednote_web_cookie
+      get("rednote_web_cookie")
+    end
+
+    def rednote_web_cookie=(val)
+      set("rednote_web_cookie", val)
+    end
+
+    def rednote_web_expires_at
+      get("rednote_web_expires_at")
+    end
+
+    def rednote_web_expires_at=(val)
+      set("rednote_web_expires_at", val)
+    end
+
+    def rednote_web_login_state
+      get("rednote_web_login_state")
+    end
+
+    def rednote_web_login_state=(val)
+      set("rednote_web_login_state", val)
+    end
+
+    def rednote_web_account_info
+      get("rednote_web_account_info")
+    end
+
+    def rednote_web_account_info=(val)
+      set("rednote_web_account_info", val)
+    end
+
+    def rednote_web_session_ttl_label
+      ttl = REDNOTE_WEB_SESSION_TTL
+      ttl < 1.day ? "约 #{(ttl / 1.hour).to_i} 小时" : "约 #{(ttl / 1.day).to_i} 天"
+    end
+
+    # 浏览器登录成功后一次性写入整套会话字段（cookie 为 "k=v; k2=v2" 头字符串）
+    def rednote_web_session_started!(cookie:, account_info: {})
+      transaction do
+        self.rednote_web_cookie = cookie
+        self.rednote_web_login_state = "success"
+        self.rednote_web_expires_at = (Time.current + REDNOTE_WEB_SESSION_TTL).iso8601
+        self.rednote_web_account_info = account_info.to_json
+      end
+    end
+
+    def rednote_web_session_cleared!
+      transaction do
+        self.rednote_web_cookie = nil
+        self.rednote_web_login_state = nil
+        self.rednote_web_expires_at = nil
+        self.rednote_web_account_info = nil
+      end
+    end
+
+    def rednote_web_session_valid?
+      return false if rednote_web_cookie.blank?
+
+      expires_at = rednote_web_expires_at
+      return true if expires_at.blank?
+      Time.parse(expires_at).future? rescue false
+    end
+
+    # ── 远程浏览器登录（BrowserLogin）─────
+    # true 时登录浏览器以有界面模式运行（Linux 下自动拉起 Xvfb 虚拟显示），
+    # 对部分反爬页面更友好；默认 headless，无需 Xvfb。
+    def browser_login_headed?
+      get("browser_login_headed") == "true"
+    end
+
+    def browser_login_headed=(val)
+      set("browser_login_headed", val == true || val == "true" || val == "1")
+    end
+
+    # 登录浏览器的代理（--proxy-server）。服务器机房 IP 常被小红书等平台的
+    # 风控标记（错误码 300012），配置住宅/本地代理可绕开。支持
+    # http://host:port 与 socks5://host:port；带账号密码的代理需先在本地
+    # 转成无认证入口（Chrome 命令行不支持内联代理认证）。空 = 直连。
+    def browser_login_proxy
+      get("browser_login_proxy")
+    end
+
+    def browser_login_proxy=(val)
+      set("browser_login_proxy", val)
     end
 
     # ── Feishu (飞书) 推送配置 ──────────────────────────

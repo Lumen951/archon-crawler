@@ -138,9 +138,16 @@ Rails.application.routes.draw do
       # 扫码登录（provider=weread / wechat_mp，见 QrLogin）
       post :qr_login_request
       get  :qr_login_status
+      # 远程浏览器登录（provider=wechat_mp / rednote_web / weread_native，见 BrowserLogin）
+      post :browser_login_start
+      get  :browser_login_frame
+      post :browser_login_interact
+      post :browser_login_stop
       # MP Native
       post :wechat_mp_logout
       post :validate_mp_native_key
+      # 小红书网页版 Cookie 会话（远程浏览器登录写入）
+      post :rednote_web_logout
       # WeRead
       post :weread_logout
       post :validate_weread_key
