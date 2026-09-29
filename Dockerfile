@@ -52,8 +52,9 @@ COPY . .
 # -j 1 disable parallel compilation to avoid a QEMU bug: https://github.com/rails/bootsnap/issues/495
 RUN bundle exec bootsnap precompile -j 1 app/ lib/
 
-# Install Python dependencies for twitter-api-client
-RUN pip3 install --target=/rails/vendor/python --no-cache-dir ./twitter-api-client
+# Install Python dependencies for twitter-api-client, pinning httpx<0.28
+RUN pip3 install --target=/rails/vendor/python --break-system-packages --no-cache-dir \
+    ./twitter-api-client "httpx<0.28"
 
 # Precompiling assets for production without requiring secret RAILS_MASTER_KEY
 RUN SECRET_KEY_BASE_DUMMY=1 ./bin/rails assets:precompile
