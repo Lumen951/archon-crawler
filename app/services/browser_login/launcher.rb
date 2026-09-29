@@ -147,12 +147,19 @@ module BrowserLogin
       # 进程已退出
     end
 
-    def kill_process_tree(pid)
+    # 结束整个进程组：先 TERM 给优雅退出的机会（Chrome 退出时会 flush Cookie
+    # 并写完 profile，SIGKILL 硬杀会截断落盘甚至损坏 profile），等
+    # graceful_timeout 秒仍存活才 KILL。
+    def kill_process_tree(pid, graceful_timeout: 8)
       return if pid.blank?
 
-      # pgroup: true 启动，负号即杀整个进程组（含 Chrome 的 helper 进程）
       ::Process.kill("TERM", -Integer(pid))
-      sleep(0.5)
+      deadline = ::Process.clock_gettime(::Process::CLOCK_MONOTONIC) + graceful_timeout
+      while ::Process.clock_gettime(::Process::CLOCK_MONOTONIC) < deadline
+        return unless process_alive?(pid)
+
+        sleep(0.2)
+      end
       ::Process.kill("KILL", -Integer(pid))
     rescue Errno::ESRCH, Errno::EPERM, TypeError, ArgumentError
       kill_process(pid)

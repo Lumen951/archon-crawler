@@ -22,6 +22,11 @@ module BrowserLogin
         Option.wechat_mp_session_valid?
       end
 
+      # 微信的环境验证 Cookie 与登录态都在 qq.com 域，快照只保留该域
+      def cookie_domain_pattern
+        /qq\.com\z/
+      end
+
       # 登录完成后微信会种下 slave_user / slave_sid 两个会话 Cookie
       def logged_in?(cookies)
         names = cookie_names(cookies, /qq\.com\z/)

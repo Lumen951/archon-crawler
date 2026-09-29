@@ -356,6 +356,113 @@ class BrowserLoginTest < ActiveSupport::TestCase
     assert_equal BrowserLogin::Session::VIEWPORT[:height], pin[1][:height]
   end
 
+  # ── Cookie 快照 ──────────────────────────────────────
+  # 会话级 Cookie（微信环境验证、slave_sid）Chrome 不会写进 profile，浏览器
+  # 进程退出即丢；Session#frame 必须持续把它们导出到 profile 目录，供正文
+  # 下载的独立浏览器回灌（生产踩过：验证完一结束会话，下载又被拦）。
+
+  # CookieExport.serialize 需要的 Ferrum cookie 替身（to_h 返回 CDP 字符串键）
+  SnapshotCookie = Struct.new(:name, :value, :domain, :path, :expires, :httpOnly, :secure, :sameSite) do
+    def to_h
+      { "name" => name, "value" => value, "domain" => domain, "path" => path,
+        "expires" => expires, "httpOnly" => httpOnly, "secure" => secure, "sameSite" => sameSite }
+    end
+  end
+
+  test "frame snapshots provider-scoped cookies into the profile dir" do
+    Dir.mktmpdir do |tmp_root|
+      profile_dir = File.join(tmp_root, "wechat_mp")
+      wechat = SnapshotCookie.new("slave_sid", "s", ".qq.com", "/", 0, true, true, "Lax")
+      junk = SnapshotCookie.new("junk", "j", ".example.com", "/", 0, false, false, nil)
+      fake_page = Object.new
+      fake_page.define_singleton_method(:cookies) { Struct.new(:all).new({ "slave_sid" => wechat, "junk" => junk }) }
+      fake_page.define_singleton_method(:screenshot) { |**| "QUJD" }
+      fake_page.define_singleton_method(:url) { "https://mp.weixin.qq.com/" }
+
+      record = {
+        "session_id" => "s-snap", "provider" => "wechat_mp", "port" => 1, "pid" => 1,
+        "created_at" => Time.current.iso8601, "last_activity_at" => Time.current.iso8601
+      }
+
+      with_memory_cache do
+        Rails.cache.write("browser_login:session:s-snap", record)
+
+        stub_class_method(BrowserLogin, :profile_dir_for, ->(_key) { profile_dir }) do
+          stub_class_method(BrowserLogin::Session, :with_page, ->(_record, &block) { block.call(fake_page) }) do
+            result = BrowserLogin::Session.frame("s-snap")
+            assert_equal "QUJD", result[:image], "快照失败不得影响截图主流程"
+          end
+        end
+      end
+
+      entries = JSON.parse(File.read(BrowserLogin::CookieExport.path_for(profile_dir)))
+      assert_equal [ "slave_sid" ], entries.map { |e| e["name"] }, "快照只保留平台域 Cookie"
+    end
+  end
+
+  test "orphan_record adopts a live browser from the pid flag file when cache is gone" do
+    Dir.mktmpdir do |tmp_root|
+      profile_dir = File.join(tmp_root, "wechat_mp")
+      FileUtils.mkdir_p(profile_dir)
+      flag_file = File.join(profile_dir, BrowserLogin::Session::PROFILE_FLAG_FILE)
+      File.write(flag_file, { "port" => 4100, "pid" => 424242, "xvfb_pid" => nil }.to_json)
+
+      stub_class_method(BrowserLogin, :profile_dir_for, ->(_key) { profile_dir }) do
+        stub_class_method(BrowserLogin::Launcher, :process_alive?, ->(_pid) { true }) do
+          stub_class_method(BrowserLogin::Launcher, :cdp_ready?, ->(_port) { true }) do
+            record = BrowserLogin::Session.orphan_record("wechat_mp")
+
+            assert_equal 4100, record["port"]
+            assert_equal 424242, record["pid"]
+            assert record["orphan"], "供正文抓取附着的孤儿记录"
+          end
+        end
+
+        stub_class_method(BrowserLogin::Launcher, :process_alive?, ->(_pid) { false }) do
+          assert_nil BrowserLogin::Session.orphan_record("wechat_mp"), "进程已死不得收养"
+        end
+      end
+
+      File.delete(flag_file)
+      assert_nil BrowserLogin::Session.orphan_record("wechat_mp"), "无 flag 文件时返回 nil"
+    end
+  end
+
+  # ── 进程组优雅退出 ────────────────────────────────────
+  # Chrome 退出时会 flush Cookie 并写完 profile；TERM 后立刻 SIGKILL 会截断
+  # 落盘甚至损坏 profile，必须先等进程退出（生产踩过：验证 Cookie 没落盘）。
+
+  test "kill_process_tree lets a cooperative process exit gracefully" do
+    pid = ::Process.spawn("sleep", "30", pgroup: true)
+    ::Process.detach(pid)
+
+    started = ::Process.clock_gettime(::Process::CLOCK_MONOTONIC)
+    BrowserLogin::Launcher.kill_process_tree(pid, graceful_timeout: 8)
+    elapsed = ::Process.clock_gettime(::Process::CLOCK_MONOTONIC) - started
+
+    sleep(0.3) # 等 detach 的 reaper 收尸，避免僵尸进程被误判为存活
+    assert_not BrowserLogin::Launcher.process_alive?(pid)
+    assert_operator elapsed, :<, 3, "配合 TERM 的进程应立即退出，而不是等满超时"
+  end
+
+  test "kill_process_tree escalates to KILL when the process ignores TERM" do
+    reader, writer = IO.pipe
+    pid = ::Process.spawn(RbConfig.ruby, "-e", "trap('TERM', 'IGNORE'); puts 'ready'; $stdout.flush; sleep 30",
+                          pgroup: true, out: writer, err: File::NULL)
+    ::Process.detach(pid)
+    writer.close
+    reader.gets # 等子进程装好 trap 再发信号，否则 TERM 会落在 trap 生效前
+    reader.close
+
+    started = ::Process.clock_gettime(::Process::CLOCK_MONOTONIC)
+    BrowserLogin::Launcher.kill_process_tree(pid, graceful_timeout: 1)
+    elapsed = ::Process.clock_gettime(::Process::CLOCK_MONOTONIC) - started
+
+    sleep(0.3)
+    assert_not BrowserLogin::Launcher.process_alive?(pid)
+    assert_operator elapsed, :>=, 1, "必须先等满优雅超时才升级 KILL"
+  end
+
   # ── ProfileLock 与 Session 锁生命周期 ─────────────────
 
   test "profile lock excludes a second holder and releases cleanly" do

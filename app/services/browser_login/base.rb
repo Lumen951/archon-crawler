@@ -37,6 +37,12 @@ module BrowserLogin
         nil
       end
 
+      # Cookie 快照（CookieExport）只保留域名匹配的 Cookie；nil = 全部保留。
+      # 快照与 profile 同目录且含登录凭据，子类应尽量收窄到自家域名。
+      def cookie_domain_pattern
+        nil
+      end
+
       private
 
       # 把浏览器 Cookie 过滤出目标域后拼成 "k=v; k2=v2" 头字符串。

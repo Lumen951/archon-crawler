@@ -33,6 +33,8 @@ module BrowserLogin
     @attach_mutex = Mutex.new
     @start_mutex = Mutex.new
     @profile_locks = {}
+    # 各会话上一次写入的 Cookie 快照内容（跳过无变化的重复写盘）
+    @last_snapshot = {}
 
     class NotFoundError < Error
     end
@@ -74,6 +76,7 @@ module BrowserLogin
 
         with_page(record) do |page|
           cookies = page.cookies.all.values
+          snapshot_cookies!(record, provider, cookies)
           logged_in = provider.logged_in?(cookies)
 
           if (logged_in && !saved) || force_save
@@ -183,6 +186,23 @@ module BrowserLogin
         return nil unless Launcher.process_alive?(record["pid"]) && Launcher.cdp_ready?(record["port"])
 
         record
+      end
+
+      # Rails.cache 已过期/丢失，但浏览器进程仍存活（profile 目录的 pid 文件
+      # 可查）时的兜底记录。只读，供 WechatArticleBrowserFetcher 附着后复用
+      # 浏览器内存里的 Cookie，不影响会话状态；进程已死或无记录时返回 nil。
+      def orphan_record(provider_key)
+        flag = flag_path(provider_key)
+        return nil unless flag.exist?
+
+        data = JSON.parse(flag.read)
+        return nil unless data.is_a?(Hash) && data["pid"] && data["port"]
+
+        return nil unless Launcher.process_alive?(data["pid"]) && Launcher.cdp_ready?(data["port"])
+
+        { "port" => data["port"], "pid" => data["pid"], "xvfb_pid" => data["xvfb_pid"], "orphan" => true }
+      rescue JSON::ParserError, StandardError
+        nil
       end
 
       private
@@ -385,6 +405,22 @@ module BrowserLogin
 
       def cdp_ready?(port)
         Launcher.cdp_ready?(port)
+      end
+
+      # ── Cookie 快照 ────────────────────────────────────
+
+      # 每帧把目标域 Cookie 快照进 profile 目录（内容不变时跳过写盘）。
+      # 会话级 Cookie（微信环境验证、slave_sid 等）Chrome 不会写进 profile，
+      # 浏览器进程退出即丢；快照让 WechatArticleBrowserFetcher 在会话结束后
+      # 拉起独立浏览器时仍能回灌这些状态，人工验证成果因此可留存。
+      def snapshot_cookies!(record, provider, cookies)
+        json = CookieExport.serialize(cookies, domain_pattern: provider.cookie_domain_pattern)
+        return if @last_snapshot[record["session_id"]] == json
+
+        CookieExport.save(profile_dir_for(record["provider"]), json)
+        @last_snapshot[record["session_id"]] = json
+      rescue StandardError => e
+        Rails.logger.warn("[BrowserLogin] #{record['provider']} Cookie 快照写入失败: #{e.class}: #{e.message}")
       end
 
       # ── profile 目录与 pid 文件 ────────────────────────

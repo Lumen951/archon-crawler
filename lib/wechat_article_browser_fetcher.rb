@@ -8,11 +8,13 @@ require "ferrum"
 # （wappoc_appmsgcaptcha），纯 HTTP 下载（WechatCrawler.fetch_article_page）
 # 无法通过。微信的环境验证以 Cookie 形式留在浏览器里，因此这里的思路是：
 #
-#   1. 复用远程登录的持久化浏览器环境（BrowserLogin.profile_dir_for("wechat_mp")）——
-#      用户在设置页「远程浏览器登录」里完成过的人工验证/登录会以 Cookie 形式
-#      留在该环境，本抓取器据此直接拿到正文，无需每次重新验证；
-#   2. 登录会话进行中时，附着到同一浏览器开一个新标签页抓取（互不干扰）；
-#      否则短暂拉起自己的 Chrome（flock 与登录会话互斥），抓完即退。
+#   1. 复用远程登录的浏览器环境（BrowserLogin.profile_dir_for("wechat_mp")）——
+#      用户在设置页「远程浏览器登录」里完成的人工验证/登录优先直接继承：
+#      登录浏览器仍在运行（含 Rails.cache 过期但进程存活的孤儿）时附着开
+#      新标签页；否则拉起独立 Chrome 并回灌 Session#frame 持续导出的 Cookie
+#      快照（会话级 Cookie 如环境验证、slave_sid 不会被 Chrome 写进 profile，
+#      不回灌就继承不到人工验证成果），无需每次重新验证；
+#   2. 抓取与登录会话靠 flock 互斥（ProfileLock），不会出现同 profile 双开。
 #
 # 抓取是串行的（类级 Mutex），且与 HTTP 路径共用同一个下载限流器。失败语义
 # 与 HTTP 路径对齐：内容被删除等 → WechatCrawler::DownloadError（单篇失败）；
@@ -42,9 +44,12 @@ class WechatArticleBrowserFetcher
 
       @mutex.synchronize do
         WechatCrawler.download_rate_limiter.wait
-        WechatCrawler.log(crawl_task, :info, "HTTP 下载被环境验证拦截，改用真实浏览器抓取: #{target[0, 80]}")
+        session_record = BrowserLogin::Session.active_record(PROFILE_PROVIDER) ||
+                         BrowserLogin::Session.orphan_record(PROFILE_PROVIDER)
+        WechatCrawler.log(crawl_task, :info,
+                          "HTTP 下载被环境验证拦截，改用真实浏览器抓取（#{mode_label(session_record)}）: #{target[0, 80]}")
 
-        html = with_browser do |page|
+        html = with_browser(session_record, crawl_task) do |page|
           page.go_to(target)
           sleep(LOAD_SETTLE_SECONDS)
           verify_page!(page, target)
@@ -57,6 +62,10 @@ class WechatArticleBrowserFetcher
 
     private
 
+    def mode_label(session_record)
+      session_record ? "附着登录浏览器" : "独立浏览器+Cookie快照"
+    end
+
     # 文章 url 有时存成了被拦截后的验证页链接（wappoc_appmsgcaptcha?…&target_url=…），
     # 此时真实地址在 target_url 参数里。
     def target_url_for(url)
@@ -68,13 +77,13 @@ class WechatArticleBrowserFetcher
       url
     end
 
-    # 登录会话存活 → 附着开新标签页；否则短暂拉起一次性 Chrome（持 profile 锁）
-    def with_browser(&block)
-      session_record = BrowserLogin::Session.active_record(PROFILE_PROVIDER)
+    # 有存活登录浏览器/孤儿浏览器 → 附着开新标签页；否则短暂拉起一次性
+    # Chrome（持 profile 锁），先回灌 Cookie 快照再导航。
+    def with_browser(session_record, crawl_task, &block)
       if session_record
         attach_to_session(session_record, &block)
       else
-        spawn_and_fetch(&block)
+        spawn_and_fetch(crawl_task, &block)
       end
     end
 
@@ -96,15 +105,20 @@ class WechatArticleBrowserFetcher
       raise Error, "附着登录浏览器失败：#{e.class}: #{e.message}"
     end
 
-    def spawn_and_fetch
+    def spawn_and_fetch(crawl_task)
       profile_dir = BrowserLogin.profile_dir_for(PROFILE_PROVIDER)
       lock = BrowserLogin::ProfileLock.acquire(profile_dir, timeout: 5)
       begin
-        port, pid, xvfb_pid = BrowserLogin::Launcher.launch(profile_dir: profile_dir, url: "about:blank", headed: false)
+        # 有界面模式与登录浏览器保持同一指纹（UA/窗口），避免「登录时有界面
+        # 通过验证、抓取时 headless 又被拦」的不一致
+        port, pid, xvfb_pid = BrowserLogin::Launcher.launch(
+          profile_dir: profile_dir, url: "about:blank", headed: Option.browser_login_headed?
+        )
         begin
           browser = BrowserLogin::Launcher.attach(port)
           page = BrowserLogin::Launcher.first_page(browser)
           BrowserLogin::Launcher.pin_viewport(page)
+          restore_cookies!(page, profile_dir, crawl_task)
           yield page
         ensure
           BrowserLogin::Launcher.kill_process_tree(pid)
@@ -115,6 +129,16 @@ class WechatArticleBrowserFetcher
       end
     rescue Ferrum::Error, IOError => e
       raise Error, "浏览器抓取失败：#{e.class}: #{e.message}"
+    end
+
+    # 会话级 Cookie（环境验证、登录态）不会被 Chrome 写进 profile，必须从
+    # Session#frame 导出的快照回灌；逐条注入，单条失败不影响其余。
+    def restore_cookies!(page, profile_dir, crawl_task)
+      entries = BrowserLogin::CookieExport.load(profile_dir)
+      return if entries.empty?
+
+      entries.each { |entry| quietly { page.cookies.set(entry) } }
+      WechatCrawler.log(crawl_task, :info, "已向独立浏览器回灌 Cookie 快照（#{entries.size} 条）")
     end
 
     def quietly

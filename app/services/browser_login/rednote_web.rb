@@ -52,10 +52,14 @@ module BrowserLogin
       def save!(page:, cookies:)
         nickname = fetch_nickname(page)
         Option.rednote_web_session_started!(
-          cookie: cookie_string(cookies, /xiaohongshu\.com\z/),
+          cookie: cookie_string(cookies, cookie_domain_pattern),
           account_info: { "nickname" => nickname }
         )
         nickname.presence || label
+      end
+
+      def cookie_domain_pattern
+        /xiaohongshu\.com\z/
       end
 
       private

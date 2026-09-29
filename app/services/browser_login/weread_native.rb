@@ -24,16 +24,20 @@ module BrowserLogin
 
       # wr_vid 是用户标识，wr_skey 是会话密钥，两者齐备才算登录
       def logged_in?(cookies)
-        jar = cookie_jar(cookies, /qq\.com\z/)
+        jar = cookie_jar(cookies, cookie_domain_pattern)
         jar["wr_vid"].present? && jar["wr_skey"].present?
       end
 
       # → 微信读书账号 vid
       def save!(page:, cookies:)
-        jar = cookie_jar(cookies, /qq\.com\z/)
+        jar = cookie_jar(cookies, cookie_domain_pattern)
         account_info = { "vid" => jar["wr_vid"] }
         Option.weread_native_session_started!(cookie_jar: jar, account_info: account_info)
         jar["wr_vid"].present? ? "#{label} #{jar['wr_vid']}" : label
+      end
+
+      def cookie_domain_pattern
+        /qq\.com\z/
       end
     end
   end
