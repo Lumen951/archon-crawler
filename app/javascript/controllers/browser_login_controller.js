@@ -47,15 +47,48 @@ export default class extends Controller {
     return document.querySelector('meta[name="csrf-token"]')?.content || ""
   }
 
+  // 统一的请求入口：带上 CSRF 与 X-Requested-With（服务端据此对会话过期
+  // 返回 401 JSON 而不是 302 登录页），并拒绝把 HTML 错误页硬喂给
+  // resp.json()——否则用户只会看到 "Unexpected token '<'" 这种没头没尾的错。
+  async fetchJson(url, options = {}) {
+    const resp = await fetch(url, {
+      ...options,
+      headers: {
+        "X-Requested-With": "XMLHttpRequest",
+        "X-CSRF-Token": this.csrfToken,
+        ...(options.body ? { "Content-Type": "application/json" } : {}),
+        ...(options.headers || {})
+      }
+    })
+
+    const contentType = resp.headers.get("Content-Type") || ""
+    if (!contentType.includes("application/json")) {
+      const err = new Error(
+        resp.status === 401
+          ? "登录已过期，请刷新页面重新登录"
+          : `服务返回非 JSON 响应（HTTP ${resp.status}），请刷新页面后重试`
+      )
+      err.status = resp.status
+      throw err
+    }
+    return resp
+  }
+
+  // 会话过期（401）时的统一收尾：停轮询、给可操作提示
+  handleAuthExpired(message = "登录已过期，请刷新页面重新登录") {
+    this.stopLoop()
+    this.setStatus(message, "text-red-600")
+    this.openButtonTarget.disabled = false
+  }
+
   async open() {
     this.openButtonTarget.disabled = true
     this.setStatus("正在启动登录浏览器...", "text-gray-500")
     this.viewerTarget.classList.remove("hidden")
 
     try {
-      const resp = await fetch(this.startUrlValue, {
+      const resp = await this.fetchJson(this.startUrlValue, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-CSRF-Token": this.csrfToken },
         body: JSON.stringify({ provider: this.providerValue })
       })
       const data = await resp.json()
@@ -69,6 +102,7 @@ export default class extends Controller {
       document.addEventListener("keydown", this.boundKeydown)
       this.startLoop()
     } catch (err) {
+      if (err.status === 401) return this.handleAuthExpired(err.message)
       this.setStatus(`启动失败: ${err.message}`, "text-red-600")
       this.openButtonTarget.disabled = false
     }
@@ -97,7 +131,7 @@ export default class extends Controller {
       if (document.hidden) return
 
       const url = `${this.frameUrlValue}?session_id=${encodeURIComponent(this.sessionId)}${forceSave ? "&force_save=1" : ""}`
-      const resp = await fetch(url, { headers: { "X-CSRF-Token": this.csrfToken } })
+      const resp = await this.fetchJson(url)
       const data = await resp.json()
 
       if (data.status === "expired") {
@@ -123,6 +157,7 @@ export default class extends Controller {
         this.setStatus(data.message || "等待登录...", "text-gray-500")
       }
     } catch (err) {
+      if (err.status === 401) return this.handleAuthExpired()
       // 单次轮询失败（网络抖动 / CDP 短暂冲突）不终止循环，下个周期自愈
       this.setStatus(`连接中断，正在重试: ${err.message}`, "text-yellow-600")
     } finally {
@@ -139,9 +174,8 @@ export default class extends Controller {
   async postEvent(event) {
     if (!this.sessionId) return
     try {
-      const resp = await fetch(this.interactUrlValue, {
+      const resp = await this.fetchJson(this.interactUrlValue, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-CSRF-Token": this.csrfToken },
         body: JSON.stringify({ session_id: this.sessionId, event })
       })
       const data = await resp.json()
@@ -150,6 +184,7 @@ export default class extends Controller {
         this.setStatus("登录会话已过期，请重新打开", "text-red-600")
       }
     } catch (err) {
+      if (err.status === 401) return this.handleAuthExpired()
       // 静默：下一帧截图会反映事件是否生效
     }
   }
@@ -274,9 +309,8 @@ export default class extends Controller {
 
     if (sessionId) {
       try {
-        await fetch(this.stopUrlValue, {
+        await this.fetchJson(this.stopUrlValue, {
           method: "POST",
-          headers: { "Content-Type": "application/json", "X-CSRF-Token": this.csrfToken },
           body: JSON.stringify({ session_id: sessionId })
         })
       } catch (err) { /* 会话超时后服务端会自行清理 */ }

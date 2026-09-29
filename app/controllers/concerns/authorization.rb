@@ -23,6 +23,12 @@ module Authorization
   private
 
   def handle_unauthorized(exception)
+    # 与 Authentication#request_authentication 同理：XHR 拿到 HTML 重定向
+    # 页只会让前端 JSON 解析报错，改回 401 JSON
+    if request.xhr?
+      return render json: { error: exception.message }, status: :unauthorized
+    end
+
     redirect_to root_path, alert: exception.message
   end
 end

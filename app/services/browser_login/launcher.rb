@@ -125,6 +125,25 @@ module BrowserLogin
       false
     end
 
+    # /proc/<pid>/cmdline 内容（参数以 NUL 分隔，这里转成空格）；非 Linux
+    # 或进程已不存在时返回 nil
+    def process_cmdline(pid)
+      File.read("/proc/#{Integer(pid)}/cmdline").tr("\0", " ")
+    rescue StandardError
+      nil
+    end
+
+    # pid 是否仍是对应特征的那个进程（按命令行核对）。Rails.cache 与 pid
+    # 文件会跨容器重启存留，新容器里同一 pid 数字可能属于任意进程，杀进程
+    # 前必须核对，否则可能误伤容器里的其他进程（甚至 puma 自己）。
+    # 拿不到 cmdline（非 Linux 环境）时无法核对，保持按 pid 处理的原行为。
+    def process_matches?(pid, pattern)
+      cmdline = process_cmdline(pid)
+      return true if cmdline.nil?
+
+      pattern.is_a?(Regexp) ? cmdline.match?(pattern) : cmdline.include?(pattern.to_s)
+    end
+
     def process_alive?(pid)
       return false if pid.blank?
 

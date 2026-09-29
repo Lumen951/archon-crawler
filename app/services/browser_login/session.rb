@@ -262,8 +262,17 @@ module BrowserLogin
       end
 
       def destroy(record)
-        kill_process_tree(record["pid"])
-        kill_process(record["xvfb_pid"])
+        # 会话记录跨容器重启存留，同一 pid 数字在新容器里可能属于任意进程，
+        # 杀前按命令行核对（Chrome 带 --user-data-dir=profile，Xvfb 是
+        # Xvfb 二进制），不匹配说明是复用的旧 pid，跳过以免误杀
+        if Launcher.process_matches?(record["pid"], profile_dir_for(record["provider"]))
+          kill_process_tree(record["pid"])
+        else
+          Rails.logger.info("[BrowserLogin] pid #{record['pid']} (#{record['provider']}) 不再是登录浏览器，跳过杀进程")
+        end
+        if record["xvfb_pid"].present? && Launcher.process_matches?(record["xvfb_pid"], "Xvfb")
+          kill_process(record["xvfb_pid"])
+        end
         @attached.delete(record["session_id"])
         release_profile_lock(record["provider"])
         Rails.cache.delete(record_key(record["session_id"]))

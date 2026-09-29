@@ -1,4 +1,14 @@
 class Admin::SettingsController < Admin::BaseController
+  # 远程浏览器登录的四个接口跳过 CSRF 校验：设置页标签页会跨部署/长时间
+  # 存留，页面里的 token 可能与服务端会话对不上，POST 被 422 HTML 拦下，
+  # 前端只会看到 "Unexpected token '<'" 这种 JSON 解析错误（生产踩过）。
+  # 豁免是安全的：四个接口都在 require_admin 之后，且登录 Cookie 为
+  # SameSite=Lax——跨站 POST 不携带 Cookie，经典 CSRF 攻击本就不成立；
+  # interact/stop 还需要不可猜测的 session_id 才能驱动浏览器。
+  skip_before_action :verify_authenticity_token,
+                     only: %i[browser_login_start browser_login_frame
+                              browser_login_interact browser_login_stop]
+
   def show
     load_settings_data
   end

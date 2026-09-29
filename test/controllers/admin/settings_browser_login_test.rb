@@ -59,6 +59,47 @@ module Admin
       assert_match "未知的远程登录平台", response.parsed_body["error"]
     end
 
+    # 设置页标签页跨部署存留时页面 token 可能与服务端会话对不上（生产踩过：
+    # 422 HTML 让前端只报 "Unexpected token '<'"），这四个接口豁免 CSRF
+    test "browser login endpoints are exempt from the authenticity token check" do
+      start = ->(provider) do
+        { session_id: "s1", provider: provider, label: "微信公众号平台",
+          resumed: false, logged_in: false, viewport: { width: 1280, height: 800 } }
+      end
+
+      old = ActionController::Base.allow_forgery_protection
+      ActionController::Base.allow_forgery_protection = true
+      stub_class_method(BrowserLogin::Session, :start, start) do
+        post browser_login_start_admin_settings_path, params: { provider: "wechat_mp" },
+             headers: { "X-CSRF-Token" => "stale-token" }
+      end
+
+      assert_response :success, "假 token 也必须到达 action，而不是被 CSRF 拦下"
+      assert_equal "s1", response.parsed_body["session_id"]
+    ensure
+      ActionController::Base.allow_forgery_protection = old
+    end
+
+    # 其余接口不豁免：XHR 的 CSRF 失败返回可读 JSON（而不是 422 HTML 页），
+    # 非 XHR 保持 Rails 默认的 422 HTML 行为
+    test "csrf failure on other endpoints returns readable json for xhr" do
+      old = ActionController::Base.allow_forgery_protection
+      ActionController::Base.allow_forgery_protection = true
+
+      post qr_login_request_admin_settings_path, params: { provider: "wechat_mp" },
+           headers: { "X-Requested-With" => "XMLHttpRequest", "X-CSRF-Token" => "stale-token" }
+      assert_response :unprocessable_entity
+      assert_equal "application/json", response.media_type
+      assert_match "页面已过期", response.parsed_body["error"]
+
+      post qr_login_request_admin_settings_path, params: { provider: "wechat_mp" },
+           headers: { "X-CSRF-Token" => "stale-token" }
+      assert_response :unprocessable_entity
+      assert_not_equal "application/json", response.media_type, "非 XHR 保持默认 HTML 页"
+    ensure
+      ActionController::Base.allow_forgery_protection = old
+    end
+
     test "frame returns the screenshot and login status" do
       frame = lambda do |session_id, force_save: false|
         { session_id: session_id, image: "FRAMEDATA", image_mime: "image/jpeg",
@@ -115,6 +156,38 @@ module Admin
       post browser_login_start_admin_settings_path, params: { provider: "wechat_mp" }
       assert_response :redirect
       assert_not_equal admin_settings_path, path
+    end
+
+    # 前端 fetch 跟随 302 会拿到登录页 HTML，resp.json() 直接报
+    # "Unexpected token '<'"（生产踩过）；XHR 必须拿到 401 JSON
+    test "unauthenticated XHR start returns 401 json instead of the login page" do
+      delete session_path
+
+      post browser_login_start_admin_settings_path, params: { provider: "wechat_mp" },
+           headers: { "X-Requested-With" => "XMLHttpRequest" }
+
+      assert_response :unauthorized
+      assert_equal "application/json", response.media_type
+      assert_match "登录已过期", response.parsed_body["error"]
+    end
+
+    test "non-admin XHR start returns 401 json instead of a redirect" do
+      delete session_path
+      plain = User.create!(
+        email_address: "browser-xhr@example.com",
+        password: "password123",
+        password_confirmation: "password123",
+        role: :user,
+        email_confirmed_at: Time.current
+      )
+      post session_path, params: { email_address: plain.email_address, password: "password123" }
+
+      post browser_login_start_admin_settings_path, params: { provider: "wechat_mp" },
+           headers: { "X-Requested-With" => "XMLHttpRequest" }
+
+      assert_response :unauthorized
+      assert_equal "application/json", response.media_type
+      assert_match "没有权限", response.parsed_body["error"]
     end
 
     test "rednote_web_logout clears the stored cookie session" do

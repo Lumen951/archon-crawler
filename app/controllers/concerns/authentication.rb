@@ -34,6 +34,12 @@ module Authentication
     end
 
     def request_authentication
+      # XHR（远程登录面板的 fetch 等）跟随重定向会拿到登录页 HTML，前端
+      # resp.json() 直接解析失败；对 XHR 返回 401 JSON，让前端能给出可读提示
+      if request.xhr?
+        return render json: { error: "登录已过期，请刷新页面重新登录" }, status: :unauthorized
+      end
+
       session[:return_to_after_authenticating] = request.url
       redirect_to new_session_path
     end

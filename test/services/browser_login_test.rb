@@ -463,6 +463,60 @@ class BrowserLoginTest < ActiveSupport::TestCase
     assert_operator elapsed, :>=, 1, "必须先等满优雅超时才升级 KILL"
   end
 
+  # ── pid 复用防护 ─────────────────────────────────────
+  # 会话记录（Solid Cache）与 pid 文件跨容器重启存留，新容器里同一 pid 数字
+  # 可能属于任意进程；cleanup_stale 在每次 start 时销毁过期会话，杀进程前
+  # 必须按 /proc cmdline 核对，否则可能误杀容器里其他进程（甚至 puma）。
+
+  test "process_matches? verifies the cmdline and defaults to true when unreadable" do
+    stub_class_method(BrowserLogin::Launcher, :process_cmdline,
+                      ->(_pid) { "chromium --user-data-dir=/rails/storage/browser_profiles/wechat_mp" }) do
+      assert BrowserLogin::Launcher.process_matches?(4242, "browser_profiles/wechat_mp")
+      assert_not BrowserLogin::Launcher.process_matches?(4242, "puma")
+      assert_not BrowserLogin::Launcher.process_matches?(4242, /Xvfb/)
+    end
+
+    stub_class_method(BrowserLogin::Launcher, :process_cmdline, ->(_pid) { nil }) do
+      assert BrowserLogin::Launcher.process_matches?(4242, "anything"), "非 Linux 读不到 cmdline 时保持按 pid 处理"
+    end
+  end
+
+  test "destroy skips killing a reused pid but still cleans up session state" do
+    Dir.mktmpdir do |tmp_root|
+      profile_dir = File.join(tmp_root, "wechat_mp")
+      record = {
+        "session_id" => "s-kill", "provider" => "wechat_mp", "port" => 1,
+        "pid" => 424242, "xvfb_pid" => nil,
+        "created_at" => Time.current.iso8601, "last_activity_at" => Time.current.iso8601
+      }
+      killed = []
+
+      stub_class_method(BrowserLogin, :profile_dir_for, ->(_key) { profile_dir }) do
+        stub_class_method(BrowserLogin::Launcher, :kill_process_tree, ->(pid) { killed << pid }) do
+          with_memory_cache do
+            stub_class_method(BrowserLogin::Launcher, :process_cmdline, ->(_pid) { "puma worker" }) do
+              Rails.cache.write("browser_login:session:s-kill", record)
+              Rails.cache.write("browser_login:active:wechat_mp", "s-kill")
+              BrowserLogin::Session.stop("s-kill")
+
+              assert_empty killed, "pid 已被无关进程复用时不得按旧记录杀进程"
+              assert_nil Rails.cache.read("browser_login:active:wechat_mp"), "会话状态仍要清理"
+            end
+
+            stub_class_method(BrowserLogin::Launcher, :process_cmdline,
+                              ->(_pid) { "chromium --user-data-dir=#{profile_dir} --remote-debugging-port=1" }) do
+              Rails.cache.write("browser_login:session:s-kill", record)
+              Rails.cache.write("browser_login:active:wechat_mp", "s-kill")
+              BrowserLogin::Session.stop("s-kill")
+
+              assert_equal [ 424242 ], killed, "命令行匹配时正常杀掉登录浏览器"
+            end
+          end
+        end
+      end
+    end
+  end
+
   # ── ProfileLock 与 Session 锁生命周期 ─────────────────
 
   test "profile lock excludes a second holder and releases cleanly" do
