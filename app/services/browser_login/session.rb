@@ -449,7 +449,6 @@ module BrowserLogin
       # 拉起独立浏览器时仍能回灌这些状态，人工验证成果因此可留存。
       def snapshot_cookies!(record, provider, cookies)
         current = JSON.parse(CookieExport.serialize(cookies, domain_pattern: provider.cookie_domain_pattern))
-        puts ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>" + current.to_s
         return if current.empty?
 
         profile_dir = profile_dir_for(record["provider"])
