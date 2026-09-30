@@ -424,11 +424,18 @@ class ApiTest < ActionDispatch::IntegrationTest
     assert_includes titles, @article1.title
     assert_not_includes titles, @article2.title
 
-    # Search matches body content too
-    params = { account_id: @wechat_account.id, keyword: "这是测试内容" }
+    # Digest is searched...
+    @article1.update!(digest: "简章摘要内容")
+    params = { account_id: @wechat_account.id, keyword: "简章摘要内容" }
     get "/api/v1/articles", params: params, headers: auth_headers
     assert_response :success
     assert JSON.parse(response.body)["articles"].any? { |a| a["title"] == @article1.title }
+
+    # ...but the body is not (no trgm index on it at this scale)
+    params = { account_id: @wechat_account.id, keyword: "这是测试内容" }
+    get "/api/v1/articles", params: params, headers: auth_headers
+    assert_response :success
+    assert_empty JSON.parse(response.body)["articles"]
 
     # No match
     params = { account_id: @wechat_account.id, keyword: "不存在的关键词xyz" }

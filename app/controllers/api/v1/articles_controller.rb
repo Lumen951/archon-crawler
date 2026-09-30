@@ -29,7 +29,7 @@ module Api
 
         scope = account.articles.order(published_at: :desc)
 
-        # Keyword fuzzy search (title / digest / body)
+        # Keyword fuzzy search (title / digest)
         scope = scope.search_keyword(params[:keyword])
 
         # Date range filter
@@ -194,7 +194,7 @@ module Api
                              .where(accounts: { type: account_type })
         end
 
-        # Keyword fuzzy search (title / digest / body)
+        # Keyword fuzzy search (title / digest)
         articles = articles.search_keyword(params[:keyword])
 
         # Execute query with pagination

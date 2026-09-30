@@ -1,7 +1,7 @@
 module Tools
   class SearchArticlesTool < MCP::Tool
     tool_name "search_articles"
-    description "跨账号全局搜索文章，按关键词模糊匹配标题、摘要和正文。可按平台和日期范围过滤，用于按主题或内容查找文章。"
+    description "跨账号全局搜索文章，按关键词模糊匹配标题和摘要。可按平台和日期范围过滤，用于按主题查找文章。"
     annotations(read_only_hint: true, destructive_hint: false)
 
     ARTICLE_FIELDS = %w[id title url published_at digest content].freeze
@@ -15,7 +15,7 @@ module Tools
 
     input_schema(
       properties: {
-        keyword: { type: "string", description: "搜索关键词，匹配标题、摘要或正文，多个词用空格分隔（AND 语义）" },
+        keyword: { type: "string", description: "搜索关键词，匹配标题或摘要，多个词用空格分隔（AND 语义）" },
         platform: { type: "string", enum: PLATFORM_ACCOUNT_TYPES.keys, description: "平台过滤（可选）" },
         start_date: { type: "string", description: "起始日期（YYYY-MM-DD）" },
         end_date: { type: "string", description: "结束日期（YYYY-MM-DD）" },

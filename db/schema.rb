@@ -71,7 +71,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_30_000001) do
     t.string "title", null: false
     t.datetime "updated_at", null: false
     t.string "url", null: false
-    t.index "COALESCE(content_markdown, content_html) gin_trgm_ops", name: "index_articles_on_body_trgm", using: :gin
     t.index ["account_id", "published_at"], name: "index_articles_on_account_id_and_published_at", order: { published_at: :desc }
     t.index ["crawl_task_id"], name: "index_articles_on_crawl_task_id"
     t.index ["digest"], name: "index_articles_on_digest_trgm", opclass: :gin_trgm_ops, using: :gin

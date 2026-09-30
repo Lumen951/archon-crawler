@@ -20,7 +20,6 @@
 # Indexes
 #
 #  index_articles_on_account_id_and_published_at  (account_id,published_at DESC)
-#  index_articles_on_body_trgm                    (COALESCE(content_markdown, content_html) gin_trgm_ops) USING gin
 #  index_articles_on_crawl_task_id                (crawl_task_id)
 #  index_articles_on_digest_trgm                  (digest) USING gin
 #  index_articles_on_published_at                 (published_at)

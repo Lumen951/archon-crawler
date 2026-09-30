@@ -361,7 +361,7 @@ GET /api/v1/articles?group_ref_keys[]=pku&group_ref_keys[]=tsinghua&start_date=2
 - `group_ref_keys[]`（必填）：要查询的分组 ref_key 数组
 - `start_date`（分组模式必填）：开始日期，格式为 YYYY-MM-DD
 - `end_date`（分组模式必填）：结束日期，格式为 YYYY-MM-DD
-- `keyword`（全局搜索模式必填）：不传 `account_id` 或 `group_ref_keys[]` 时，搜索标题、摘要和正文；多个词以空格分隔，按 AND 语义匹配
+- `keyword`（全局搜索模式必填）：不传 `account_id` 或 `group_ref_keys[]` 时，搜索标题和摘要；多个词以空格分隔，按 AND 语义匹配
 - `platform`（全局搜索模式可选）：按平台筛选（`wechat`、`rednote`、`twitter`、`website`）
 - `source`（分组模式可选）：按平台筛选（`wechat`、`rednote`、`twitter`、`website`）
 - `page`（可选）：页码（默认：1）

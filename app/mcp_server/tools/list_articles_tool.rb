@@ -1,7 +1,7 @@
 module Tools
   class ListArticlesTool < MCP::Tool
     tool_name "list_articles"
-    description "查询某账号的文章列表，支持关键词模糊搜索（标题/摘要/正文）、日期范围过滤和分页。用于分析账号发布内容。"
+    description "查询某账号的文章列表，支持关键词模糊搜索（标题/摘要）、日期范围过滤和分页。用于分析账号发布内容。"
     annotations(read_only_hint: true, destructive_hint: false)
 
     ARTICLE_FIELDS = %w[id title url published_at digest content].freeze
@@ -9,7 +9,7 @@ module Tools
     input_schema(
       properties: {
         account_id: { type: "integer", description: "账号 ID" },
-        keyword: { type: "string", description: "关键词模糊搜索，匹配标题、摘要或正文，多个词用空格分隔（AND 语义）" },
+        keyword: { type: "string", description: "关键词模糊搜索，匹配标题或摘要，多个词用空格分隔（AND 语义）" },
         start_date: { type: "string", description: "起始日期（YYYY-MM-DD）" },
         end_date: { type: "string", description: "结束日期（YYYY-MM-DD）" },
         fields: { type: "array", items: { type: "string" }, description: "只返回指定文章字段（可选值：#{ARTICLE_FIELDS.join('、')}），不传则返回除 content 外的全部字段。content 较大，仅在需要时传入。" },
@@ -31,7 +31,7 @@ module Tools
 
       scope = account.articles.order(published_at: :desc)
 
-      # Keyword fuzzy search (title / digest / body)
+      # Keyword fuzzy search (title / digest)
       scope = scope.search_keyword(keyword)
 
       # Date range filter

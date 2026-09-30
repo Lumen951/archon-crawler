@@ -138,7 +138,7 @@ class ApiDocsController < ApplicationController
           security: [{ BearerAuth: [] }],
           parameters: [
             { name: "account_id", in: "query", required: false, schema: { type: "integer" }, description: "账号模式：按单个账号查询；可搭配 keyword、start_date、end_date" },
-            { name: "keyword", in: "query", required: false, schema: { type: "string" }, description: "全局搜索模式必填：未传 account_id 或 group_ref_keys 时按标题、摘要和正文全局模糊搜索；多个词用空格分隔（AND 语义）" },
+            { name: "keyword", in: "query", required: false, schema: { type: "string" }, description: "全局搜索模式必填：未传 account_id 或 group_ref_keys 时按标题和摘要全局模糊搜索；多个词用空格分隔（AND 语义）" },
             { name: "platform", in: "query", required: false, schema: { type: "string", enum: %w[wechat rednote twitter website] }, description: "全局搜索模式可选：按平台过滤" },
             { name: "start_date", in: "query", required: false, schema: { type: "string", format: "date" }, description: "账号或全局搜索模式可选；分组模式必填：起始日期（YYYY-MM-DD）" },
             { name: "end_date", in: "query", required: false, schema: { type: "string", format: "date" }, description: "账号或全局搜索模式可选；分组模式必填：结束日期（YYYY-MM-DD）" },
