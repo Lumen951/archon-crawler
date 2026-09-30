@@ -78,4 +78,51 @@ class WechatCrawlerContentDownloadTest < ActiveSupport::TestCase
     article&.destroy
     account&.destroy
   end
+
+  # /s?__biz=… 查询串链接实测必被环境验证拦截（2026-09 生产确认）：兜底开启
+  # 时直接走浏览器，不浪费一次注定失败的 HTTP 请求；/s/<hash> 短链仍先试 HTTP。
+  test "biz-query urls skip the http download and go straight to the browser" do
+    biz_url = "https://mp.weixin.qq.com/s?__biz=MzA3NDMzNTgzMQ==&mid=2650000000&idx=1&sn=abc#rd"
+    browser = ->(_url, crawl_task: nil) { "<div id=\"js_content\">浏览器正文</div>" }
+    http = ->(_url, crawl_task: nil) { flunk "查询串链接不应再尝试 HTTP 下载" }
+
+    stub_class_method(WechatCrawler, :fetch_article_page, http) do
+      stub_class_method(WechatArticleBrowserFetcher, :fetch, browser) do
+        assert_equal "浏览器正文", WechatCrawler.download_content(biz_url)
+      end
+    end
+  end
+
+  test "short urls still try the http download first" do
+    http = ->(_url, crawl_task: nil) { "<div id=\"js_content\">HTTP正文</div>" }
+    browser = ->(_url, crawl_task: nil) { flunk "短链 HTTP 未被拦截前不应进浏览器" }
+
+    stub_class_method(WechatCrawler, :fetch_article_page, http) do
+      stub_class_method(WechatArticleBrowserFetcher, :fetch, browser) do
+        assert_equal "HTTP正文", WechatCrawler.download_content(@url)
+      end
+    end
+  end
+
+  test "biz-query urls fall back to the http path when the browser fallback is disabled" do
+    Option.set("wechat_content_browser_fallback", "false")
+    biz_url = "https://mp.weixin.qq.com/s?__biz=MzA3NDMzNTgzMQ==&mid=2650000000&idx=1&sn=abc"
+    http = ->(_url, crawl_task: nil) { "<div id=\"js_content\">HTTP正文</div>" }
+    browser = ->(_url, crawl_task: nil) { flunk "开关关闭时不应触发浏览器" }
+
+    stub_class_method(WechatCrawler, :fetch_article_page, http) do
+      stub_class_method(WechatArticleBrowserFetcher, :fetch, browser) do
+        assert_equal "HTTP正文", WechatCrawler.download_content(biz_url)
+      end
+    end
+  end
+
+  test "biz_query_article_url? only matches the query-string shape" do
+    assert WechatCrawler.biz_query_article_url?("https://mp.weixin.qq.com/s?__biz=MzA3NDMzNTgzMQ==&mid=1&sn=x")
+    assert WechatCrawler.biz_query_article_url?("https://mp.weixin.qq.com/s/?__biz=MzA3NDMzNTgzMQ==&mid=1")
+    assert WechatCrawler.biz_query_article_url?("http://mp.weixin.qq.com/s?__biz=MzA3NDMzNTgzMQ==")
+    assert_not WechatCrawler.biz_query_article_url?("https://mp.weixin.qq.com/s/Wl4obDCwrQtymxxGnP7CFw")
+    assert_not WechatCrawler.biz_query_article_url?("https://mp.weixin.qq.com/s?mid=1&sn=x")
+    assert_not WechatCrawler.biz_query_article_url?("https://mp.weixin.qq.com/s/Wl4obDCwrQtymxxGnP7CFw?__biz=x")
+  end
 end

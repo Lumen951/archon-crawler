@@ -6,6 +6,7 @@ require "faraday"
 require "faraday/retry"
 require "rate_limiter"
 require "rate_limiter_middleware"
+require "uri"
 
 # Crawls WeChat public accounts. Orchestration across accounts (concurrency,
 # pausing, retry scheduling) is handled by CrawlOrchestrator; this class only
@@ -101,6 +102,12 @@ class WechatCrawler < BaseCrawler
 
     log(crawl_task, :debug, "下载文章: #{normalize_article_url(url)[0..80]}..., 速率限制: #{download_rate_limiter.remaining}/#{Option.wechat_download_rate_limit}")
 
+    # /s?__biz=… 查询串链接实测必被环境验证拦截，HTTP 下载纯属白跑一趟：
+    # 兜底开启时直接走浏览器；/s/<hash> 短链仍先试 HTTP，被拦再兜底。
+    if biz_query_article_url?(url) && browser_fallback_enabled?
+      return clean_rich_media_content(WechatArticleBrowserFetcher.fetch(url, crawl_task: crawl_task))
+    end
+
     begin
       clean_rich_media_content(fetch_article_page(url))
     rescue DownloadError => e
@@ -118,6 +125,16 @@ class WechatCrawler < BaseCrawler
   # 仅作为 HTTP 被拦截时的兜底，其余失败路径（删除/审核中）不受影响。
   def self.browser_fallback_enabled?
     Option.wechat_content_browser_fallback_enabled?
+  end
+
+  # 查询串格式的文章链接（mp.weixin.qq.com/s?__biz=…&mid=…&sn=…）。与
+  # /s/<hash> 短链不同，这类链接实测总是被环境验证拦截（2026-09 生产确认），
+  # HTTP 下载必然失败，应直接走浏览器路径。
+  def self.biz_query_article_url?(url)
+    uri = URI.parse(normalize_article_url(url))
+    uri.path.delete_suffix("/") == "/s" && uri.query.to_s.include?("__biz=")
+  rescue URI::InvalidURIError, URI::InvalidComponentError
+    false
   end
 
   # 将各种格式的微信文章链接统一为可直接请求的 URL
