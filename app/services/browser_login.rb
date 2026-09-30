@@ -23,8 +23,9 @@ module BrowserLogin
     PROVIDERS.fetch(key.to_s) { raise Error, "未知的远程登录平台: #{key}" }
   end
 
-  # 各平台持久化浏览器环境（user-data-dir）的根目录。人工登录与正文抓取
-  # 共用同一环境，验证/登录产生的 Cookie 因此可以在两者之间生效。
+  # 各平台持久化浏览器环境（user-data-dir）的根目录。登录浏览器把验证/登录
+  # Cookie 持续快照到自己的 profile 目录；正文抓取的常驻共享浏览器使用独立
+  # 的 wechat_mp_downloader 目录（见 SharedBrowser），据此回灌快照。
   def profile_root
     Rails.root.join("storage", "browser_profiles")
   end

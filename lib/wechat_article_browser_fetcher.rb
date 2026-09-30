@@ -8,13 +8,13 @@ require "ferrum"
 # （wappoc_appmsgcaptcha），纯 HTTP 下载（WechatCrawler.fetch_article_page）
 # 无法通过。微信的环境验证以 Cookie 形式留在浏览器里，因此这里的思路是：
 #
-#   1. 复用远程登录的浏览器环境（BrowserLogin.profile_dir_for("wechat_mp")）——
-#      用户在设置页「远程浏览器登录」里完成的人工验证/登录优先直接继承：
-#      登录浏览器仍在运行（含 Rails.cache 过期但进程存活的孤儿）时附着开
-#      新标签页；否则拉起独立 Chrome 并回灌 Session#frame 持续导出的 Cookie
-#      快照（会话级 Cookie 如环境验证、slave_sid 不会被 Chrome 写进 profile，
-#      不回灌就继承不到人工验证成果），无需每次重新验证；
-#   2. 抓取与登录会话靠 flock 互斥（ProfileLock），不会出现同 profile 双开。
+#   1. 复用远程登录的浏览器环境——用户在设置页「远程浏览器登录」里完成的
+#      人工验证/登录优先直接继承：登录浏览器仍在运行（含 Rails.cache 过期
+#      但进程存活的孤儿）时附着开新标签页；
+#   2. 否则用常驻共享浏览器（SharedBrowser）抓取：独立 user-data-dir，从
+#      Session#frame 持续导出的 Cookie 快照回灌（会话级 Cookie 如环境验证、
+#      slave_sid 不会被 Chrome 写进 profile，不回灌就继承不到人工验证成果），
+#      每次抓取前重灌，无需每次重新验证。
 #
 # 抓取是串行的（类级 Mutex），且与 HTTP 路径共用同一个下载限流器。失败语义
 # 与 HTTP 路径对齐：内容被删除等 → WechatCrawler::DownloadError（单篇失败）；
@@ -63,7 +63,7 @@ class WechatArticleBrowserFetcher
     private
 
     def mode_label(session_record)
-      session_record ? "附着登录浏览器" : "独立浏览器+Cookie快照"
+      session_record ? "附着登录浏览器" : "共享浏览器+Cookie快照"
     end
 
     # 文章 url 有时存成了被拦截后的验证页链接（wappoc_appmsgcaptcha?…&target_url=…），
@@ -77,13 +77,13 @@ class WechatArticleBrowserFetcher
       url
     end
 
-    # 有存活登录浏览器/孤儿浏览器 → 附着开新标签页；否则短暂拉起一次性
-    # Chrome（持 profile 锁），先回灌 Cookie 快照再导航。
+    # 有存活登录浏览器/孤儿浏览器 → 附着开新标签页；否则走常驻共享浏览器
+    # （首用拉起、跨抓取复用、空闲回收，详见 SharedBrowser）。
     def with_browser(session_record, crawl_task, &block)
       if session_record
         attach_to_session(session_record, &block)
       else
-        spawn_and_fetch(crawl_task, &block)
+        SharedBrowser.with_page(crawl_task, &block)
       end
     end
 
@@ -103,58 +103,6 @@ class WechatArticleBrowserFetcher
       end
     rescue Ferrum::Error, IOError => e
       raise Error, "附着登录浏览器失败：#{e.class}: #{e.message}"
-    end
-
-    def spawn_and_fetch(crawl_task)
-      profile_dir = BrowserLogin.profile_dir_for(PROFILE_PROVIDER)
-      lock = BrowserLogin::ProfileLock.acquire(profile_dir, timeout: 5)
-      begin
-        BrowserLogin::Launcher.clear_stale_chrome_locks(profile_dir)
-        # 有界面模式与登录浏览器保持同一指纹（UA/窗口），避免「登录时有界面
-        # 通过验证、抓取时 headless 又被拦」的不一致
-        port, pid, xvfb_pid = BrowserLogin::Launcher.launch(
-          profile_dir: profile_dir, url: "about:blank", headed: Option.browser_login_headed?
-        )
-        begin
-          browser = BrowserLogin::Launcher.attach(port)
-          page = BrowserLogin::Launcher.first_page(browser)
-          BrowserLogin::Launcher.pin_viewport(page)
-          restore_cookies!(page, profile_dir, crawl_task)
-          yield page
-        ensure
-          # Chrome 被杀只是断开 WS，ferrum 的消息/事件线程不会自己退出；不显式
-          # quit 会随每次抓取在 worker 进程里泄漏线程，内存持续上涨直到卡死
-          quietly { browser&.quit }
-          BrowserLogin::Launcher.kill_process_tree(pid)
-          BrowserLogin::Launcher.kill_process(xvfb_pid)
-        end
-      ensure
-        lock.release
-      end
-    rescue Ferrum::Error, IOError => e
-      raise Error, "浏览器抓取失败：#{e.class}: #{e.message}"
-    end
-
-    # 会话级 Cookie（环境验证、登录态）不会被 Chrome 写进 profile，必须从
-    # Session#frame 导出的快照回灌；逐条注入，单条失败不影响其余。
-    def restore_cookies!(page, profile_dir, crawl_task)
-      entries = BrowserLogin::CookieExport.load(profile_dir)
-      WechatCrawler.log(crawl_task, :info,
-                        "读取 Cookie 快照：#{profile_dir}/#{BrowserLogin::CookieExport::FILENAME}（#{entries.size} 条）")
-      return if entries.empty?
-
-      restored = 0
-      failures = Hash.new(0)
-      entries.each do |entry|
-        page.cookies.set(entry)
-        restored += 1
-      rescue StandardError => e
-        failures[e.class.name] += 1
-      end
-
-      failure_summary = failures.map { |error, count| "#{error}=#{count}" }.join(", ")
-      suffix = failure_summary.present? ? "，失败：#{failure_summary}" : ""
-      WechatCrawler.log(crawl_task, :info, "Cookie 快照回灌结果：成功 #{restored}/#{entries.size} 条#{suffix}")
     end
 
     def quietly

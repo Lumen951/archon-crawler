@@ -1,11 +1,22 @@
 require "test_helper"
 
 class WechatArticleBrowserFetcherTest < ActiveSupport::TestCase
+  include ActiveSupport::Testing::TimeHelpers
+
   setup do
     Option.delete_all
+    # 类级限流器跨测试共享，放水避免滑动窗口拖慢套件
+    Option.wechat_download_rate_limit = 1000
+    # 上一条测试可能遗留常驻共享浏览器：垫掉杀进程后复位（防误杀机器上的真实 pid）
+    stub_class_method(BrowserLogin::Launcher, :kill_process_tree, ->(_pid) { nil }) do
+      stub_class_method(BrowserLogin::Launcher, :kill_process, ->(_pid) { nil }) do
+        WechatArticleBrowserFetcher::SharedBrowser.shutdown
+      end
+    end
     @article_url = "https://mp.weixin.qq.com/s?__biz=MzA=&mid=1&idx=1&sn=x"
     @captcha_url = "https://mp.weixin.qq.com/mp/wappoc_appmsgcaptcha?poc_token=abc&target_url=#{CGI.escape(@article_url)}#rd"
   end
+
   # 鸭子类型替身：WechatArticleBrowserFetcher 只用 go_to / url / body / close /
   # cookies.set / quit
   class FakeCookies
@@ -17,7 +28,7 @@ class WechatArticleBrowserFetcherTest < ActiveSupport::TestCase
   end
 
   class FakePage
-    attr_reader :navigated_to, :closed, :cookie_sets
+    attr_reader :navigated_to, :closed, :cookie_sets, :go_to_calls
 
     def initialize(url:, body:)
       @url = url
@@ -30,6 +41,7 @@ class WechatArticleBrowserFetcherTest < ActiveSupport::TestCase
 
     def go_to(target)
       @navigated_to = target
+      @go_to_calls = @go_to_calls.to_i + 1
       self
     end
 
@@ -103,76 +115,79 @@ class WechatArticleBrowserFetcherTest < ActiveSupport::TestCase
     end
   end
 
-  test "fetch spawns a one-shot chrome and releases the profile lock when no session is active" do
+  # 会话级 Cookie（环境验证、登录态）Chrome 不会写进 profile：独立浏览器必须
+  # 先回灌 Session#frame 导出的快照，否则人工验证成果继承不到（生产踩过）。
+  test "shared browser re-injects the latest cookie snapshot before every fetch" do
     Dir.mktmpdir do |tmp_root|
       page = FakePage.new(url: @article_url, body: "<div id=\"js_content\">正文</div>")
       browser = FakeBrowser.new(page)
-      profile_dir = File.join(tmp_root, "wechat_mp")
-      launched = {}
-      killed = []
-      quit_state_at_kill = []
-      FileUtils.mkdir_p(profile_dir)
-      FileUtils.ln_s("old-container-host-123", File.join(profile_dir, "SingletonLock"))
+      profile_dir = File.join(tmp_root, "wechat_mp_downloader")
+      snapshot_dir = File.join(tmp_root, "wechat_mp")
+      FileUtils.mkdir_p(snapshot_dir)
+      write_snapshot(snapshot_dir, "s1")
 
-      stub_class_method(BrowserLogin::Session, :active_record, ->(_key) { nil }) do
-        stub_class_method(BrowserLogin, :profile_dir_for, ->(_key) { profile_dir }) do
-          stub_class_method(BrowserLogin::Launcher, :launch,
-                            ->(profile_dir:, url:, headed:) { launched[:url] = url; launched[:headed] = headed; [ 4001, 4242, nil ] }) do
-            stub_class_method(BrowserLogin::Launcher, :attach, ->(_port) { browser }) do
-              stub_class_method(BrowserLogin::Launcher, :kill_process_tree,
-                                ->(pid) { quit_state_at_kill << browser.quit_called; killed << pid }) do
-                stub_class_method(BrowserLogin::Launcher, :kill_process, ->(pid) { killed << pid }) do
-                  html = WechatArticleBrowserFetcher.fetch(@article_url)
+      without_session(profile_dir, snapshot_dir: snapshot_dir) do
+        stub_launch do
+          stub_attach(->(_port) { browser }) do
+            with_kill_stubs([]) do
+              WechatArticleBrowserFetcher.fetch(@article_url)
 
-                  assert_includes html, "正文"
-                  assert_equal "about:blank", launched[:url], "一次性 Chrome 以空白页启动，由 go_to 显式导航"
-                  assert_equal false, launched[:headed], "默认无界面模式"
-                  assert_includes killed, 4242, "抓完必须杀掉一次性 Chrome"
-                  assert_equal [ true ], quit_state_at_kill,
-                               "杀进程前必须先 quit，否则 ferrum 线程泄漏在 worker 进程里"
-                  assert_empty page.cookie_sets.sets, "没有快照时不应注入任何 Cookie"
-                end
-              end
+              # 模拟登录浏览器里完成了新一轮环境验证：快照值更新
+              write_snapshot(snapshot_dir, "s2")
+
+              WechatArticleBrowserFetcher.fetch(@article_url)
+
+              assert_equal %w[s1 s2], page.cookie_sets.sets.map { |entry| entry["value"] },
+                           "每次抓取前都要重灌最新快照，长寿命浏览器才能继承新验证"
             end
           end
         end
       end
-
-      assert_not File.exist?(File.join(profile_dir, "SingletonLock")), "spawn 前必须清掉跨容器残锁"
-
-      # 锁已释放：能再次获取
-      lock = BrowserLogin::ProfileLock.acquire(profile_dir, timeout: 0)
-      lock.release
     end
   end
 
-  # 会话级 Cookie（环境验证、登录态）Chrome 不会写进 profile：独立浏览器必须
-  # 先回灌 Session#frame 导出的快照，否则人工验证成果继承不到（生产踩过）。
-  test "spawned browser restores the cookie snapshot before navigating" do
+  # 常驻共享浏览器的核心语义：跨抓取复用同一 Chrome 与 ferrum 连接，浏览器
+  # 存活期间持有 profile 锁并落盘 pid 文件，shutdown 回收时先 quit 再杀进程。
+  test "fetch reuses one shared browser across fetches and keeps the profile lock until shutdown" do
     Dir.mktmpdir do |tmp_root|
       page = FakePage.new(url: @article_url, body: "<div id=\"js_content\">正文</div>")
-      profile_dir = File.join(tmp_root, "wechat_mp")
-      FileUtils.mkdir_p(profile_dir)
-      json = BrowserLogin::CookieExport.serialize(
-        [ SnapshotCookie.new("slave_sid", "s", ".qq.com", "/", 0, true, true, nil) ]
-      )
-      BrowserLogin::CookieExport.save(profile_dir, json)
+      browser = FakeBrowser.new(page)
+      profile_dir = File.join(tmp_root, "wechat_mp_downloader")
+      launched = []
+      attached_ports = []
+      killed = []
+      quit_state_at_kill = []
 
-      stub_class_method(BrowserLogin::Session, :active_record, ->(_key) { nil }) do
-        stub_class_method(BrowserLogin, :profile_dir_for, ->(_key) { profile_dir }) do
-          stub_class_method(BrowserLogin::Launcher, :launch, ->(profile_dir:, url:, headed:) { [ 4001, 4242, nil ] }) do
-            stub_class_method(BrowserLogin::Launcher, :attach, ->(_port) { FakeBrowser.new(page) }) do
-              stub_class_method(BrowserLogin::Launcher, :kill_process_tree, ->(pid) { nil }) do
-                stub_class_method(BrowserLogin::Launcher, :kill_process, ->(pid) { nil }) do
-                  html = WechatArticleBrowserFetcher.fetch(@article_url)
+      without_session(profile_dir) do
+        stub_launch(->(profile_dir:, url:, headed:) { launched << { url: url, headed: headed }; [ 4001, 4242, nil ] }) do
+          stub_attach(->(port) { attached_ports << port; browser }) do
+            with_kill_stubs(killed, before_kill: -> { quit_state_at_kill << browser.quit_called }) do
+              FileUtils.mkdir_p(profile_dir)
+              FileUtils.ln_s("old-container-host-123", File.join(profile_dir, "SingletonLock"))
 
-                  assert_includes html, "正文"
-                  assert_equal [ {
-                    "name" => "slave_sid", "value" => "s", "domain" => ".qq.com", "path" => "/",
-                    "httpOnly" => true, "secure" => true
-                  } ], page.cookie_sets.sets, "导航前必须回灌快照（会话级 Cookie 不带 expires）"
-                end
-              end
+              html = WechatArticleBrowserFetcher.fetch(@article_url)
+
+              assert_includes html, "正文"
+              WechatArticleBrowserFetcher.fetch(@article_url)
+
+              assert_equal [ { url: "about:blank", headed: false } ], launched,
+                           "两次抓取只拉起一次 Chrome，以空白页启动、由 go_to 显式导航"
+              assert_not File.exist?(File.join(profile_dir, "SingletonLock")), "拉起前必须清掉跨容器残锁"
+              assert_equal [ 4001 ], attached_ports, "复用同一 ferrum 连接，不重复附着"
+              assert_equal 2, page.go_to_calls, "每次抓取都独立导航"
+              assert_equal 4242,
+                           JSON.parse(File.read(File.join(profile_dir, WechatArticleBrowserFetcher::SharedBrowser::PID_FILE)))["pid"],
+                           "port/pid 必须落盘供跨进程收养"
+              # 浏览器存活期间必须持有 profile 锁
+              assert_raises(BrowserLogin::Error) { BrowserLogin::ProfileLock.acquire(profile_dir, timeout: 0) }
+
+              WechatArticleBrowserFetcher::SharedBrowser.shutdown
+              assert_equal [ true ], quit_state_at_kill, "杀进程前必须先 quit 释放 ferrum 线程"
+              assert_includes killed, 4242, "回收时必须杀掉 Chrome"
+              assert_not File.exist?(File.join(profile_dir, WechatArticleBrowserFetcher::SharedBrowser::PID_FILE)),
+                         "回收后必须清掉 pid 文件"
+              lock = BrowserLogin::ProfileLock.acquire(profile_dir, timeout: 0)
+              lock.release
             end
           end
         end
@@ -180,26 +195,27 @@ class WechatArticleBrowserFetcherTest < ActiveSupport::TestCase
     end
   end
 
-  test "spawned fetch browser follows the headed-mode option" do
-    Option.browser_login_headed = true
-    page = FakePage.new(url: @article_url, body: "正文")
-    launched = {}
-
+  test "browser option changes (headed/proxy) relaunch the shared browser" do
     Dir.mktmpdir do |tmp_root|
-      profile_dir = File.join(tmp_root, "wechat_mp")
+      page = FakePage.new(url: @article_url, body: "正文")
+      browser = FakeBrowser.new(page)
+      profile_dir = File.join(tmp_root, "wechat_mp_downloader")
+      launched = []
+      killed = []
 
-      stub_class_method(BrowserLogin::Session, :active_record, ->(_key) { nil }) do
-        stub_class_method(BrowserLogin, :profile_dir_for, ->(_key) { profile_dir }) do
-          stub_class_method(BrowserLogin::Launcher, :launch,
-                            ->(profile_dir:, url:, headed:) { launched[:headed] = headed; [ 4001, 4242, nil ] }) do
-            stub_class_method(BrowserLogin::Launcher, :attach, ->(_port) { FakeBrowser.new(page) }) do
-              stub_class_method(BrowserLogin::Launcher, :kill_process_tree, ->(pid) { nil }) do
-                stub_class_method(BrowserLogin::Launcher, :kill_process, ->(pid) { nil }) do
-                  WechatArticleBrowserFetcher.fetch(@article_url)
+      without_session(profile_dir) do
+        stub_launch(->(profile_dir:, url:, headed:) { launched << headed; [ 4001, 4242, nil ] }) do
+          stub_attach(->(_port) { browser }) do
+            with_kill_stubs(killed) do
+              WechatArticleBrowserFetcher.fetch(@article_url)
+              assert_equal [ false ], launched, "默认无界面模式"
 
-                  assert_equal true, launched[:headed], "有界面选项开启时独立浏览器应与登录浏览器同指纹"
-                end
-              end
+              Option.browser_login_headed = true
+              WechatArticleBrowserFetcher.fetch(@article_url)
+
+              assert_equal [ false, true ], launched,
+                           "headed 选项变化后必须重启共享浏览器（与登录浏览器保持同一指纹）"
+              assert_includes killed, 4242, "旧浏览器必须先被回收"
             end
           end
         end
@@ -207,6 +223,156 @@ class WechatArticleBrowserFetcherTest < ActiveSupport::TestCase
     end
   ensure
     Option.browser_login_headed = false
+  end
+
+  test "idle shared browser is recycled after the TTL" do
+    Dir.mktmpdir do |tmp_root|
+      page = FakePage.new(url: @article_url, body: "正文")
+      browser = FakeBrowser.new(page)
+      profile_dir = File.join(tmp_root, "wechat_mp_downloader")
+      launched = []
+      killed = []
+
+      without_session(profile_dir) do
+        stub_launch(->(profile_dir:, url:, headed:) { launched << headed; [ 4001, 4242, nil ] }) do
+          stub_attach(->(_port) { browser }) do
+            with_kill_stubs(killed) do
+              WechatArticleBrowserFetcher.fetch(@article_url)
+              assert_empty killed, "TTL 内的后续抓取必须复用浏览器"
+
+              travel_to WechatArticleBrowserFetcher::SharedBrowser::IDLE_TTL.from_now + 1.minute do
+                WechatArticleBrowserFetcher.fetch(@article_url)
+              end
+
+              assert_equal [ false, false ], launched, "空闲超过 TTL 后必须回收重拉"
+              assert_includes killed, 4242, "过期浏览器必须被杀掉"
+            end
+          end
+        end
+      end
+    end
+  end
+
+  # 上一任 owner 进程死亡后（flock 随之释放）Chrome 孤儿存活：凭 pid 文件
+  # 收养，避免再拉一个被 SingletonLock 顶掉的同 profile Chrome。
+  test "adopt a surviving browser left behind by a dead owner process" do
+    Dir.mktmpdir do |tmp_root|
+      page = FakePage.new(url: @article_url, body: "正文")
+      browser = FakeBrowser.new(page)
+      profile_dir = File.join(tmp_root, "wechat_mp_downloader")
+      FileUtils.mkdir_p(profile_dir)
+      File.write(File.join(profile_dir, WechatArticleBrowserFetcher::SharedBrowser::PID_FILE),
+                 { "port" => 4777, "pid" => 4242, "xvfb_pid" => nil }.to_json)
+      launched = false
+      attached_ports = []
+      killed = []
+
+      without_session(profile_dir) do
+        stub_launch(->(*) { launched = true; [ 4001, 4242, nil ] }) do
+          stub_attach(->(port) { attached_ports << port; browser }) do
+            with_kill_stubs(killed) do
+              html = WechatArticleBrowserFetcher.fetch(@article_url)
+
+              assert_includes html, "正文"
+              assert_not launched, "有存活遗留浏览器时不得再拉起"
+              assert_equal [ 4777 ], attached_ports, "必须按 pid 文件附着收养"
+              # 收养后本进程成为 owner，必须持有 profile 锁
+              assert_raises(BrowserLogin::Error) { BrowserLogin::ProfileLock.acquire(profile_dir, timeout: 0) }
+
+              WechatArticleBrowserFetcher::SharedBrowser.shutdown
+              assert_includes killed, 4242
+              assert_not File.exist?(File.join(profile_dir, WechatArticleBrowserFetcher::SharedBrowser::PID_FILE))
+            end
+          end
+        end
+      end
+    end
+  end
+
+  # 锁被 owner 进程持有（如日常下载 job 与手动「重新下载」分属不同进程）：
+  # 按 pid 文件借用附着，只开标签页抓完即断开，绝不拉起或杀进程。
+  test "borrow the running browser from the owning process when the lock is busy" do
+    Dir.mktmpdir do |tmp_root|
+      page = FakePage.new(url: @article_url, body: "正文")
+      profile_dir = File.join(tmp_root, "wechat_mp_downloader")
+      FileUtils.mkdir_p(profile_dir)
+      File.write(File.join(profile_dir, WechatArticleBrowserFetcher::SharedBrowser::PID_FILE),
+                 { "port" => 4777, "pid" => 4242, "xvfb_pid" => nil }.to_json)
+      holder = BrowserLogin::ProfileLock.acquire(profile_dir, timeout: 0)
+      launched = false
+      attached_ports = []
+      browsers = []
+      killed = []
+
+      without_session(profile_dir) do
+        stub_launch(->(*) { launched = true; [ 4001, 4242, nil ] }) do
+          stub_attach(->(port) do
+            attached_ports << port
+            FakeBrowser.new(page).tap { |b| browsers << b }
+          end) do
+            with_kill_stubs(killed) do
+              WechatArticleBrowserFetcher.fetch(@article_url)
+              WechatArticleBrowserFetcher.fetch(@article_url)
+
+              assert_not launched, "锁被占用时不得拉起自己的浏览器"
+              assert_equal [ 4777, 4777 ], attached_ports, "借用是每次抓取重新附着、一次一断"
+              assert browsers.first.quit_called, "借用连接用完即断开"
+              assert_empty killed, "借用方绝不杀浏览器进程"
+            end
+          end
+        end
+      end
+    ensure
+      holder.release
+    end
+  end
+
+  test "raises when the lock is busy and no browser is borrowable" do
+    Dir.mktmpdir do |tmp_root|
+      profile_dir = File.join(tmp_root, "wechat_mp_downloader")
+      FileUtils.mkdir_p(profile_dir)
+      holder = BrowserLogin::ProfileLock.acquire(profile_dir, timeout: 0)
+
+      without_session(profile_dir) do
+        stub_launch(->(*) { flunk("锁被占用且无可借用浏览器时不应拉起") }) do
+          error = assert_raises(WechatArticleBrowserFetcher::Error) do
+            WechatArticleBrowserFetcher.fetch(@article_url)
+          end
+
+          assert_match(/占用/, error.message)
+        end
+      end
+    ensure
+      holder.release
+    end
+  end
+
+  test "relaunches the shared browser when its process died between fetches" do
+    Dir.mktmpdir do |tmp_root|
+      page = FakePage.new(url: @article_url, body: "正文")
+      browser = FakeBrowser.new(page)
+      profile_dir = File.join(tmp_root, "wechat_mp_downloader")
+      launched = []
+      killed = []
+      chrome_alive = true
+
+      without_session(profile_dir, alive: ->(_pid) { chrome_alive }) do
+        stub_launch(->(profile_dir:, url:, headed:) { launched << headed; [ 4001, 4242, nil ] }) do
+          stub_attach(->(_port) { browser }) do
+            with_kill_stubs(killed) do
+              WechatArticleBrowserFetcher.fetch(@article_url)
+              assert_empty killed
+
+              chrome_alive = false # 模拟 Chrome 被 OOM killer 杀掉
+              WechatArticleBrowserFetcher.fetch(@article_url)
+
+              assert_equal [ false, false ], launched, "进程死亡后必须重新拉起"
+              assert_includes killed, 4242, "死亡实例必须被回收"
+            end
+          end
+        end
+      end
+    end
   end
 
   # Rails.cache 过期但登录浏览器进程还活着（用户关掉设置页后超时前的窗口）：
@@ -252,5 +418,61 @@ class WechatArticleBrowserFetcherTest < ActiveSupport::TestCase
         WechatArticleBrowserFetcher.fetch(url)
       end
     end
+  end
+
+  # 无登录会话时的共享浏览器兜底路径：垫掉 Session 记录，把 profile 目录
+  # 按用途分派到临时目录（下载浏览器目录 / 登录快照目录互不干扰），健康探测
+  # 按 alive 谓词处理（替身浏览器没有真实进程，默认存活）。
+  # 注意 stub_class_methods 不支持嵌套打同一个方法，存活谓词只能从这里传。
+  def without_session(profile_root, snapshot_dir: profile_root, alive: ->(_pid) { true })
+    stub_class_method(BrowserLogin::Session, :active_record, ->(_key) { nil }) do
+      stub_class_method(BrowserLogin::Session, :orphan_record, ->(_key) { nil }) do
+        stub_class_method(BrowserLogin, :profile_dir_for,
+                          ->(key) do
+                            if key == WechatArticleBrowserFetcher::SharedBrowser::PROFILE_PROVIDER
+                              profile_root
+                            else
+                              snapshot_dir
+                            end
+                          end) do
+          stub_class_method(BrowserLogin::Launcher, :process_alive?, alive) do
+            stub_class_method(BrowserLogin::Launcher, :cdp_ready?, ->(_port) { true }) do
+              yield
+            end
+          end
+        end
+      end
+    end
+  end
+
+  def stub_launch(launch = ->(profile_dir:, url:, headed:) { [ 4001, 4242, nil ] })
+    stub_class_method(BrowserLogin::Launcher, :launch, launch) do
+      yield
+    end
+  end
+
+  def stub_attach(attach)
+    stub_class_method(BrowserLogin::Launcher, :attach, attach) do
+      yield
+    end
+  end
+
+  # 杀进程路径统一垫掉（含 pid 复用核对），before_kill 用于断言 quit 时序
+  def with_kill_stubs(killed, before_kill: nil)
+    stub_class_method(BrowserLogin::Launcher, :process_matches?, ->(_pid, _pattern) { true }) do
+      stub_class_method(BrowserLogin::Launcher, :kill_process_tree,
+                        ->(pid) { before_kill&.call; killed << pid }) do
+        stub_class_method(BrowserLogin::Launcher, :kill_process, ->(pid) { killed << pid }) do
+          yield
+        end
+      end
+    end
+  end
+
+  def write_snapshot(dir, value)
+    BrowserLogin::CookieExport.save(
+      dir,
+      BrowserLogin::CookieExport.serialize([ SnapshotCookie.new("slave_sid", value, ".qq.com", "/", 0, true, true, nil) ])
+    )
   end
 end
