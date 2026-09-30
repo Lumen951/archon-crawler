@@ -6,7 +6,8 @@ class WechatArticleBrowserFetcherTest < ActiveSupport::TestCase
     @article_url = "https://mp.weixin.qq.com/s?__biz=MzA=&mid=1&idx=1&sn=x"
     @captcha_url = "https://mp.weixin.qq.com/mp/wappoc_appmsgcaptcha?poc_token=abc&target_url=#{CGI.escape(@article_url)}#rd"
   end
-  # 鸭子类型替身：WechatArticleBrowserFetcher 只用 go_to / url / body / close / cookies.set
+  # 鸭子类型替身：WechatArticleBrowserFetcher 只用 go_to / url / body / close /
+  # cookies.set / quit
   class FakeCookies
     attr_reader :sets
 
@@ -44,15 +45,18 @@ class WechatArticleBrowserFetcherTest < ActiveSupport::TestCase
   end
 
   class FakeBrowser
+    attr_reader :quit_called
+
     def initialize(page)
       @page = page
+      @quit_called = false
     end
 
     def create_page = @page
 
     def pages = [ @page ]
 
-    def quit = nil
+    def quit = @quit_called = true
   end
 
   test "fetch navigates to the target_url when given a captcha redirect url" do
@@ -102,9 +106,11 @@ class WechatArticleBrowserFetcherTest < ActiveSupport::TestCase
   test "fetch spawns a one-shot chrome and releases the profile lock when no session is active" do
     Dir.mktmpdir do |tmp_root|
       page = FakePage.new(url: @article_url, body: "<div id=\"js_content\">正文</div>")
+      browser = FakeBrowser.new(page)
       profile_dir = File.join(tmp_root, "wechat_mp")
       launched = {}
       killed = []
+      quit_state_at_kill = []
       FileUtils.mkdir_p(profile_dir)
       FileUtils.ln_s("old-container-host-123", File.join(profile_dir, "SingletonLock"))
 
@@ -112,8 +118,9 @@ class WechatArticleBrowserFetcherTest < ActiveSupport::TestCase
         stub_class_method(BrowserLogin, :profile_dir_for, ->(_key) { profile_dir }) do
           stub_class_method(BrowserLogin::Launcher, :launch,
                             ->(profile_dir:, url:, headed:) { launched[:url] = url; launched[:headed] = headed; [ 4001, 4242, nil ] }) do
-            stub_class_method(BrowserLogin::Launcher, :attach, ->(_port) { FakeBrowser.new(page) }) do
-              stub_class_method(BrowserLogin::Launcher, :kill_process_tree, ->(pid) { killed << pid }) do
+            stub_class_method(BrowserLogin::Launcher, :attach, ->(_port) { browser }) do
+              stub_class_method(BrowserLogin::Launcher, :kill_process_tree,
+                                ->(pid) { quit_state_at_kill << browser.quit_called; killed << pid }) do
                 stub_class_method(BrowserLogin::Launcher, :kill_process, ->(pid) { killed << pid }) do
                   html = WechatArticleBrowserFetcher.fetch(@article_url)
 
@@ -121,6 +128,8 @@ class WechatArticleBrowserFetcherTest < ActiveSupport::TestCase
                   assert_equal "about:blank", launched[:url], "一次性 Chrome 以空白页启动，由 go_to 显式导航"
                   assert_equal false, launched[:headed], "默认无界面模式"
                   assert_includes killed, 4242, "抓完必须杀掉一次性 Chrome"
+                  assert_equal [ true ], quit_state_at_kill,
+                               "杀进程前必须先 quit，否则 ferrum 线程泄漏在 worker 进程里"
                   assert_empty page.cookie_sets.sets, "没有快照时不应注入任何 Cookie"
                 end
               end

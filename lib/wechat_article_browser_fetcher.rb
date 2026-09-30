@@ -122,6 +122,9 @@ class WechatArticleBrowserFetcher
           restore_cookies!(page, profile_dir, crawl_task)
           yield page
         ensure
+          # Chrome 被杀只是断开 WS，ferrum 的消息/事件线程不会自己退出；不显式
+          # quit 会随每次抓取在 worker 进程里泄漏线程，内存持续上涨直到卡死
+          quietly { browser&.quit }
           BrowserLogin::Launcher.kill_process_tree(pid)
           BrowserLogin::Launcher.kill_process(xvfb_pid)
         end
