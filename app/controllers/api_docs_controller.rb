@@ -44,13 +44,13 @@ class ApiDocsController < ApplicationController
           tags: ["Accounts"],
           security: [{ BearerAuth: [] }],
           parameters: [
-            { name: "platform", in: "query", schema: { type: "string", enum: %w[wechat rednote twitter] }, description: "按平台过滤" },
-            { name: "status", in: "query", schema: { type: "string", enum: %w[active inactive] }, description: "按状态过滤" },
-            { name: "activity_level", in: "query", schema: { type: "string", enum: %w[active slow dormant dead never uncrawled] }, description: "按活跃度过滤" },
-            { name: "tag_id", in: "query", schema: { type: "integer" }, description: "按标签 ID 过滤" },
-            { name: "keyword", in: "query", schema: { type: "string" }, description: "按账号名称搜索" },
-            { name: "page", in: "query", schema: { type: "integer", default: 1 } },
-            { name: "per_page", in: "query", schema: { type: "integer", default: 25, maximum: 100 } },
+            { name: "platform", in: "query", required: false, schema: { type: "string", enum: %w[wechat rednote twitter website] }, description: "可选：按平台过滤" },
+            { name: "status", in: "query", required: false, schema: { type: "string", enum: %w[active inactive] }, description: "可选：按状态过滤" },
+            { name: "activity_level", in: "query", required: false, schema: { type: "string", enum: %w[active slow dormant dead never uncrawled] }, description: "可选：按活跃度过滤" },
+            { name: "tag_id", in: "query", required: false, schema: { type: "integer" }, description: "可选：按标签 ID 过滤" },
+            { name: "keyword", in: "query", required: false, schema: { type: "string" }, description: "可选：按账号名称搜索" },
+            { name: "page", in: "query", required: false, schema: { type: "integer", default: 1, minimum: 1 }, description: "可选：页码，默认 1" },
+            { name: "per_page", in: "query", required: false, schema: { type: "integer", default: 25, minimum: 1, maximum: 100 }, description: "可选：每页数量，默认 25，最大 100" },
           ],
           responses: {
             "200" => {
@@ -120,8 +120,8 @@ class ApiDocsController < ApplicationController
           security: [{ BearerAuth: [] }],
           parameters: [
             { name: "source", in: "query", required: true, schema: { type: "string", enum: %w[wechat rednote twitter] } },
-            { name: "id", in: "query", schema: { type: "string" } },
-            { name: "name", in: "query", schema: { type: "string" } },
+            { name: "id", in: "query", required: false, schema: { type: "string" }, description: "可选：按平台账号 ID 精确查询" },
+            { name: "name", in: "query", required: false, schema: { type: "string" }, description: "可选：按账号名称查询" },
           ],
           responses: { "200" => { description: "成功" } }
         }
@@ -137,13 +137,14 @@ class ApiDocsController < ApplicationController
           tags: ["Articles"],
           security: [{ BearerAuth: [] }],
           parameters: [
-            { name: "account_id", in: "query", schema: { type: "integer" }, description: "按账号查询" },
-            { name: "start_date", in: "query", schema: { type: "string", format: "date" } },
-            { name: "end_date", in: "query", schema: { type: "string", format: "date" } },
-            { name: "group_ref_keys[]", in: "query", schema: { type: "array", items: { type: "string" } } },
-            { name: "range[]", in: "query", schema: { type: "array", items: { type: "string", format: "date" } } },
-            { name: "page", in: "query", schema: { type: "integer", default: 1 } },
-            { name: "per_page", in: "query", schema: { type: "integer", default: 25 } },
+            { name: "account_id", in: "query", required: false, schema: { type: "integer" }, description: "账号模式：按单个账号查询；可搭配 keyword、start_date、end_date" },
+            { name: "keyword", in: "query", required: false, schema: { type: "string" }, description: "全局搜索模式必填：未传 account_id 或 group_ref_keys 时按标题、摘要和正文全局模糊搜索；多个词用空格分隔（AND 语义）" },
+            { name: "platform", in: "query", required: false, schema: { type: "string", enum: %w[wechat rednote twitter website] }, description: "全局搜索模式可选：按平台过滤" },
+            { name: "start_date", in: "query", required: false, schema: { type: "string", format: "date" }, description: "账号或全局搜索模式可选；分组模式必填：起始日期（YYYY-MM-DD）" },
+            { name: "end_date", in: "query", required: false, schema: { type: "string", format: "date" }, description: "账号或全局搜索模式可选；分组模式必填：结束日期（YYYY-MM-DD）" },
+            { name: "group_ref_keys[]", in: "query", required: false, schema: { type: "array", items: { type: "string" } }, description: "分组模式必填；未传 account_id 或 keyword 时至少传一个分组 ref_key" },
+            { name: "page", in: "query", required: false, schema: { type: "integer", default: 1, minimum: 1 }, description: "可选：页码，默认 1" },
+            { name: "per_page", in: "query", required: false, schema: { type: "integer", default: 25, minimum: 1, maximum: 100 }, description: "可选：每页数量，默认 25，最大 100" },
           ],
           responses: { "200" => { description: "成功" } }
         }

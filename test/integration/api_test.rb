@@ -289,7 +289,8 @@ class ApiTest < ActionDispatch::IntegrationTest
 
     params = {
       group_ref_keys: ["article-test"],
-      range: [1.week.ago.to_date.to_s, Date.today.to_s]
+      start_date: 1.week.ago.to_date.to_s,
+      end_date: Date.today.to_s
     }
 
     get "/api/v1/articles",
@@ -325,7 +326,8 @@ class ApiTest < ActionDispatch::IntegrationTest
 
     params = {
       group_ref_keys: ["empty-group"],
-      range: [1.week.ago.to_date.to_s, Date.today.to_s]
+      start_date: 1.week.ago.to_date.to_s,
+      end_date: Date.today.to_s
     }
 
     get "/api/v1/articles",
@@ -351,7 +353,8 @@ class ApiTest < ActionDispatch::IntegrationTest
 
     params = {
       group_ref_keys: ["filter-test"],
-      range: [1.week.ago.to_date.to_s, Date.today.to_s],
+      start_date: 1.week.ago.to_date.to_s,
+      end_date: Date.today.to_s,
       source: "wechat"
     }
 
@@ -379,7 +382,8 @@ class ApiTest < ActionDispatch::IntegrationTest
 
     params = {
       group_ref_keys: ["pagination-test"],
-      range: [1.week.ago.to_date.to_s, Date.today.to_s],
+      start_date: 1.week.ago.to_date.to_s,
+      end_date: Date.today.to_s,
       page: 1,
       per_page: 1
     }
@@ -399,11 +403,117 @@ class ApiTest < ActionDispatch::IntegrationTest
     assert json["pagination"]["total_pages"] > 1
   end
 
+  test "GET /articles - keyword search in account mode" do
+    debug_log("测试: 查询文章 - 账号模式关键词搜索")
+
+    params = {
+      account_id: @wechat_account.id,
+      keyword: "招生简章"
+    }
+
+    get "/api/v1/articles",
+      params: params,
+      headers: auth_headers
+
+    debug_response(response, request_params: params)
+
+    assert_response :success
+    json = JSON.parse(response.body)
+
+    titles = json["articles"].map { |a| a["title"] }
+    assert_includes titles, @article1.title
+    assert_not_includes titles, @article2.title
+
+    # Search matches body content too
+    params = { account_id: @wechat_account.id, keyword: "这是测试内容" }
+    get "/api/v1/articles", params: params, headers: auth_headers
+    assert_response :success
+    assert JSON.parse(response.body)["articles"].any? { |a| a["title"] == @article1.title }
+
+    # No match
+    params = { account_id: @wechat_account.id, keyword: "不存在的关键词xyz" }
+    get "/api/v1/articles", params: params, headers: auth_headers
+    assert_response :success
+    assert_empty JSON.parse(response.body)["articles"]
+  end
+
+  test "GET /articles - keyword search in group mode" do
+    debug_log("测试: 查询文章 - 分组模式关键词搜索")
+
+    group = @user.groups.create!(ref_key: "keyword-test")
+    group.group_accounts.create!(account: @wechat_account)
+    group.group_accounts.create!(account: @rednote_account)
+
+    params = {
+      group_ref_keys: ["keyword-test"],
+      start_date: 1.week.ago.to_date.to_s,
+      end_date: Date.today.to_s,
+      keyword: "新生入学指南"
+    }
+
+    get "/api/v1/articles",
+      params: params,
+      headers: auth_headers
+
+    debug_response(response, request_params: params)
+
+    assert_response :success
+    json = JSON.parse(response.body)
+
+    titles = json["articles"].map { |a| a["title"] }
+    assert_includes titles, @article2.title
+    assert_not_includes titles, @article1.title
+  end
+
+  test "GET /articles - global keyword search without account or group" do
+    debug_log("测试: 查询文章 - 全局关键词搜索")
+
+    params = { keyword: "招生简章" }
+    get "/api/v1/articles", params: params, headers: auth_headers
+
+    assert_response :success
+    json = JSON.parse(response.body)
+
+    assert_equal "招生简章", json["keyword"]
+    titles = json["articles"].map { |article| article["title"] }
+    assert_includes titles, @article1.title
+    assert_not_includes titles, @article2.title
+
+    article = json["articles"].find { |entry| entry["title"] == @article1.title }
+    assert_equal @wechat_account.id, article.dig("account", "id")
+    assert_equal @wechat_account.fakeid, article.dig("account", "fakeid")
+    assert_equal "wechat", article.dig("account", "platform")
+  end
+
+  test "GET /articles - global keyword search filters by platform and date" do
+    params = {
+      keyword: "新生入学指南",
+      platform: "rednote",
+      start_date: 1.week.ago.to_date.to_s,
+      end_date: Date.today.to_s
+    }
+
+    get "/api/v1/articles", params: params, headers: auth_headers
+
+    assert_response :success
+    json = JSON.parse(response.body)
+    assert_includes json["articles"].map { |article| article["title"] }, @article2.title
+    assert json["articles"].all? { |article| article.dig("account", "platform") == "rednote" }
+  end
+
+  test "GET /articles - global keyword search rejects invalid platform" do
+    get "/api/v1/articles", params: { keyword: "招生简章", platform: "invalid_platform" }, headers: auth_headers
+
+    assert_response :bad_request
+    assert_includes JSON.parse(response.body)["error"], "不支持的平台"
+  end
+
   test "GET /articles - error missing group_ref_keys" do
     debug_log("测试: 查询文章 - 缺少 group_ref_keys")
 
     params = {
-      range: [1.week.ago.to_date.to_s, Date.today.to_s]
+      start_date: 1.week.ago.to_date.to_s,
+      end_date: Date.today.to_s
     }
 
     get "/api/v1/articles",
@@ -422,7 +532,8 @@ class ApiTest < ActionDispatch::IntegrationTest
 
     params = {
       group_ref_keys: ["test"],
-      range: ["invalid-date", "2026-07-15"]
+      start_date: "invalid-date",
+      end_date: "2026-07-15"
     }
 
     get "/api/v1/articles",
@@ -451,7 +562,7 @@ class ApiTest < ActionDispatch::IntegrationTest
 
     assert_response :bad_request
     json = JSON.parse(response.body)
-    assert_includes json["error"], "range 必须包含两个日期"
+    assert_includes json["error"], "start_date 和 end_date 不能为空"
   end
 
   test "GET /articles - error invalid platform filter" do
@@ -462,7 +573,8 @@ class ApiTest < ActionDispatch::IntegrationTest
 
     params = {
       group_ref_keys: ["platform-filter-test"],
-      range: [1.week.ago.to_date.to_s, Date.today.to_s],
+      start_date: 1.week.ago.to_date.to_s,
+      end_date: Date.today.to_s,
       source: "invalid_platform"
     }
 
@@ -482,7 +594,8 @@ class ApiTest < ActionDispatch::IntegrationTest
 
     params = {
       group_ref_keys: ["nonexistent"],
-      range: [1.week.ago.to_date.to_s, Date.today.to_s]
+      start_date: 1.week.ago.to_date.to_s,
+      end_date: Date.today.to_s
     }
 
     get "/api/v1/articles",

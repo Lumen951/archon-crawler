@@ -10,9 +10,10 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_15_000001) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_30_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+  enable_extension "pg_trgm"
 
   create_table "accounts", force: :cascade do |t|
     t.integer "activity_score", default: 0, null: false
@@ -70,9 +71,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_15_000001) do
     t.string "title", null: false
     t.datetime "updated_at", null: false
     t.string "url", null: false
+    t.index "COALESCE(content_markdown, content_html) gin_trgm_ops", name: "index_articles_on_body_trgm", using: :gin
     t.index ["account_id", "published_at"], name: "index_articles_on_account_id_and_published_at", order: { published_at: :desc }
     t.index ["crawl_task_id"], name: "index_articles_on_crawl_task_id"
+    t.index ["digest"], name: "index_articles_on_digest_trgm", opclass: :gin_trgm_ops, using: :gin
     t.index ["published_at"], name: "index_articles_on_published_at"
+    t.index ["title"], name: "index_articles_on_title_trgm", opclass: :gin_trgm_ops, using: :gin
     t.index ["url"], name: "index_articles_on_url", unique: true
   end
 

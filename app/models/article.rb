@@ -20,8 +20,11 @@
 # Indexes
 #
 #  index_articles_on_account_id_and_published_at  (account_id,published_at DESC)
+#  index_articles_on_body_trgm                    (COALESCE(content_markdown, content_html) gin_trgm_ops) USING gin
 #  index_articles_on_crawl_task_id                (crawl_task_id)
+#  index_articles_on_digest_trgm                  (digest) USING gin
 #  index_articles_on_published_at                 (published_at)
+#  index_articles_on_title_trgm                   (title) USING gin
 #  index_articles_on_url                          (url) UNIQUE
 #
 # Foreign Keys
@@ -44,6 +47,22 @@ class Article < ApplicationRecord
   scope :last_7_days, -> { where("published_at >= ?", 7.days.ago) }
   scope :last_month, -> { where("published_at >= ?", 1.month.ago) }
   scope :wechat_missing_content, -> { joins(:account).where(accounts: { type: "WechatAccount" }, content_html: nil) }
+
+  # Fuzzy keyword search over title, digest and body. Space-separated terms are
+  # AND-ed; every term must appear as a substring in at least one column.
+  # Backed by the pg_trgm GIN indexes on the same expressions.
+  def self.search_keyword(keyword)
+    terms = keyword.to_s.split.reject(&:blank?)
+    return all if terms.empty?
+
+    terms.reduce(all) do |scope, term|
+      pattern = "%#{sanitize_sql_like(term)}%"
+      scope.where(
+        "title ILIKE :p OR digest ILIKE :p OR COALESCE(content_markdown, content_html) ILIKE :p",
+        p: pattern
+      )
+    end
+  end
 
   # 从原文 URL 重新下载文章内容 (仅支持微信公众号)
   def download_content!
@@ -84,12 +103,12 @@ class Article < ApplicationRecord
     when "wechat"
       # Remove the CSS block at the beginning and cover image
       cleaned = content_markdown
-        .gsub(/\A\s*#js[^\n]*\{[^}]*\}\s*/m, '')  # Remove #js_row... block
-        .gsub(/\A\s*\.[a-z_][^\n]*\{[^}]*\}\s*/m, '')  # Remove .class blocks
-        .gsub(/\A\s*img\s*\{[^}]*\}\s*/m, '')  # Remove img{} block
-        .gsub(/\A\s*<style[^>]*>.*?<\/style>\s*/im, '')
-        .gsub(/\A\s*<script[^>]*>.*?<\/script>\s*/im, '')
-        .gsub(/\A\s*!\[cover_image\]\([^\)]+\)\s*/i, '')  # Remove cover image
+        .gsub(/\A\s*#js[^\n]*\{[^}]*\}\s*/m, "")  # Remove #js_row... block
+        .gsub(/\A\s*\.[a-z_][^\n]*\{[^}]*\}\s*/m, "")  # Remove .class blocks
+        .gsub(/\A\s*img\s*\{[^}]*\}\s*/m, "")  # Remove img{} block
+        .gsub(/\A\s*<style[^>]*>.*?<\/style>\s*/im, "")
+        .gsub(/\A\s*<script[^>]*>.*?<\/script>\s*/im, "")
+        .gsub(/\A\s*!\[cover_image\]\([^\)]+\)\s*/i, "")  # Remove cover image
         .strip
       cleaned.presence
     when "rednote"
@@ -110,8 +129,8 @@ class Article < ApplicationRecord
     when "wechat"
       # Remove style and script blocks
       cleaned = content_html
-        .gsub(/<style[^>]*>.*?<\/style>/im, '')
-        .gsub(/<script[^>]*>.*?<\/script>/im, '')
+        .gsub(/<style[^>]*>.*?<\/style>/im, "")
+        .gsub(/<script[^>]*>.*?<\/script>/im, "")
         .strip
       cleaned.presence
     when "rednote"
@@ -173,7 +192,7 @@ class Article < ApplicationRecord
     when "twitter"
       raw_data&.dig("media_urls") || []
     when "wechat"
-      cover_url.present? ? [cover_url] : []
+      cover_url.present? ? [ cover_url ] : []
     else
       []
     end
@@ -232,7 +251,7 @@ class Article < ApplicationRecord
     # Has cover image
     score += 5 if cover_url.present?
 
-    [score, 100].min
+    [ score, 100 ].min
   end
 
   private

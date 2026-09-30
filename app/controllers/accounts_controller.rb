@@ -21,7 +21,7 @@ class AccountsController < ApplicationController
 
   def show
     @account = Account.find(params[:id])
-    @articles = @account.articles.recent.page(params[:page]).per(25)
+    @articles = @account.articles.recent.search_keyword(params[:keyword]).page(params[:page]).per(25)
     if @account.website?
       @monitor_pages = @account.monitor_pages.ordered.limit(20)
       @monitor_changes = @account.monitor_changes.recent.limit(10)

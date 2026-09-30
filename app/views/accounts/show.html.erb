@@ -361,6 +361,27 @@
       最近文章
     </h2>
 
+    <!-- Keyword Search -->
+    <%= form_with url: account_path(@account), method: :get, local: true, class: "mb-4" do %>
+      <div class="flex flex-col sm:flex-row gap-3">
+        <div class="relative flex-1">
+          <svg class="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+          </svg>
+          <%= text_field_tag :keyword, params[:keyword],
+                placeholder: "搜索该账号的文章标题、摘要或正文…",
+                class: "w-full h-11 pl-10 pr-4 rounded-xl border border-border-primary bg-bg-secondary text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent transition" %>
+        </div>
+        <button type="submit"
+                class="h-11 px-5 rounded-xl bg-brand text-white hover:bg-brand-dark font-semibold text-sm transition inline-flex items-center justify-center gap-2 shadow-[0_7px_16px_rgba(59,130,246,.14)]">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+          </svg>
+          搜索
+        </button>
+      </div>
+    <% end %>
+
     <% if @articles.any? %>
       <!-- Desktop Table -->
       <div class="hidden md:block bg-bg-card border border-border-primary rounded-2xl overflow-hidden shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">

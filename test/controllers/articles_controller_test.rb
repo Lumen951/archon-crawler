@@ -56,4 +56,37 @@ class ArticlesControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "a[href=?]", account_path(@article.account)
   end
+
+  test "should get articles index" do
+    get articles_path
+    assert_response :success
+    assert_select "a[href=?]", article_path(@article)
+  end
+
+  test "articles index filters by keyword" do
+    get articles_path, params: { keyword: @article.title }
+    assert_response :success
+    assert_select "a[href=?]", article_path(@article)
+
+    get articles_path, params: { keyword: "不存在的关键词xyz" }
+    assert_response :success
+    assert_select "p", text: "没有匹配的文章"
+  end
+
+  test "articles index filters by platform" do
+    get articles_path, params: { platform: "wechat" }
+    assert_response :success
+    assert_select "a[href=?]", article_path(@article)
+
+    # accounts(:one) is a WechatAccount, so the website filter matches nothing
+    get articles_path, params: { platform: "website" }
+    assert_response :success
+    assert_select "p", text: "没有匹配的文章"
+  end
+
+  test "account page filters articles by keyword" do
+    get account_path(@account), params: { keyword: @article.title }
+    assert_response :success
+    assert_select "a[href=?]", article_path(@article)
+  end
 end

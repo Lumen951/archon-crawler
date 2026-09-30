@@ -2,12 +2,17 @@ module Api
   module V1
     class ArticlesController < Api::BaseController
       # GET /api/v1/articles
-      # Supports two modes:
-      #   1. By groups: ?group_ref_keys[]=key1&group_ref_keys[]=key2&range[]=start&range[]=end
+      # Supports three modes:
+      #   1. By groups: ?group_ref_keys[]=key1&group_ref_keys[]=key2&start_date=2026-08-01&end_date=2026-08-19
       #   2. By account: ?account_id=123&start_date=2026-08-01&end_date=2026-08-19
+      #   3. Global keyword search: ?keyword=term&platform=wechat&start_date=2026-08-01
       def index
         if params[:account_id].present?
           index_by_account
+        elsif params[:group_ref_keys].present?
+          index_by_group
+        elsif params[:keyword].present?
+          index_by_keyword
         else
           index_by_group
         end
@@ -23,6 +28,9 @@ module Api
         per_page = [[params[:per_page].to_i, 25].max, 100].min
 
         scope = account.articles.order(published_at: :desc)
+
+        # Keyword fuzzy search (title / digest / body)
+        scope = scope.search_keyword(params[:keyword])
 
         # Date range filter
         if params[:start_date].present?
@@ -71,10 +79,70 @@ module Api
         }
       end
 
-      # Mode 1: Original group-based query (unchanged)
+      # Mode 3: Global keyword search. This intentionally does not require an
+      # account or group, mirroring the MCP search_articles tool.
+      def index_by_keyword
+        page = [ params[:page].to_i, 1 ].max
+        per_page = [ [ params[:per_page].to_i, 25 ].max, 100 ].min
+        scope = Article.order(published_at: :desc).search_keyword(params[:keyword])
+
+        if params[:platform].present?
+          account_type = platform_account_type(params[:platform])
+          return unless account_type
+
+          scope = scope.joins(:account).where(accounts: { type: account_type })
+        end
+
+        if params[:start_date].present?
+          begin
+            scope = scope.where("published_at >= ?", Date.parse(params[:start_date]).beginning_of_day)
+          rescue Date::Error
+            render json: { error: "start_date 格式无效，请使用 YYYY-MM-DD" }, status: :bad_request
+            return
+          end
+        end
+
+        if params[:end_date].present?
+          begin
+            scope = scope.where("published_at <= ?", Date.parse(params[:end_date]).end_of_day)
+          rescue Date::Error
+            render json: { error: "end_date 格式无效，请使用 YYYY-MM-DD" }, status: :bad_request
+            return
+          end
+        end
+
+        articles = scope.includes(:account).page(page).per(per_page)
+
+        render json: {
+          keyword: params[:keyword],
+          articles: articles.map { |article|
+            {
+              id: article.id,
+              title: article.title,
+              url: article.url,
+              digest: article.best_digest,
+              content: article.clean_content_markdown,
+              published_at: article.published_at&.iso8601,
+              account: {
+                id: article.account.id,
+                fakeid: article.account.fakeid,
+                nickname: article.account.nickname,
+                platform: article.account.type.sub("Account", "").downcase
+              }
+            }
+          },
+          pagination: {
+            page: articles.current_page,
+            per_page: articles.limit_value,
+            total_count: articles.total_count,
+            total_pages: articles.total_pages
+          }
+        }
+      end
+
+      # Mode 1: Original group-based query
       def index_by_group
         group_ref_keys = params[:group_ref_keys] || []
-        range = params[:range] || []
         source = params[:source].to_s.strip.presence
         page = (params[:page] || 1).to_i
         per_page = [(params[:per_page] || 25).to_i, 100].min
@@ -85,14 +153,14 @@ module Api
           return
         end
 
-        if range.length != 2
-          render json: { error: "range 必须包含两个日期 [start_date, end_date]" }, status: :bad_request
+        if params[:start_date].blank? || params[:end_date].blank?
+          render json: { error: "start_date 和 end_date 不能为空" }, status: :bad_request
           return
         end
 
         begin
-          range_start = Date.parse(range[0]).beginning_of_day
-          range_end = Date.parse(range[1]).end_of_day
+          range_start = Date.parse(params[:start_date]).beginning_of_day
+          range_end = Date.parse(params[:end_date]).end_of_day
         rescue Date::Error
           render json: { error: "日期格式无效，请使用 YYYY-MM-DD 格式" }, status: :bad_request
           return
@@ -119,19 +187,15 @@ module Api
 
         # Apply platform filter
         if source.present?
-          account_type = case source.downcase
-                         when "wechat" then "WechatAccount"
-                         when "rednote" then "RednoteAccount"
-                         when "twitter" then "TwitterAccount"
-                         when "website" then "WebsiteAccount"
-                         else
-                           render json: { error: "不支持的平台: #{source}" }, status: :bad_request
-                           return
-                         end
+          account_type = platform_account_type(source)
+          return unless account_type
 
           articles = articles.joins("INNER JOIN accounts ON accounts.id = articles.account_id")
                              .where(accounts: { type: account_type })
         end
+
+        # Keyword fuzzy search (title / digest / body)
+        articles = articles.search_keyword(params[:keyword])
 
         # Execute query with pagination
         articles = articles.includes(:account)
@@ -163,6 +227,19 @@ module Api
             total_count: articles.total_count,
             total_pages: articles.total_pages
           }
+        }
+      end
+
+      def platform_account_type(platform)
+        {
+          "wechat" => "WechatAccount",
+          "rednote" => "RednoteAccount",
+          "twitter" => "TwitterAccount",
+          "website" => "WebsiteAccount"
+        }[platform.to_s.downcase].tap { |account_type|
+          unless account_type
+            render json: { error: "不支持的平台: #{platform}" }, status: :bad_request
+          end
         }
       end
     end

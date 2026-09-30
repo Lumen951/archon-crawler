@@ -349,18 +349,21 @@ GET /api/v1/accounts?source=rednote&name=蔚来
 
 ### 4. GET /articles
 
-查询分组中的文章，支持分页和筛选。
+查询文章，支持以下三种模式：按分组查询、按单个账号查询，或仅传 `keyword` 进行全局搜索。
 
 #### 请求
 
 ```
-GET /api/v1/articles?group_ref_keys[]=pku&group_ref_keys[]=tsinghua&range[]=2026-07-01&range[]=2026-07-15&source=wechat&page=1&per_page=25
+GET /api/v1/articles?group_ref_keys[]=pku&group_ref_keys[]=tsinghua&start_date=2026-07-01&end_date=2026-07-15&source=wechat&page=1&per_page=25
 ```
 
 **查询参数：**
 - `group_ref_keys[]`（必填）：要查询的分组 ref_key 数组
-- `range[]`（必填）：日期范围 [开始日期, 结束日期]，格式为 YYYY-MM-DD
-- `source`（可选）：按平台筛选（`wechat`、`rednote`、`twitter`）
+- `start_date`（分组模式必填）：开始日期，格式为 YYYY-MM-DD
+- `end_date`（分组模式必填）：结束日期，格式为 YYYY-MM-DD
+- `keyword`（全局搜索模式必填）：不传 `account_id` 或 `group_ref_keys[]` 时，搜索标题、摘要和正文；多个词以空格分隔，按 AND 语义匹配
+- `platform`（全局搜索模式可选）：按平台筛选（`wechat`、`rednote`、`twitter`、`website`）
+- `source`（分组模式可选）：按平台筛选（`wechat`、`rednote`、`twitter`、`website`）
 - `page`（可选）：页码（默认：1）
 - `per_page`（可选）：每页数量（默认：25，最大：100）
 
@@ -462,7 +465,7 @@ GET /api/v1/articles?group_ref_keys[]=pku&group_ref_keys[]=tsinghua&range[]=2026
 **错误（400 Bad Request）- 日期范围无效：**
 ```json
 {
-  "error": "range 必须包含两个日期 [start_date, end_date]"
+  "error": "start_date 和 end_date 不能为空"
 }
 ```
 
@@ -625,8 +628,8 @@ curl -G "https://your-domain.com/api/v1/articles" \
   -H "Authorization: Bearer YOUR_API_KEY" \
   --data-urlencode "group_ref_keys[]=pku" \
   --data-urlencode "group_ref_keys[]=tsinghua" \
-  --data-urlencode "range[]=2026-07-01" \
-  --data-urlencode "range[]=2026-07-15" \
+  --data-urlencode "start_date=2026-07-01" \
+  --data-urlencode "end_date=2026-07-15" \
   --data-urlencode "page=1" \
   --data-urlencode "per_page=25"
 ```
@@ -636,7 +639,7 @@ curl -G "https://your-domain.com/api/v1/articles" \
 curl -G "https://your-domain.com/api/v1/articles" \
   -H "Authorization: Bearer YOUR_API_KEY" \
   --data-urlencode "group_ref_keys[]=pku" \
-  --data-urlencode "range[]=2026-07-01" \
-  --data-urlencode "range[]=2026-07-15" \
+  --data-urlencode "start_date=2026-07-01" \
+  --data-urlencode "end_date=2026-07-15" \
   --data-urlencode "source=wechat"
 ```
