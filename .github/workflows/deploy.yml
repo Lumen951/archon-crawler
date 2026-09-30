@@ -21,6 +21,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           repository: MiraclePlus/twitter-api-client
+          ref: f936e5832cdf830742cf23cc4d5566193d9f88b5
           ssh-key: ${{ secrets.SUBMODULE_SSH_PRIVATE_KEY }}
           path: twitter-api-client
 
