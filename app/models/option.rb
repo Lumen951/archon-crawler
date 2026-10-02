@@ -614,6 +614,54 @@ class Option < ApplicationRecord
       Time.parse(expires_at).future? rescue false
     end
 
+    # ── 小红书采集通道（api / browser）─────────────────
+    # "api"（默认）：RednoteApiClient 付费 API。"browser"：真实浏览器直连
+    # xiaohongshu.com（RednoteBrowserCrawler），依赖上方网页版登录态，且 IP/环境
+    # 触发风控时会明确失败。切换入口在设置页小红书面板。
+    REDNOTE_CRAWL_PROVIDERS = %w[api browser].freeze
+
+    def rednote_crawl_provider
+      stored = get("rednote_crawl_provider")
+      REDNOTE_CRAWL_PROVIDERS.include?(stored) ? stored : "api"
+    end
+
+    def rednote_crawl_provider=(val)
+      normalized = REDNOTE_CRAWL_PROVIDERS.include?(val.to_s) ? val.to_s : "api"
+      set("rednote_crawl_provider", normalized)
+    end
+
+    def rednote_browser_crawl?
+      rednote_crawl_provider == "browser"
+    end
+
+    # 浏览器通道页面导航限流：次数 / 窗口秒数（主页与逐篇详情共用，默认保守值
+    # 10 次/60 秒）。风控敏感，宁慢勿快。
+    def rednote_browser_rate_limit
+      (get('rednote_browser_rate_limit') || 10).to_i
+    end
+
+    def rednote_browser_rate_limit=(val)
+      set('rednote_browser_rate_limit', val)
+    end
+
+    def rednote_browser_rate_window
+      (get('rednote_browser_rate_window') || 60).to_i
+    end
+
+    def rednote_browser_rate_window=(val)
+      set('rednote_browser_rate_window', val)
+    end
+
+    # 浏览器通道滚动轮数上限（账号 crawl_rule 未限制 max_pages 时兜底），防止
+    # 异常页面导致无限滚动。
+    def rednote_browser_max_scrolls
+      (get('rednote_browser_max_scrolls') || 40).to_i
+    end
+
+    def rednote_browser_max_scrolls=(val)
+      set('rednote_browser_max_scrolls', val)
+    end
+
     # ── 远程浏览器登录（BrowserLogin）─────
     # true 时登录浏览器以有界面模式运行（Linux 下自动拉起 Xvfb 虚拟显示），
     # 对部分反爬页面更友好；默认 headless，无需 Xvfb。

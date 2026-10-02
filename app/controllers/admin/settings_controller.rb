@@ -144,6 +144,13 @@ class Admin::SettingsController < Admin::BaseController
       Option.set("crawl_rednote_enabled", params[:crawl_rednote_enabled] == "1")
     end
 
+    if params[:rednote_crawl_provider].present?
+      Option.rednote_crawl_provider = params[:rednote_crawl_provider]
+      message = params[:rednote_crawl_provider] == "browser" ?
+        "小红书采集通道已切换为浏览器直连（依赖网页版登录态，风控时会明确失败）" :
+        "小红书采集通道已切换为付费 API"
+    end
+
     if params.key?(:crawl_twitter_enabled)
       Option.set("crawl_twitter_enabled", params[:crawl_twitter_enabled] == "1")
     end
@@ -647,6 +654,7 @@ class Admin::SettingsController < Admin::BaseController
     @wechat_api_provider = Option.wechat_api_provider
     @dajiala_api_key = Option.dajiala_api_key
     @rednote_api_key = Option.rednote_api_key
+    @rednote_crawl_provider = Option.rednote_crawl_provider
     @default_article_concurrency = Option.default_article_concurrency
     @default_account_concurrency = Option.default_account_concurrency
     @max_crawl_pages = Option.max_crawl_pages

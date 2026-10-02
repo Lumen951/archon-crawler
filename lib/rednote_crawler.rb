@@ -45,6 +45,14 @@ class RednoteCrawler < BaseCrawler
   # fetched sequentially rather than using article_concurrency (kept in the
   # signature only to conform to BaseCrawler).
   def self.crawl_account(account, crawl_task, article_concurrency:, max_pages:)
+    # 浏览器通道：Option.rednote_browser_crawl? 时整个账号走真实浏览器直连
+    # （RednoteBrowserCrawler），协议与返回值保持一致。
+    if Option.rednote_browser_crawl?
+      return RednoteBrowserCrawler.crawl_account(
+        account, crawl_task, article_concurrency: article_concurrency, max_pages: max_pages
+      )
+    end
+
     task_account = crawl_task.crawl_task_accounts.find_by(account: account)
     task_account&.mark_running!
 
@@ -135,7 +143,7 @@ class RednoteCrawler < BaseCrawler
     note_id = note_info["noteId"] || note_info["id"]
     return :error if note_id.blank?
 
-    note_url = "#{NOTE_URL_BASE}/#{note_id}"
+    note_url = note_url_for(note_id)
 
     if Article.exists?(url: note_url)
       log(crawl_task, :debug, "跳过重复笔记: #{note_info['title']} (#{note_id})")
@@ -149,6 +157,18 @@ class RednoteCrawler < BaseCrawler
       log(crawl_task, :warn, "笔记 #{note_id} 详情获取失败，跳过")
       return :error
     end
+
+    save_note_with_detail(note_info, detail_data, account, crawl_task)
+  end
+
+  # 笔记落库的唯一入口（列表项 + API 形状的详情 hash）。小红书付费 API 路径与
+  # 浏览器路径（RednoteBrowserCrawler，详情经 detail_to_api_shape 归一）共用：
+  # URL 方案、去重兜底、字段映射、进度与错误计数都从这里走，避免两条采集通道漂移。
+  def self.save_note_with_detail(note_info, detail_data, account, crawl_task)
+    note_id = note_info["noteId"] || note_info["id"]
+    return :error if note_id.blank?
+
+    note_url = note_url_for(note_id)
 
     note_card      = detail_data["note_card"] || {}
     interact_info  = note_card["interact_info"] || {}
@@ -193,6 +213,7 @@ class RednoteCrawler < BaseCrawler
     :error
   end
 
+  # 笔记详情获取（API 通道）。
   def self.fetch_note_detail_with_retry(note_id, account, crawl_task)
     Retryable.with_retry(
       crawl_task: crawl_task,
@@ -202,5 +223,11 @@ class RednoteCrawler < BaseCrawler
         track_usage(crawl_task, account, "笔记详情 #{note_id}", usage)
       end
     end
+  end
+
+  # 笔记的规范 URL（不含 xsec_token 等跳转参数）。两条采集通道共用：Article.url
+  # 唯一性依赖它，浏览器路径打开详情页时才临时附加 xsec_token。
+  def self.note_url_for(note_id)
+    "#{NOTE_URL_BASE}/#{note_id}"
   end
 end
