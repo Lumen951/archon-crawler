@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh_CN">
+<head>
+  <meta charset="utf-8">
+  <title>E2E 回归测试：主流程链路验证</title>
+  <script>
+    // E2E mock 正文页：WereadNativeApiClient#extract_cgi_data 从这里取权威元数据
+    //（link/create_time/title/desc/cdn_url/nick_name），键名必须顶格或仅缩进。
+    window.cgiDataNew = {
+        link: 'https://mp.weixin.qq.com/s/MOCKARTICLE1',
+        create_time: '2026-09-30 12:00',
+        title: 'E2E 回归测试：主流程链路验证',
+        desc: '验证抓取、正文下载、展示的端到端链路。',
+        cdn_url: '/e2e-assets/cover-1.svg',
+        nick_name: 'E2E演示公众号',
+        content_noencode: ''
+    };
+  </script>
+</head>
+<body>
+  <div id="app">
+    <h1>E2E 回归测试：主流程链路验证</h1>
+    <div id="js_content">
+      <p>本文用于 <strong>mp-crawler</strong> 的端到端回归验证（微信读书直连链路）：从帐号触发抓取，到文章列表落库，再到正文下载与页面展示，全链路不依赖外部网络。</p>
+      <p>正文第一段包含断言关键词：<span style="color: #337fed;"><strong>流式链路验证完成</strong></span>。Playwright 会等待这段文字出现在文章详情页。</p>
+      <blockquote>
+        <p>引用块：截图里应能看到这段缩进文字，证明富文本结构被完整保留。</p>
+      </blockquote>
+      <p><img class="rich_pages wxw-img" data-src="/e2e-assets/figure-1.svg" data-w="600"></p>
+      <p>第二段验证懒加载图片的 data-src → src 修复逻辑，以及正文中的多段落排版。</p>
+      <ul>
+        <li>列表项一：目录结构保持不变</li>
+        <li>列表项二：重复运行不得产生重复文章（Article.url 唯一）</li>
+        <li>列表项三：失败要有可审查的任务日志</li>
+      </ul>
+    </div>
+  </div>
+</body>
+</html>

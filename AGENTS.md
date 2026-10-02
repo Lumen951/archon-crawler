@@ -115,6 +115,18 @@ add tests that prove both the successful path and the relevant failure or retry
 invariant. Stub external HTTP/Python-provider calls; do not depend on live
 credentials or external services in the test suite.
 
+### Browser E2E regression (offline closed loop)
+
+`bin/e2e` runs a Playwright suite against development with a dedicated database
+(`E2E_DB_NAME`, default `mp_crawler_e2e`) and every external dependency mocked
+(`E2E_MOCKS=1` → WebMock replays `e2e/fixtures/`; Twitter/Ferrum stubbed at the
+Ruby layer; never network). It produces an HTML report with screenshots and
+videos (`npx playwright show-report`). Run it (full or targeted spec) after
+changing controllers, views, crawlers, jobs, or routes that affect user-facing
+flows, and when adding a new external endpoint add a mock handler +
+fixture (`lib/e2e_mock/handlers.rb`) so the suite stays offline. Details:
+`e2e/README.md` and the `e2e-regression` / `prod-sample` skills.
+
 ## Local Development and Deployment
 
 - Install Ruby dependencies with `bundle install` using the Ruby version in

@@ -1,0 +1,20 @@
+[
+  {
+    "id": "tweet-1001",
+    "author_id": "1299000001",
+    "screen_name": "e2edemo_tw",
+    "created_at": "Tue Sep 29 10:00:00 +0000 2026",
+    "full_text": "E2E mock 推文一：验证 Twitter 抓取链路的 Ruby 层 stub（无 python3 依赖）。",
+    "favorite_count": 12,
+    "retweet_count": 3
+  },
+  {
+    "id": "tweet-1002",
+    "author_id": "1299000001",
+    "screen_name": "e2edemo_tw",
+    "created_at": "Mon Sep 28 09:30:00 +0000 2026",
+    "full_text": "E2E mock 推文二：回归时这条推文应当出现在对应帐号的文章列表里。",
+    "favorite_count": 7,
+    "retweet_count": 1
+  }
+]

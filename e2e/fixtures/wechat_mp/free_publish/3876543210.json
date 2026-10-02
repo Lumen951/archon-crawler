@@ -1,0 +1,38 @@
+{
+  "base_resp": { "ret": 0, "err_msg": "ok" },
+  "free_publish_list": [
+    {
+      "aid": "e2e-aid-001",
+      "title": "E2E 回归测试：主流程链路验证",
+      "link": "https://mp.weixin.qq.com/s/MOCKARTICLE1",
+      "cover": "/e2e-assets/cover-1.svg",
+      "digest": "验证抓取、正文下载、展示的端到端链路。",
+      "author_name": "测试员甲",
+      "create_time": 1790726400,
+      "item_show_type": 9,
+      "copyright_stat": 1
+    },
+    {
+      "aid": "e2e-aid-002",
+      "title": "MCP 工具接入实战指南",
+      "link": "https://mp.weixin.qq.com/s/MOCKARTICLE2",
+      "cover": "/e2e-assets/cover-2.svg",
+      "digest": "把内部能力通过 MCP 暴露给客户端的实践笔记。",
+      "author_name": "测试员乙",
+      "create_time": 1790640000,
+      "item_show_type": 9,
+      "copyright_stat": 0
+    },
+    {
+      "aid": "e2e-aid-003",
+      "title": "本周技术周报：Rails 8.1 与 Solid 全家桶",
+      "link": "https://mp.weixin.qq.com/s/MOCKARTICLE3",
+      "cover": "/e2e-assets/cover-3.svg",
+      "digest": "Solid Queue / Cache / Cable 的运维体感。",
+      "author_name": "测试员丙",
+      "create_time": 1790553600,
+      "item_show_type": 9,
+      "copyright_stat": 0
+    }
+  ]
+}

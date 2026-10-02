@@ -43,8 +43,12 @@ gem "thruster", require: false
 gem "image_processing", "~> 1.2"
 
 group :development, :test do
-  # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem
+  # See https://guides.rails.org/debugging_rails_applications.html#debugging-with-the-debug-gem
   gem "debug", platforms: %i[ mri windows ], require: "debug/prelude"
+
+  # E2E 浏览器回归测试（bin/e2e）在 development 环境拦截外部 HTTP，
+  # 回放 e2e/fixtures 下的本地报文；仅在 E2E_MOCKS=1 时由 e2e_mock 初始化器显式 require。
+  gem "webmock", require: false
 
   # Audits gems for known security defects (use config/bundler-audit.yml to ignore issues)
   gem "bundler-audit", require: false

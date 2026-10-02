@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh_CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>E2E 回归测试：主流程链路验证</title>
+  <script>
+    // 与真实文章页同构的 JS 变量：WechatCrawler#get_mp_info / extract_mp_var
+    // 依赖 nickname、ori_head_img_url、create_time 与 __biz。
+    var biz = "Mzg3NjU0MzIxMA==";
+    var user_uin = "" * 1;
+    var nickname = htmlDecode("E2E演示公众号");
+    var ori_head_img_url = "https://mp.weixin.qq.com/mock/avatar.svg";
+    var msg_title = htmlDecode("E2E 回归测试：主流程链路验证");
+    var msg_desc = htmlDecode("验证抓取、正文下载、展示的端到端链路。");
+    var msg_cdn_url = "";
+    var msg_link = "https://mp.weixin.qq.com/s?__biz=Mzg3NjU0MzIxMA==&mid=2247485001&sn=mocksn0001&chksm=mock";
+    var create_time = "1790726400" * 1;
+  </script>
+</head>
+<body id="activity-detail" class="zh_CN">
+  <div id="js_article" class="rich_media">
+    <div class="rich_media_inner">
+      <h1 class="rich_media_title" id="activity-name">E2E 回归测试：主流程链路验证</h1>
+      <div class="rich_media_meta_list">
+        <span class="rich_media_meta rich_media_meta_nickname" id="js_name">E2E演示公众号</span>
+        <em id="publish_time" class="rich_media_meta rich_media_meta_text">2026年9月30日</em>
+      </div>
+      <div class="rich_media_content js_underline_content autoType_setting24psection" id="js_content">
+        <p style="text-align: justify;">本文用于 <strong>mp-crawler</strong> 的端到端回归验证：从帐号触发抓取，到文章列表落库，再到正文下载与页面展示，全链路不依赖外部网络。</p>
+        <p style="text-align: justify;">正文第一段包含断言关键词：<span style="color: #337fed;"><strong>流式链路验证完成</strong></span>。Playwright 会等待这段文字出现在文章详情页。</p>
+        <blockquote class="js_blockquote_wrap">
+          <p>引用块：截图里应能看到这段缩进文字，证明富文本结构被完整保留。</p>
+        </blockquote>
+        <p><img class="rich_pages wxw-img js_insertlocalimg" data-src="/e2e-assets/figure-1.svg" data-w="600"></p>
+        <p style="text-align: justify;">第二段验证懒加载图片的 data-src → src 修复逻辑，以及正文中的多段落排版。</p>
+        <ul>
+          <li>列表项一：目录结构保持不变</li>
+          <li>列表项二：重复运行不得产生重复文章（Article.url 唯一）</li>
+          <li>列表项三：失败要有可审查的任务日志</li>
+        </ul>
+        <p>查看公众号主页：<a href="https://mp.weixin.qq.com/mp/profile_ext?action=home&__biz=Mzg3NjU0MzIxMA==#wechat_redirect">E2E演示公众号</a></p>
+      </div>
+    </div>
+  </div>
+  <script>
+    var __redirect_url = "";
+  </script>
+</body>
+</html>

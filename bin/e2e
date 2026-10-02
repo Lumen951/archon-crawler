@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# E2E 浏览器回归测试一键入口。
+#
+#   bin/e2e                 # 全量回归（默认重置 E2E 数据库，确定性运行）
+#   bin/e2e --keep-db       # 保留数据库，只补种子（快速迭代单条用例）
+#   bin/e2e tests/05-crawl.spec.ts        # 只跑某个文件
+#   bin/e2e --headed        # 带 GUI 运行
+#   bin/e2e --ui            # Playwright UI 模式
+#
+# 流程：重置并种子化独立数据库（E2E_DB_NAME，默认 mp_crawler_e2e）→
+# 以 E2E_MOCKS=1 启动 development 服务器（外部 HTTP 全部由 e2e/fixtures 回放）→
+# 跑 Playwright → 提示打开 HTML 报告。报告截图/视频在 e2e/playwright-report/。
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+E2E_DB_NAME="${E2E_DB_NAME:-mp_crawler_e2e}"
+E2E_PORT="${E2E_PORT:-3001}"
+export E2E_DB_NAME
+export E2E_MOCKS=1
+
+KEEP_DB=0
+args=()
+for arg in "$@"; do
+  case "$arg" in
+    --keep-db) KEEP_DB=1 ;;
+    *) args+=("$arg") ;;
+  esac
+done
+
+bundle check >/dev/null 2>&1 || bundle install
+
+if [ "$KEEP_DB" -eq 0 ]; then
+  echo "==> 重置 E2E 数据库 ${E2E_DB_NAME}"
+  # 用 TRUNCATE 而非 db:drop：drop 会被残留连接（未退出的旧服务器）阻塞，
+  # TRUNCATE 对此免疫，且比 drop/create/migrate 快
+  bin/rails db:prepare >/dev/null
+  bin/rails e2e:reset_db
+else
+  bin/rails db:prepare >/dev/null
+fi
+
+echo "==> 生成种子数据"
+bin/rails e2e:seed
+
+echo "==> 构建 Tailwind CSS"
+bin/rails tailwindcss:build >/dev/null
+
+BASE_URL="http://127.0.0.1:${E2E_PORT}"
+SERVER_PID=""
+if curl -fsS "${BASE_URL}/up" >/dev/null 2>&1; then
+  echo "==> 复用已在运行的 E2E 服务器 ${BASE_URL}（如需重启请先手动停止）"
+else
+  echo "==> 启动 development 服务器（E2E_MOCKS=1）：${BASE_URL}"
+  bin/rails server -b 127.0.0.1 -p "${E2E_PORT}" >log/e2e-server.log 2>&1 &
+  SERVER_PID=$!
+  trap '[ -n "$SERVER_PID" ] && kill "$SERVER_PID" 2>/dev/null || true' EXIT
+  ok=0
+  for _ in $(seq 1 60); do
+    if curl -fsS "${BASE_URL}/up" >/dev/null 2>&1; then ok=1; break; fi
+    kill -0 "$SERVER_PID" 2>/dev/null || { echo "服务器启动失败，日志见 log/e2e-server.log"; exit 1; }
+    sleep 1
+  done
+  [ "$ok" -eq 1 ] || { echo "服务器 60 秒内未就绪，日志见 log/e2e-server.log"; exit 1; }
+fi
+
+cd e2e
+if [ ! -d node_modules/@playwright ]; then
+  echo "==> 安装 Playwright 依赖"
+  npm install
+  npx playwright install chromium
+fi
+
+echo "==> 运行 Playwright"
+if [ "${#args[@]}" -gt 0 ]; then
+  npx playwright test "${args[@]}"
+else
+  npx playwright test
+fi
+
+echo "==> 完成。结果入口：e2e/report.html（双击打开）；深度排查：cd e2e && npx playwright show-report"

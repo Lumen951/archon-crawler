@@ -54,6 +54,9 @@ Rails.application.routes.draw do
       # Website import routes
       get  "import/website", to: "accounts#import_website_page", as: :import_website_page
       post :import_website
+      # Event research import routes
+      get  "import/event", to: "accounts#import_event_page", as: :import_event_page
+      post "import/event", to: "accounts#import_event", as: :import_event
     end
     member do
       post :crawl
@@ -62,6 +65,19 @@ Rails.application.routes.draw do
       post :rediscover
       patch :update_crawl_rule
       post :generate_crawl_rule
+      get :edit_event
+      patch :update_event
+    end
+  end
+
+  # 活动研究控制台：与抓取管线独立，show 页就是调研的入口与结果中心
+  resources :event_accounts, only: [ :show ] do
+    member do
+      post :start_research
+      post :fail_run
+      get :logs
+      get :poll
+      get :download
     end
   end
 
@@ -195,6 +211,7 @@ Rails.application.routes.draw do
         end
       end
       resources :tags, only: [:index, :show, :create]
+      resources :event_research_runs, only: [:index, :show]
     end
   end
 

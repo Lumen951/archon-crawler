@@ -1,0 +1,14 @@
+{
+  "organic": [
+    {
+      "title": "张三：E2E示例科技有限公司创始人",
+      "link": "https://news.e2e-event.test/person-zhangsan",
+      "snippet": "张三，E2E示例科技有限公司创始人兼CEO"
+    },
+    {
+      "title": "E2E创新创业大赛获奖名单公布",
+      "link": "https://news.e2e-event.test/award-list",
+      "snippet": "获奖名单"
+    }
+  ]
+}

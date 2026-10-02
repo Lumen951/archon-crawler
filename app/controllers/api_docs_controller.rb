@@ -17,7 +17,7 @@ class ApiDocsController < ApplicationController
       servers: [
         { url: request.base_url, description: "Current" }
       ],
-      paths: account_paths.merge(article_paths).merge(tag_paths).merge(group_paths),
+      paths: account_paths.merge(article_paths).merge(tag_paths).merge(group_paths).merge(event_research_run_paths),
       components: {
         securitySchemes: {
           BearerAuth: {
@@ -26,7 +26,7 @@ class ApiDocsController < ApplicationController
             description: "在 /profile 页面创建 API Key"
           }
         },
-        schemas: account_schema.merge(article_schema).merge(tag_schema).merge(group_schema).merge(pagination_schema)
+        schemas: account_schema.merge(article_schema).merge(tag_schema).merge(group_schema).merge(event_research_run_schema).merge(pagination_schema)
       }
     }
 
@@ -182,6 +182,47 @@ class ApiDocsController < ApplicationController
     }
   end
 
+  def event_research_run_paths
+    {
+      "/api/v1/event_research_runs" => {
+        get: {
+          summary: "查询活动调研运行记录",
+          description: "活动调研（Event Research）的运行记录列表。latest=true 时只返回每个账号最近一次成功调研。",
+          tags: ["EventResearch"],
+          security: [{ BearerAuth: [] }],
+          parameters: [
+            { name: "account_id", in: "query", schema: { type: "integer" }, description: "按活动账号过滤" },
+            { name: "status", in: "query", schema: { type: "string", enum: %w[pending running completed failed] }, description: "按状态过滤" },
+            { name: "latest", in: "query", schema: { type: "string", enum: %w[true false] }, description: "只看每个账号最近一次成功调研" },
+            { name: "page", in: "query", schema: { type: "integer", default: 1 } },
+            { name: "per_page", in: "query", schema: { type: "integer", default: 25, maximum: 100 } }
+          ],
+          responses: {
+            "200" => {
+              description: "成功",
+              content: { "application/json" => { schema: {
+                type: "object",
+                properties: {
+                  event_research_runs: { type: "array", items: { "$ref" => "#/components/schemas/EventResearchRun" } },
+                  pagination: { "$ref" => "#/components/schemas/Pagination" }
+                }
+              }}}
+            }
+          }
+        }
+      },
+      "/api/v1/event_research_runs/{id}" => {
+        get: {
+          summary: "获取调研运行详情（含完整结果 JSON）",
+          tags: ["EventResearch"],
+          security: [{ BearerAuth: [] }],
+          parameters: [ { name: "id", in: "path", required: true, schema: { type: "integer" } } ],
+          responses: { "200" => { description: "成功" } }
+        }
+      }
+    }
+  end
+
   def account_schema
     {
       "Account" => {
@@ -211,6 +252,28 @@ class ApiDocsController < ApplicationController
 
   def group_schema
     { "Group" => { type: "object", properties: { ref_key: { type: "string" }, accounts: { type: "array", items: { type: "object" } } } } }
+  end
+
+  def event_research_run_schema
+    {
+      "EventResearchRun" => {
+        type: "object",
+        properties: {
+          id: { type: "integer" },
+          account: { type: "object", properties: { id: { type: "integer" }, nickname: { type: "string" }, type: { type: "string" } } },
+          status: { type: "string", enum: %w[pending running completed failed] },
+          refresh_cache: { type: "boolean" },
+          people_count: { type: "integer", nullable: true },
+          award_count: { type: "integer", nullable: true },
+          company_count: { type: "integer", nullable: true },
+          error_message: { type: "string", nullable: true },
+          started_at: { type: "string", format: "date-time", nullable: true },
+          completed_at: { type: "string", format: "date-time", nullable: true },
+          created_at: { type: "string", format: "date-time" },
+          result: { type: "object", description: "完整调研结果 JSON（仅 show 接口返回）：event / awards / companies / metadata", nullable: true }
+        }
+      }
+    }
   end
 
   def pagination_schema

@@ -23,7 +23,9 @@ default: &default
 development:
   <<: *default
   # database: mp_crawler_development
-  database: mp_crawler_development
+  # E2E 浏览器回归（bin/e2e）通过 E2E_DB_NAME 指向独立数据库（默认 mp_crawler_e2e），
+  # 避免污染日常开发数据；不设置该变量时行为完全不变。
+  database: <%= ENV.fetch("E2E_DB_NAME", "mp_crawler_development") %>
 
   # The specified database role being used to connect to PostgreSQL.
   # To create additional roles in PostgreSQL see `$ createuser --help`.

@@ -1,0 +1,60 @@
+<div class="space-y-6">
+  <div class="flex items-start justify-between">
+    <div>
+      <h1 class="text-3xl font-bold text-gray-900"><%= @account.nickname %></h1>
+      <p class="text-gray-600 mt-1 flex items-center gap-3">
+        <span class="px-2 py-0.5 rounded text-xs font-medium <%= @account.platform_badge_class %>">活动研究</span>
+        <%= link_to "← 返回帐号列表", accounts_path, class: "text-primary hover:underline" %>
+        <% if current_user_is_admin? %>
+          <%= link_to "编辑活动配置", edit_event_account_path(@account), class: "text-primary hover:underline" %>
+        <% end %>
+      </p>
+    </div>
+  </div>
+
+  <!-- 活动配置摘要 -->
+  <div class="card">
+    <h2 class="text-lg font-semibold text-gray-900 mb-3">活动配置</h2>
+    <dl class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+      <div>
+        <dt class="text-gray-500">研究目的</dt>
+        <dd class="text-gray-900 mt-0.5 whitespace-pre-wrap"><%= @account.purpose.presence || "—" %></dd>
+      </div>
+      <div>
+        <dt class="text-gray-500">搜索关键词（在固定搜索词之外追加）</dt>
+        <dd class="mt-0.5">
+          <% if @account.keywords.any? %>
+            <div class="flex flex-wrap gap-1.5">
+              <% @account.keywords.each do |keyword| %>
+                <span class="px-2 py-0.5 rounded bg-amber-50 text-amber-700 text-xs"><%= keyword %></span>
+              <% end %>
+            </div>
+          <% else %>
+            <span class="text-gray-900">—</span>
+          <% end %>
+        </dd>
+      </div>
+      <div>
+        <dt class="text-gray-500">指定页面（最先抓取的种子 URL）</dt>
+        <dd class="text-gray-900 mt-0.5 break-all">
+          <% if @account.event_url.present? %>
+            <%= link_to @account.event_url, @account.event_url, target: "_blank", rel: "noopener", class: "text-primary hover:underline" %>
+          <% else %>
+            —
+          <% end %>
+        </dd>
+      </div>
+      <div>
+        <dt class="text-gray-500">其它背景信息</dt>
+        <dd class="text-gray-900 mt-0.5 whitespace-pre-wrap"><%= @account.other_information.presence || "—" %></dd>
+      </div>
+    </dl>
+  </div>
+
+  <% poll_worthy = @active_run.present? %>
+  <div <% if poll_worthy %>data-controller="task-poller"
+       data-task-poller-url-value="<%= poll_event_account_path(@account, run_id: @run&.id) %>"
+       data-task-poller-interval-value="3000"<% end %>>
+    <%= render 'research_body' %>
+  </div>
+</div>

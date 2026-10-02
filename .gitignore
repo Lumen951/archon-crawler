@@ -43,4 +43,14 @@
 /node_modules/*
 /vibe/*
 
+# E2E 浏览器回归（bin/e2e）
+/e2e/node_modules/
+/e2e/playwright-report/
+/e2e/test-results/
+/e2e/report.html
+/public/e2e-assets/
+# 生产样本数据只留在本地，绝不入库
+/e2e/fixtures/samples/*
+!/e2e/fixtures/samples/.keep
+
 __pycache__

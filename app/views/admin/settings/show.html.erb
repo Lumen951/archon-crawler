@@ -12,6 +12,8 @@
       <a href="#rednote" class="px-3 py-1.5 text-sm rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition">小红书</a>
       <a href="#twitter" class="px-3 py-1.5 text-sm rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition">Twitter</a>
       <a href="#tikhub" class="px-3 py-1.5 text-sm rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition">TikHub</a>
+      <a href="#tianyancha" class="px-3 py-1.5 text-sm rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition">天眼查</a>
+      <a href="#serper" class="px-3 py-1.5 text-sm rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition">Serper</a>
       <a href="#website-render" class="px-3 py-1.5 text-sm rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition">官网渲染兜底</a>
       <a href="#browser-login" class="px-3 py-1.5 text-sm rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition">远程浏览器登录</a>
       <a href="#openai" class="px-3 py-1.5 text-sm rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition">OpenAI / LLM</a>
@@ -26,264 +28,16 @@
   <div class="card" id="wechat">
     <h2 class="text-xl font-bold text-gray-900 mb-4">微信 API 设置</h2>
 
-    <!-- Provider Selector -->
-    <div class="mb-6">
-      <label class="block text-sm font-medium text-gray-700 mb-2">API 提供商</label>
-      <%= form_with url: admin_settings_path, method: :patch, class: "flex items-center gap-3", data: { turbo: false } do |f| %>
-        <select name="wechat_api_provider" id="wechat_provider_select"
-                class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                onchange="this.form.requestSubmit()">
-          <option value="mp_native" <%= 'selected' if @wechat_api_provider == 'mp_native' || @wechat_api_provider == 'mptext' %>>MP 原生 (扫码登录 mp.weixin.qq.com)</option>
-          <option value="dajiala" <%= 'selected' if @wechat_api_provider == 'dajiala' %>>Dajiala (dajiala.com)</option>
-          <option value="profile_ext" hidden <%= 'selected' if @wechat_api_provider == 'profile_ext' %>>Profile Ext (mitmproxy 凭证抓取)</option>
-          <option value="weread" <%= 'selected' if @wechat_api_provider == 'weread' %>>WeRead (微信读书转发)</option>
-          <option value="weread_native" <%= 'selected' if @wechat_api_provider == 'weread_native' %>>WeRead 直连 (扫码登录 weread.qq.com)</option>
-        </select>
-        <noscript><button type="submit" class="btn btn-primary text-sm">切换</button></noscript>
-      <% end %>
-      <p class="mt-1 text-sm text-gray-500">选择用于抓取微信公众号文章的 API 服务</p>
-    </div>
-
-    <!-- Tabs -->
-    <% active_tab = case @wechat_api_provider; when 'dajiala' then 'dajiala'; when 'profile_ext' then 'profile_ext'; when 'weread' then 'weread'; when 'weread_native' then 'weread_native'; else 'mp_native'; end %>
+    <!-- Tabs：其余 provider（mp_native / dajiala / profile_ext / weread 转发池）已下线，仅保留 WeRead 直连 -->
+    <% active_tab = 'weread_native' %>
     <div class="border-b border-gray-200 mb-4">
       <nav class="flex gap-0 -mb-px" role="tablist">
-        <button class="wechat-tab px-4 py-2 text-sm font-medium border-b-2 rounded-t-lg transition <%= active_tab == 'dajiala' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' %>" data-tab="dajiala" role="tab">Dajiala</button>
-        <button class="wechat-tab px-4 py-2 text-sm font-medium border-b-2 rounded-t-lg transition <%= active_tab == 'profile_ext' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' %>" data-tab="profile_ext" role="tab" hidden>Profile Ext</button>
-        <button class="wechat-tab px-4 py-2 text-sm font-medium border-b-2 rounded-t-lg transition <%= active_tab == 'mp_native' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' %>" data-tab="mp_native" role="tab">MP 原生</button>
-        <button class="wechat-tab px-4 py-2 text-sm font-medium border-b-2 rounded-t-lg transition <%= active_tab == 'weread' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' %>" data-tab="weread" role="tab">WeRead</button>
-        <button class="wechat-tab px-4 py-2 text-sm font-medium border-b-2 rounded-t-lg transition <%= active_tab == 'weread_native' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' %>" data-tab="weread_native" role="tab">WeRead 直连</button>
+        <button class="wechat-tab px-4 py-2 text-sm font-medium border-b-2 rounded-t-lg transition border-primary text-primary" data-tab="weread_native" role="tab">WeRead 直连</button>
       </nav>
     </div>
 
-    <!-- Dajiala Panel -->
-    <div class="wechat-panel <%= 'hidden' unless active_tab == 'dajiala' %>" data-tab-panel="dajiala" role="tabpanel">
-      <% if @dajiala_api_key.present? %>
-        <div class="mb-4 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm font-medium text-indigo-900">当前 API 密钥</p>
-              <p class="text-sm text-indigo-700 mt-1 font-mono"><%= mask_api_key(@dajiala_api_key) %></p>
-              <% if @dajiala_key_check %>
-                <p class="text-sm mt-1">
-                  上次验证：
-                  <% if @dajiala_key_check[:valid] == true %>
-                    <span class="text-green-700 font-semibold">✓ 有效</span>
-                  <% elsif @dajiala_key_check[:valid] == false %>
-                    <span class="text-red-700 font-semibold">✗ 无效</span>
-                  <% else %>
-                    <span class="text-yellow-700 font-semibold">? 验证失败</span>
-                  <% end %>
-                  <span class="text-gray-500 text-xs ml-1">(<%= Time.parse(@dajiala_key_check[:checked_at]).strftime('%Y-%m-%d %H:%M') %>)</span>
-                </p>
-              <% end %>
-            </div>
-            <div class="flex flex-col items-end gap-2">
-              <%= button_to "验证接口", validate_dajiala_key_admin_settings_path, method: :post,
-                  class: "text-sm px-3 py-1.5 rounded bg-indigo-600 text-white hover:bg-indigo-700 transition" %>
-            </div>
-          </div>
-        </div>
-      <% else %>
-        <div class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-          <p class="text-sm text-yellow-800">未配置 Dajiala API 密钥。请在下方添加。</p>
-        </div>
-      <% end %>
-
-      <%= form_with url: admin_settings_path, method: :patch, class: "space-y-4" do |f| %>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">API 密钥</label>
-          <input type="text" name="dajiala_api_key" placeholder="输入您的 Dajiala API 密钥"
-                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
-          <p class="mt-1 text-sm text-gray-500">
-            从 <a href="https://www.dajiala.com" target="_blank" class="text-primary hover:underline">dajiala.com</a> 获取您的 API 密钥
-          </p>
-        </div>
-
-        <button type="submit" class="btn btn-primary">保存 Dajiala 密钥</button>
-      <% end %>
-    </div>
-
-    <!-- Profile Ext Panel -->
-    <div class="wechat-panel hidden" data-tab-panel="profile_ext" role="tabpanel" hidden>
-      <p class="text-sm text-gray-500 mb-4">
-        使用 mitmproxy 抓取的 credentials.json 内容。凭证有效期约 25 分钟，过期后需重新抓包并更新。
-      </p>
-
-      <% if @profile_ext_credentials.present? %>
-        <div class="mb-4 p-4 <%= @profile_ext_expired ? 'bg-red-50 border-red-200' : 'bg-teal-50 border-teal-200' %> border rounded-lg">
-          <p class="text-sm font-medium <%= @profile_ext_expired ? 'text-red-900' : 'text-teal-900' %>">
-            凭证状态：<%= @profile_ext_expired ? '✗ 已过期' : '✓ 有效' %>
-          </p>
-          <p class="text-sm mt-1 text-gray-600">
-            更新时间：<%= Time.parse(@profile_ext_updated_at).strftime('%Y-%m-%d %H:%M:%S') rescue '未知' %>
-            <% if @profile_ext_age_minutes %>
-              （<%= @profile_ext_age_minutes %> 分钟前）
-            <% end %>
-          </p>
-          <% if @profile_ext_expired %>
-            <p class="text-sm mt-1 text-red-700">请重新抓包获取新凭证并粘贴到下方</p>
-          <% end %>
-          <% if @profile_ext_account_bizs.any? %>
-            <p class="text-sm mt-1 text-gray-600">
-              已覆盖 <%= @profile_ext_account_bizs.size %> 个号：
-              <% @profile_ext_account_bizs.each do |biz| %>
-                <% account = Account.find_by(fakeid: biz) %>
-                <span class="font-mono text-xs"><%= account&.nickname || biz[0..12] %></span><%= biz != @profile_ext_account_bizs.last ? '、' : '' %>
-              <% end %>
-            </p>
-          <% end %>
-        </div>
-      <% else %>
-        <div class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-          <p class="text-sm text-yellow-800">未配置 profile_ext 凭证。请粘贴 credentials.json 内容到下方。</p>
-        </div>
-      <% end %>
-
-      <%= form_with url: admin_settings_path, method: :patch, class: "space-y-4" do |f| %>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">credentials.json 内容</label>
-          <textarea name="profile_ext_credentials" rows="8" placeholder='粘贴 credentials.json 的完整 JSON 内容'
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent font-mono text-sm"><%= @profile_ext_credentials %></textarea>
-          <p class="mt-1 text-sm text-gray-500">
-            运行 <code class="bg-gray-100 px-1 rounded">scripts/capture_credentials.rb</code> 一键抓包，
-            或手动粘贴 credentials.json 内容
-          </p>
-        </div>
-
-        <div class="flex items-center gap-3">
-          <button type="submit" class="btn btn-primary">保存凭证</button>
-          <%= button_to "验证凭证", validate_profile_ext_key_admin_settings_path, method: :post,
-              class: "text-sm px-3 py-1.5 rounded bg-teal-600 text-white hover:bg-teal-700 transition" %>
-        </div>
-      <% end %>
-    </div>
-
-    <!-- MP Native Panel -->
-    <div class="wechat-panel <%= 'hidden' unless active_tab == 'mp_native' %>" data-tab-panel="mp_native" role="tabpanel">
-      <p class="text-sm text-gray-500 mb-4">
-        通过扫描二维码登录微信公众号平台（mp.weixin.qq.com），登录后可使用原生 API 抓取文章。Cookie/Token 有效期<%= wechat_mp_session_ttl_label %>，失效时会通过飞书推送提醒。
-      </p>
-
-      <%= render "admin/settings/mp_native_panel" %>
-
-      <div class="border-t border-gray-200 my-4 pt-4">
-        <p class="text-sm font-medium text-gray-700 mb-2">二维码获取失败时的备用方式</p>
-        <%= render "admin/settings/browser_login", provider_key: "wechat_mp",
-              hint: "在服务端打开远程浏览器并显示登录页，直接在本页面扫码；二维码接口异常时仍可用。" %>
-      </div>
-    </div>
-
-    <!-- WeRead Panel -->
-    <div id="weread" class="wechat-panel <%= 'hidden' unless active_tab == 'weread' %>" data-tab-panel="weread" role="tabpanel">
-      <p class="text-sm text-gray-500 mb-4">
-        管理微信读书转发服务的登录账号。登录后可抓取微信公众号文章。
-      </p>
-
-      <!-- Account Status -->
-      <% if @weread_accounts.any? %>
-        <div class="mb-4 p-4 <%= @weread_has_valid_accounts ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200' %> border rounded-lg">
-          <p class="text-sm font-medium <%= @weread_has_valid_accounts ? 'text-green-900' : 'text-yellow-900' %>">
-            账号状态：<%= @weread_has_valid_accounts ? '✓ 有可用账号' : '⚠ 无可用账号' %>
-          </p>
-          <p class="text-sm mt-1 text-gray-600">
-            共 <%= @weread_accounts.size %> 个账号，
-            启用 <%= @weread_accounts.count { |a| a['status'].to_i == 1 } %> 个，
-            今日黑名单 <%= @weread_today_blocked.size %> 个
-          </p>
-          <% if @weread_key_check %>
-            <p class="text-sm mt-1">
-              上次验证：
-              <% if @weread_key_check[:valid] == true %>
-                <span class="text-green-700 font-semibold">✓ 有效</span>
-              <% else %>
-                <span class="text-red-700 font-semibold">✗ 无效</span>
-              <% end %>
-              <span class="text-gray-500 text-xs ml-1">(<%= Time.parse(@weread_key_check[:checked_at]).strftime('%Y-%m-%d %H:%M') %>)</span>
-            </p>
-          <% end %>
-        </div>
-
-        <!-- Account List Table -->
-        <div class="mb-4 overflow-x-auto">
-          <table class="w-full text-sm border border-gray-200 rounded-lg">
-            <thead class="bg-gray-50">
-              <tr>
-                <th class="px-3 py-2 text-left text-gray-600">VID</th>
-                <th class="px-3 py-2 text-left text-gray-600">用户名</th>
-                <th class="px-3 py-2 text-left text-gray-600">状态</th>
-                <th class="px-3 py-2 text-left text-gray-600">备注</th>
-                <th class="px-3 py-2 text-right text-gray-600">操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              <% @weread_accounts.each do |a| %>
-                <% vid = a['vid'].to_s %>
-                <% status = a['status'].to_i %>
-                <% is_blocked = @weread_today_blocked.include?(vid) %>
-                <tr class="border-t border-gray-200 <%= 'bg-red-50' if status == 0 %>">
-                  <td class="px-3 py-2 font-mono text-xs"><%= vid[0..14] %></td>
-                  <td class="px-3 py-2"><%= a['name'] %></td>
-                  <td class="px-3 py-2">
-                    <% case status
-                       when 1 %>
-                      <span class="text-xs px-2 py-0.5 rounded bg-green-100 text-green-800">启用</span>
-                    <% when 0 %>
-                      <span class="text-xs px-2 py-0.5 rounded bg-red-100 text-red-800">失效</span>
-                    <% when 2 %>
-                      <span class="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-800">禁用</span>
-                    <% end %>
-                    <% if is_blocked %>
-                      <span class="text-xs px-2 py-0.5 rounded bg-orange-100 text-orange-800 ml-1">今日限流</span>
-                    <% end %>
-                  </td>
-                  <td class="px-3 py-2 text-xs text-gray-500">
-                    <%= '已失效，请重新登录' if status == 0 %>
-                    <%= '今日被限流' if is_blocked %>
-                  </td>
-                  <td class="px-3 py-2 text-right">
-                    <div class="flex items-center justify-end gap-1">
-                      <% if status != 1 %>
-                        <%= button_to "启用", weread_enable_account_admin_settings_path(vid: vid),
-                            method: :post, class: "text-xs px-2 py-1 rounded bg-green-600 text-white hover:bg-green-700",
-                            form: { style: "display: inline;" } %>
-                      <% end %>
-                      <% if status == 1 %>
-                        <%= button_to "禁用", weread_disable_account_admin_settings_path(vid: vid),
-                            method: :post, class: "text-xs px-2 py-1 rounded bg-gray-500 text-white hover:bg-gray-600",
-                            form: { style: "display: inline;" } %>
-                      <% end %>
-                      <%= button_to "移除", weread_remove_account_admin_settings_path(vid: vid),
-                          method: :post, class: "text-xs px-2 py-1 rounded bg-red-500 text-white hover:bg-red-600",
-                          form: { style: "display: inline;" },
-                          data: { confirm: "确定要移除账号 #{a['name']} 吗？" } %>
-                    </div>
-                  </td>
-                </tr>
-              <% end %>
-            </tbody>
-          </table>
-        </div>
-      <% else %>
-        <div class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-          <p class="text-sm text-yellow-800">暂无 WeRead 账号。请使用下方的二维码登录功能添加账号。</p>
-        </div>
-      <% end %>
-
-      <div class="flex items-center gap-3 mb-4">
-        <%= button_to "验证账号", validate_weread_key_admin_settings_path, method: :post,
-            class: "text-sm px-3 py-1.5 rounded bg-indigo-600 text-white hover:bg-indigo-700 transition" %>
-      </div>
-
-      <!-- QR Code Login Area -->
-      <hr class="my-4 border-gray-200">
-      <h3 class="text-lg font-semibold text-gray-800 mb-3">添加新账号（扫码登录）</h3>
-
-      <%= render "admin/settings/qr_login", provider: "weread" %>
-    </div>
-
     <!-- WeRead Native Panel -->
-    <div id="weread_native" class="wechat-panel <%= 'hidden' unless active_tab == 'weread_native' %>" data-tab-panel="weread_native" role="tabpanel">
+    <div id="weread_native" class="wechat-panel" data-tab-panel="weread_native" role="tabpanel">
       <p class="text-sm text-gray-500 mb-4">
         直连微信读书网页版（weread.qq.com），通过扫码登录获取会话 Cookie，无需转发服务。会话有效期<%= weread_native_session_ttl_label %>，失效时会通过飞书推送提醒。
         <br>注意：微信读书网页版已下线历史列表，每个公众号每次仅能抓取「最新一篇」文章。
@@ -475,6 +229,72 @@
 
       <div class="flex items-center justify-end">
         <button type="submit" class="btn btn-primary">保存 TikHub 密钥</button>
+      </div>
+    <% end %>
+  </div>
+
+  <!-- Tianyancha API Key -->
+  <div class="card" id="tianyancha">
+    <h2 class="text-xl font-bold text-gray-900 mb-4">天眼查 API 密钥</h2>
+    <p class="text-sm text-gray-600 mb-4">用于 event_research 补全机构工商档案（法人、注册资本、统一社会信用代码、成立时间、存续状态、公开联系方式）</p>
+
+    <% if @tianyancha_api_key.present? %>
+      <div class="mb-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+        <p class="text-sm font-medium text-orange-900">当前 API Token</p>
+        <p class="text-sm text-orange-700 mt-1 font-mono"><%= mask_api_key(@tianyancha_api_key) %></p>
+      </div>
+    <% else %>
+      <div class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+        <p class="text-sm text-yellow-800">未配置天眼查 API Token。event_research 仍可运行，但会跳过工商信息补全。</p>
+      </div>
+    <% end %>
+
+    <%= form_with url: admin_settings_path, method: :patch, class: "space-y-4" do |f| %>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">API Token</label>
+        <%= text_field_tag :tianyancha_api_key, nil,
+            class: "w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent",
+            placeholder: "输入天眼查 API Token" %>
+        <p class="mt-1 text-sm text-gray-500">
+          从 <a href="https://open.tianyancha.com" target="_blank" class="text-primary hover:underline">open.tianyancha.com</a> 控制台获取 Token
+        </p>
+      </div>
+
+      <div class="flex items-center justify-end">
+        <button type="submit" class="btn btn-primary">保存天眼查 Token</button>
+      </div>
+    <% end %>
+  </div>
+
+  <!-- Serper API Key -->
+  <div class="card" id="serper">
+    <h2 class="text-xl font-bold text-gray-900 mb-4">Serper API 密钥</h2>
+    <p class="text-sm text-gray-600 mb-4">用于活动调研的 Google 搜索（搜索获奖名单、人物资料等来源页面）</p>
+
+    <% if @serper_api_key.present? %>
+      <div class="mb-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+        <p class="text-sm font-medium text-orange-900">当前 API Key</p>
+        <p class="text-sm text-orange-700 mt-1 font-mono"><%= mask_api_key(@serper_api_key) %></p>
+      </div>
+    <% else %>
+      <div class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+        <p class="text-sm text-yellow-800">未配置 Serper API Key。活动调研无法启动（搜索是调研的第一步）。</p>
+      </div>
+    <% end %>
+
+    <%= form_with url: admin_settings_path, method: :patch, class: "space-y-4" do |f| %>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">API Key</label>
+        <%= text_field_tag :serper_api_key, nil,
+            class: "w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent",
+            placeholder: "输入 Serper API Key" %>
+        <p class="mt-1 text-sm text-gray-500">
+          从 <a href="https://serper.dev" target="_blank" class="text-primary hover:underline">serper.dev</a> 控制台获取 API Key。本地开发也可用环境变量 SERPER_API_KEY。
+        </p>
+      </div>
+
+      <div class="flex items-center justify-end">
+        <button type="submit" class="btn btn-primary">保存 Serper Key</button>
       </div>
     <% end %>
   </div>

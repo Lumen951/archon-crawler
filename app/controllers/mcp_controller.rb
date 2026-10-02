@@ -11,6 +11,8 @@ class McpController < ActionController::API
     Tools::BatchUpdateAccountsByFilterTool,
     Tools::ListTagsTool,
     Tools::GetActivityStatsTool,
+    Tools::ListEventResearchRunsTool,
+    Tools::GetEventResearchResultTool,
     Tools::WereadLoginStartTool,
     Tools::WereadLoginStatusTool,
     Tools::WereadAccountsTool

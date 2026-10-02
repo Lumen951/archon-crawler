@@ -175,7 +175,7 @@ class WebsiteCrawler < BaseCrawler
 
   # Result of one HTTP fetch attempt.
   FetchResult = Data.define(:url, :html, :status, :kind, :error) do
-    KINDS = %i[success rate_limited blocked timeout robots_disallowed server_error unsupported].freeze
+    KINDS = %i[success rate_limited blocked timeout robots_disallowed server_error unsupported network_error].freeze
 
     def self.success(url:, html:, status: 200)
       new(url, html.to_s, status.to_i, :success, nil)
@@ -202,7 +202,85 @@ class WebsiteCrawler < BaseCrawler
     TRACKING_PREFIXES = %w[utm_].freeze
     TRACKING_KEYS = %w[fbclid gclid gclsrc dclid msclkid].freeze
 
+    # 按「字节」而不是「字符」处理 query 的 params_encoder。
+    #
+    # Faraday 会把 URL 的 query 拆下来解码成 params、最后再转义回去
+    # （Request#url → ParamsHash#merge_query → build_exclusive_url）。默认转义走
+    # URI 的字符语义，遇到百分号编码的非 UTF-8 字节就炸 —— 例如新浪常见的
+    # `&Name=%D1%EE%B3%AC`（GBK 字节）会直接抛
+    # `ArgumentError: invalid byte sequence in UTF-8`，整条 URL 抓不下来；
+    # 用 URI.decode_www_form / encode_www_form 往返也会把这些字节换成 U+FFFD。
+    #
+    # 这个 encoder 只做 %XX 的展开与还原，不解释字节含义，因此 GBK / GB18030 等
+    # 任意字节的 query 都能原样往返。
+    class ByteSafeParamsEncoder
+      # `[` `]` 不转义：它们常用于 `ids[]=1&ids[]=2` 这类数组参数，default_params_encoder
+      # 也不转义它们，转义只会让 URL 变样（normalize 的输出会进 Article#url 唯一索引）。
+      UNRESERVED = /[^A-Za-z0-9\-._~\[\]]/n
+      PERCENT_ESCAPE = /%(\h\h)/n
+      # Faraday 只给了 decode → Hash → encode 这一条路，而 Hash 会合并重复键
+      # （`ids[]=1&ids[]=2` 会丢掉一个），所以整条 query 原样挂在这个键下带着走。
+      RAW_QUERY_KEY = "__raw_query__"
+
+      class << self
+        def decode(query)
+          { RAW_QUERY_KEY => query.to_s }
+        end
+
+        # RAW_QUERY_KEY 里是原样带回的 query；调用方显式传入的 params 追加在后。
+        # 这里刻意用 empty? 而不是 ActiveSupport 的 presence/blank?——后者用正则判空，
+        # 遇到非 UTF-8 字节的串会抛 Encoding::CompatibilityError。
+        def encode(params)
+          raw = params[RAW_QUERY_KEY].to_s
+          extra = encode_pairs(params.reject { |key, _| key.to_s == RAW_QUERY_KEY })
+
+          return raw if extra.empty?
+          return extra if raw.empty?
+
+          "#{raw}&#{extra}"
+        end
+
+        # 不经过 Hash 的键值对接口（normalize 用），保留重复键。
+        def decode_pairs(query)
+          query.to_s.split("&").filter_map do |pair|
+            next if pair.empty?
+
+            key, value = pair.split("=", 2)
+            [ unescape(key.tr("+", " ")), value.nil? ? nil : unescape(value.tr("+", " ")) ]
+          end
+        end
+
+        def encode_pairs(pairs)
+          pairs.map { |key, value| value.nil? ? escape(key) : "#{escape(key)}=#{escape(value)}" }.join("&")
+        end
+
+        def escape(value)
+          value.to_s.b.gsub(UNRESERVED) { |byte| format("%%%02X", byte.ord) }
+        end
+
+        def unescape(value)
+          value.to_s.b.gsub(PERCENT_ESCAPE) { ::Regexp.last_match(1).to_i(16).chr }
+        end
+      end
+    end
+
     class << self
+      # 关闭这条连接的 TLS 证书校验。
+      #
+      # 国内政府 / 高校 / 事业单位站点大量存在证书链不全（缺中间证书）或证书
+      # 已过期的情况，默认的 VERIFY_PEER 会直接抛
+      # `Faraday::SSLError: ... certificate verify failed (unable to get local
+      # issuer certificate)`，整页抓不下来 —— 而这恰恰是本项目最需要读到的
+      # 一批页面（获奖公示、政府公告）。对这些站点，「能读到内容」比「证书
+      # 可信」更重要，因此统一不校验。
+      #
+      # 代价：不再防中间人。可以接受，因为这些连接只用于 GET 公开网页，
+      # 不携带任何凭据。
+      def relax_tls!(faraday)
+        faraday.ssl.verify = false
+        faraday
+      end
+
       # Absolutize `href` against `base`, drop fragments and tracking params.
       # Returns nil for unusable links (mailto/tel/js/anchors/invalid).
       def normalize(base, href)
@@ -218,10 +296,12 @@ class WebsiteCrawler < BaseCrawler
         url.fragment = nil
 
         if url.query
-          params = URI.decode_www_form(url.query).reject do |key, _|
+          # 用 ByteSafeParamsEncoder 而不是 URI.decode_www_form / encode_www_form：
+          # 后者会把 `%D1%EE%B3%AC` 这类非 UTF-8 字节换成 U+FFFD，重定向目标 URL 就此损坏。
+          params = ByteSafeParamsEncoder.decode_pairs(url.query).reject do |key, _|
             TRACKING_PREFIXES.any? { |p| key.start_with?(p) } || TRACKING_KEYS.include?(key)
           end
-          url.query = params.empty? ? nil : URI.encode_www_form(params)
+          url.query = params.empty? ? nil : ByteSafeParamsEncoder.encode_pairs(params)
         end
 
         url.to_s
@@ -268,6 +348,11 @@ class WebsiteCrawler < BaseCrawler
       fetch_url(url, redirects_remaining: MAX_REDIRECTS)
     rescue Faraday::TimeoutError, Faraday::ConnectionFailed => e
       FetchResult.failure(url: url, kind: :timeout, error: e.message)
+    rescue Faraday::Error => e
+      # SSL 握手失败（bad ecpoint 之类）、EOFError、ECONNRESET 等都会被 net_http
+      # 适配器包装成 Faraday::SSLError / ConnectionFailed，统一归到这里 —— 之前
+      # 它们会直接穿透 fetch，让调用方拿到一个未捕获的异常。
+      FetchResult.failure(url: url, kind: :network_error, error: "#{e.class.name}: #{e.message}")
     rescue URI::Error => e
       FetchResult.failure(url: url, kind: :unsupported, error: e.message)
     end
@@ -314,9 +399,19 @@ class WebsiteCrawler < BaseCrawler
 
     def connection
       @connection ||= Faraday.new do |faraday|
+        self.class.relax_tls!(faraday)
         faraday.proxy = proxy_url if proxy_url
-        faraday.request :retry, max: 2, interval: 0.5, backoff_factor: 2,
-                                 exceptions: [ Faraday::TimeoutError, Faraday::ConnectionFailed ]
+        # faraday-retry 2.x 默认**不**按状态码重试（retry_statuses 默认为空），
+        # 且它抛出的 Faraday::RetriableResponse 不在自定的 exceptions 名单里时会
+        # 直接穿透中间件 —— 两者都补上，429/5xx 才真的会重试。
+        # max_interval 默认是 Float::MAX，没有它一个 Retry-After 能睡一小时。
+        faraday.request :retry, max: 2, interval: 0.5, backoff_factor: 2, max_interval: 10,
+                                 exceptions: [ Faraday::TimeoutError, Faraday::ConnectionFailed,
+                                               Faraday::RetriableResponse ],
+                                 retry_statuses: [ 408, 429, 500, 502, 503, 504 ]
+        # Faraday 默认的 query 转义按字符处理，含 GBK 字节的 URL 会抛
+        # ArgumentError: invalid byte sequence in UTF-8（见 ByteSafeParamsEncoder）。
+        faraday.options.params_encoder = ByteSafeParamsEncoder
         faraday.options.timeout = @timeout
         faraday.options.open_timeout = @timeout
         faraday.adapter Faraday.default_adapter
@@ -348,19 +443,32 @@ class WebsiteCrawler < BaseCrawler
     # Faraday hands back a binary body; many sites omit or mislabel the
     # charset, which later breaks Nokogiri + Html2Text with
     # Encoding::CompatibilityError. Honor an explicit charset when present,
-    # otherwise treat the bytes as UTF-8 and scrub anything invalid.
+    # fall back to a <meta> declaration (Chinese sites very often send no
+    # charset at all and rely on <meta charset=gbk>), otherwise treat the
+    # bytes as UTF-8. Invalid bytes are replaced rather than raising, so a
+    # partially corrupt page still yields its readable text.
     def decode_body(response, body)
-      charset = content_type(response)[/charset=["']?([\w\-]+)/i, 1].presence
+      charset = declared_charset(response) || meta_charset(body)
+
       if charset
         begin
-          body = body.dup.force_encoding(charset).encode(Encoding::UTF_8)
-        rescue Encoding::ConverterNotFoundError, Encoding::InvalidByteSequenceError, Encoding::UndefinedConversionError
-          body = body.dup.force_encoding(Encoding::UTF_8)
+          return body.dup.force_encoding(charset).encode(Encoding::UTF_8, invalid: :replace, undef: :replace)
+        rescue ArgumentError, Encoding::ConverterNotFoundError, Encoding::UndefinedConversionError
+          # 未知/不可用的字符集名（如 "x-gbk"），退回下面的 UTF-8 处理
         end
-      else
-        body = body.dup.force_encoding(Encoding::UTF_8)
       end
-      body.valid_encoding? ? body : body.scrub
+
+      decoded = body.dup.force_encoding(Encoding::UTF_8)
+      decoded.valid_encoding? ? decoded : decoded.scrub
+    end
+
+    def declared_charset(response)
+      content_type(response)[/charset=["']?([\w\-]+)/i, 1].presence
+    end
+
+    # 只看前 4KB，避免扫描整页；正则限定 ASCII 且带 /n，可安全匹配二进制正文字节串。
+    def meta_charset(body)
+      body.to_s[0, 4096][/<meta[^>]+charset\s*=\s*["']?\s*([\w\-]+)/in, 1].presence
     end
   end
 
@@ -424,6 +532,9 @@ class WebsiteCrawler < BaseCrawler
       options.add_argument("--no-sandbox")
       options.add_argument("--disable-dev-shm-usage")
       options.add_argument("--disable-blink-features=AutomationControlled")
+      # 与 Fetcher.relax_tls! 同一个理由：证书链不全 / 过期的政务站点，
+      # 走渲染兜底时同样会被 Chrome 拦在证书校验上。
+      options.add_argument("--ignore-certificate-errors")
       driver = Selenium::WebDriver.for(:chrome, options: options)
       driver.manage.timeouts.page_load = @timeout
       driver
@@ -582,6 +693,8 @@ class WebsiteCrawler < BaseCrawler
     # connection intentionally ignores Option.twitter_proxy, unlike Fetcher's.
     def connection
       @connection ||= Faraday.new(url: BASE_URL) do |faraday|
+        # 这条连接不经过本类的 Fetcher#connection，TLS 放宽要单独来一遍
+        self.class.relax_tls!(faraday)
         faraday.request :retry, max: 2, interval: 0.5, backoff_factor: 2,
                                  exceptions: [ Faraday::TimeoutError, Faraday::ConnectionFailed ]
         faraday.options.timeout = @timeout

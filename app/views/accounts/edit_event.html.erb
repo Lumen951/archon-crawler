@@ -1,0 +1,21 @@
+<div class="space-y-6">
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-3xl font-bold text-gray-900">编辑活动配置</h1>
+      <p class="text-gray-600 mt-1">
+        <%= link_to "← 返回 #{@account.nickname}", event_account_path(@account), class: "text-primary hover:underline" %>
+      </p>
+    </div>
+  </div>
+
+  <div class="card">
+    <%= render 'event_form', form_url: update_event_account_path(@account), form_method: :patch, submit_label: "保存配置" %>
+  </div>
+
+  <div class="card bg-gray-50 border-gray-200">
+    <p class="text-sm text-gray-700">
+      修改配置不影响已完成的调研记录；下一轮调研会使用新配置。
+      抽取结果按 prompt 内容缓存 —— 配置变更后相关缓存键会自然变化，不会拿旧结果顶替。
+    </p>
+  </div>
+</div>

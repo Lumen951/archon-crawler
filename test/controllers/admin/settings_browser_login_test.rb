@@ -16,13 +16,15 @@ module Admin
       post session_path, params: { email_address: @admin.email_address, password: "password123" }
     end
 
-    test "settings page renders one remote-browser login block per platform" do
+    # 2026-10 起其余 provider 从 UI 隐藏，远程登录区块只保留 weread_native
+    #（rednote_web 是独立平台，不受影响）
+    test "settings page renders remote-browser login blocks for the visible platforms" do
       get admin_settings_path
 
       assert_response :success
-      assert_match 'data-browser-login-provider-value="wechat_mp"', response.body
       assert_match 'data-browser-login-provider-value="rednote_web"', response.body
       assert_match 'data-browser-login-provider-value="weread_native"', response.body
+      assert_no_match 'data-browser-login-provider-value="wechat_mp"', response.body
     end
 
     test "start returns the session handle from the session manager" do

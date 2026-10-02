@@ -112,10 +112,42 @@ class Option < ApplicationRecord
       tikhub_api_key.present?
     end
 
+    # Tianyancha API key helpers (企业工商信息，供活动调研补全机构档案)
+    def tianyancha_api_key
+      get('tianyancha_api_key')
+    end
+
+    def tianyancha_api_key=(val)
+      set('tianyancha_api_key', val)
+    end
+
+    def tianyancha_api_key_valid?
+      tianyancha_api_key.present?
+    end
+
+    # Serper (Google Search) API key helpers（活动调研的搜索数据源）
+    def serper_api_key
+      get('serper_api_key')
+    end
+
+    def serper_api_key=(val)
+      set('serper_api_key', val)
+    end
+
+    def serper_api_key_valid?
+      serper_api_key.present?
+    end
+
     # WeChat API provider helpers
-    # Returns "mptext" (default) or "dajiala"
     def wechat_api_provider
-      get('wechat_api_provider') || 'mp_native'
+      # 2026-10：mp.weixin.qq.com 直连系 provider（mp_native / dajiala / profile_ext）
+      # 与 weread 转发账号池已基本不可用，抓取统一切换到 weread_native（直连微信读书）。
+      # 历史库里遗留的旧值一并按 weread_native 处理——否则生产库已存的 mp_native
+      # 会让默认值改动不生效。如需恢复旧 provider，从这里改起。
+      stored = get('wechat_api_provider')
+      return 'weread_native' if stored.blank? || %w[mp_native dajiala profile_ext weread].include?(stored)
+
+      stored
     end
 
     def wechat_api_provider=(val)

@@ -1,0 +1,22 @@
+<div class="space-y-6">
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-3xl font-bold text-gray-900">导入活动研究</h1>
+      <p class="text-gray-600 mt-1">创建一份活动调研配置，之后在研究控制台随时启动调研</p>
+    </div>
+    <%= link_to "← 返回导入页", import_accounts_path, class: "btn btn-secondary" %>
+  </div>
+
+  <div class="card">
+    <%= render 'event_form', form_url: import_event_accounts_path, form_method: :post, submit_label: "创建活动配置" %>
+  </div>
+
+  <div class="card bg-blue-50 border-blue-200">
+    <h3 class="font-semibold text-blue-900 mb-3">💡 说明</h3>
+    <ul class="space-y-2 text-sm text-blue-800">
+      <li>• 活动研究账号不抓文章、不进抓取队列，只承载调研配置</li>
+      <li>• 创建后进入研究控制台，可随时启动 / 重新启动调研（异步执行，结果为 JSON 数据）</li>
+      <li>• 调研数据通过 REST API 与 MCP 对外提供；报告请基于数据自行生成</li>
+    </ul>
+  </div>
+</div>

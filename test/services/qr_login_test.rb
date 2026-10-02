@@ -137,7 +137,9 @@ class QrLoginTest < ActiveSupport::TestCase
   end
 
   test "wechat_mp reminder follows the live session probe, not the stored timestamp" do
-    Option.wechat_api_provider = "mp_native"
+    # 2026-10 起抓取 provider 固定为 weread_native，mp_native 的提醒只覆盖
+    # 「登录过（cookie 还在）、会话失效」的场景——帐号搜索仍依赖该会话
+    Option.wechat_mp_cookie = "c=1"
 
     stub_class_method(WechatMpNativeApiClient, :validate_session, -> { false }) do
       assert QrLogin::WechatMp.reminder_needed?
@@ -148,7 +150,7 @@ class QrLoginTest < ActiveSupport::TestCase
     end
   end
 
-  test "wechat_mp stays quiet when another provider is active and it was never logged in" do
+  test "wechat_mp stays quiet when never logged in" do
     Option.wechat_api_provider = "weread"
 
     stub_class_method(WechatMpNativeApiClient, :validate_session, -> { false }) do

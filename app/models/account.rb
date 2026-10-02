@@ -145,6 +145,10 @@ class Account < ApplicationRecord
     is_a?(WebsiteAccount)
   end
 
+  def event?
+    is_a?(EventAccount)
+  end
+
   # === Activity & Health ===
 
   # Returns the activity tier for this account, derived from `last_published_at`.

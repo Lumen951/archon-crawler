@@ -15,14 +15,16 @@ module Admin
       post session_path, params: { email_address: @admin.email_address, password: "password123" }
     end
 
-    # 两个平台共用同一套 partial / Stimulus controller
-    test "settings page renders one shared QR panel per platform" do
+    # 2026-10 起其余 provider 从 UI 隐藏，设置页只渲染 weread_native 的扫码面板
+    # （partial / Stimulus controller 与已下线的平台共用）
+    test "settings page renders the QR panel for weread_native only" do
       get admin_settings_path
 
       assert_response :success
-      assert_match 'data-qr-login-provider-value="wechat_mp"', response.body
-      assert_match 'data-qr-login-provider-value="weread"', response.body
-      assert_match "约 4 天", response.body, "有效期文案应由 Option::WECHAT_MP_SESSION_TTL 驱动"
+      assert_match 'data-qr-login-provider-value="weread_native"', response.body
+      assert_no_match 'data-qr-login-provider-value="wechat_mp"', response.body
+      assert_no_match 'data-qr-login-provider-value="weread"', response.body
+      assert_match "约 2 小时", response.body, "有效期文案应由 Option::WEREAD_NATIVE_SESSION_TTL 驱动"
       assert_no_match(/WechatMpQrPoller|WereadQrPoller/, response.body, "内联轮询脚本应已被 Stimulus 取代")
     end
 

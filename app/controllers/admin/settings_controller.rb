@@ -43,6 +43,16 @@ class Admin::SettingsController < Admin::BaseController
       message = "ScrapingAnt API Key 更新成功"
     end
 
+    if params[:tianyancha_api_key].present?
+      Option.tianyancha_api_key = params[:tianyancha_api_key].to_s.strip
+      message = "天眼查 API Token 更新成功"
+    end
+
+    if params[:serper_api_key].present?
+      Option.serper_api_key = params[:serper_api_key].to_s.strip
+      message = "Serper API Key 更新成功"
+    end
+
     if params.key?(:website_render_fallbacks)
       fallbacks = params[:website_render_fallbacks].is_a?(Array) ? params[:website_render_fallbacks] : []
       Option.website_render_fallbacks = fallbacks
@@ -655,6 +665,8 @@ class Admin::SettingsController < Admin::BaseController
     @twitter_auth_token = Option.get('twitter_auth_token')
     @twitter_proxy = Option.get('twitter_proxy')
     @tikhub_api_key = Option.tikhub_api_key
+    @tianyancha_api_key = Option.tianyancha_api_key
+    @serper_api_key = Option.serper_api_key
     @scrapingant_api_key = Option.scrapingant_api_key
     @website_render_fallbacks = Option.website_render_fallbacks
     @dajiala_key_check = Rails.cache.read('api_key_check:dajiala')

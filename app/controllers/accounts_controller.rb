@@ -1,6 +1,8 @@
 class AccountsController < ApplicationController
   include QueryPersistenceConcern
 
+  before_action :require_admin, only: [ :import_event_page, :import_event, :edit_event, :update_event ]
+
   # Maximum length for flash error messages to avoid cookie overflow
   MAX_FLASH_ERROR_LENGTH = 200
 
@@ -21,6 +23,9 @@ class AccountsController < ApplicationController
 
   def show
     @account = Account.find(params[:id])
+    # 活动研究账号有独立的研究控制台，不进文章账号的 show 页
+    redirect_to event_account_path(@account) and return if @account.event?
+
     @articles = @account.articles.recent.search_keyword(params[:keyword]).page(params[:page]).per(25)
     if @account.website?
       @monitor_pages = @account.monitor_pages.ordered.limit(20)
@@ -69,6 +74,52 @@ class AccountsController < ApplicationController
 
   def import_website_page
     # Show website import form
+  end
+
+  def import_event_page
+    @account = EventAccount.new
+  end
+
+  # 活动研究账号只是一份调研配置：不抓文章、不进抓取管线，
+  # 创建后到研究控制台启动调研。
+  def import_event
+    @account = EventAccount.new(
+      fakeid: "event:#{SecureRandom.uuid}",
+      status: :active,
+      nickname: event_account_params[:name].to_s.strip
+    )
+    assign_event_account_attributes
+
+    if @account.save
+      flash[:success] = "活动研究账号已创建：#{@account.nickname}"
+      redirect_to event_account_path(@account)
+    else
+      flash.now[:error] = truncate_error(@account.errors.full_messages.join("；"))
+      render :import_event_page, status: :unprocessable_entity
+    end
+  rescue ActiveRecord::RecordNotUnique
+    flash.now[:error] = "创建失败，请重试"
+    render :import_event_page, status: :unprocessable_entity
+  end
+
+  def edit_event
+    @account = EventAccount.find(params[:id])
+  end
+
+  def update_event
+    @account = EventAccount.find(params[:id])
+    @account.nickname = event_account_params[:name].to_s.strip
+    assign_event_account_attributes
+
+    if @account.save
+      flash[:success] = "活动配置已更新"
+      redirect_to event_account_path(@account)
+    else
+      flash.now[:error] = truncate_error(@account.errors.full_messages.join("；"))
+      render :edit_event, status: :unprocessable_entity
+    end
+  rescue ActiveRecord::RecordNotFound
+    redirect_to accounts_path, flash: { error: "活动研究帐号不存在" }
   end
 
   def import_wechat_search
@@ -294,6 +345,11 @@ class AccountsController < ApplicationController
   def crawl
     @account = Account.find(params[:id])
 
+    if @account.event?
+      flash[:error] = "活动研究账号不支持抓取，请在研究控制台启动调研"
+      redirect_to event_account_path(@account) and return
+    end
+
     begin
       crawl_task = @account.crawl!
       flash[:success] = "已为 #{@account.nickname} 启动抓取"
@@ -418,7 +474,8 @@ class AccountsController < ApplicationController
       redirect_back fallback_location: accounts_path and return
     end
 
-    accounts = Account.where(id: account_ids).active
+    # 活动研究账号不走抓取管线（研究在各自的控制台单独启动）
+    accounts = Account.where(id: account_ids).active.where.not(type: "EventAccount")
     if accounts.empty?
       flash[:error] = "选中的帐号中没有活跃帐号"
       redirect_back fallback_location: accounts_path and return
@@ -741,6 +798,19 @@ class AccountsController < ApplicationController
     return if account.website?
 
     raise WebsiteCrawler::ListingRule::InvalidRule, "只有官网帐号可以配置抓取规则"
+  end
+
+  def event_account_params
+    params.require(:event_account).permit(:name, :url, :keywords, :other_information, :purpose)
+  end
+
+  def assign_event_account_attributes
+    @account.event_config = {
+      url: event_account_params[:url],
+      keywords: event_account_params[:keywords],
+      other_information: event_account_params[:other_information],
+      purpose: event_account_params[:purpose]
+    }
   end
 
   def success_message_for(result)

@@ -1,0 +1,139 @@
+<%# 研究结果 JSON 的可读渲染：概要 / 获奖名单 / 人物 / 公司 / 原始 JSON %>
+<div class="card">
+  <h2 class="text-lg font-semibold text-gray-900 mb-4">研究结果</h2>
+
+  <!-- 概要 -->
+  <% meta = result["metadata"].to_h %>
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+    <div>
+      <p class="text-sm text-gray-600">搜索到的来源</p>
+      <p class="text-2xl font-bold text-gray-900"><%= meta["sources_searched"] || "—" %></p>
+    </div>
+    <div>
+      <p class="text-sm text-gray-600">可用文档</p>
+      <p class="text-2xl font-bold text-gray-900"><%= meta["documents_fetched"] || "—" %></p>
+    </div>
+    <div>
+      <p class="text-sm text-gray-600">人物</p>
+      <p class="text-2xl font-bold text-gray-900"><%= meta["people_found"] || "—" %></p>
+    </div>
+    <div>
+      <p class="text-sm text-gray-600">抓取失败</p>
+      <p class="text-2xl font-bold <%= meta["fetch_failure_count"].to_i > 0 ? "text-red-600" : "text-gray-900" %>"><%= meta["fetch_failure_count"] || 0 %></p>
+    </div>
+  </div>
+
+  <details open class="mb-4">
+    <summary class="cursor-pointer font-semibold text-gray-800">获奖名单（<%= result["awards"].to_a.length %> 条）</summary>
+    <div class="mt-3 overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead>
+          <tr class="text-left text-gray-500 border-b border-gray-100">
+            <th class="py-2 pr-4 font-medium">排名</th>
+            <th class="py-2 pr-4 font-medium">奖项</th>
+            <th class="py-2 pr-4 font-medium">项目 / 机构</th>
+            <th class="py-2 font-medium">人物</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% result["awards"].to_a.each_with_index do |award, index| %>
+            <tr class="border-b border-gray-50 align-top">
+              <td class="py-2 pr-4 text-gray-700"><%= award["rank"] || index + 1 %></td>
+              <td class="py-2 pr-4 text-gray-700"><%= [award["award"], award["category"]].compact.reject(&:blank?).join(" · ").presence || "—" %></td>
+              <td class="py-2 pr-4 text-gray-700">
+                <%= award.dig("project", "name").presence || "—" %>
+                <% org = award.dig("project", "organization").presence %>
+                <% if org %><div class="text-gray-500 text-xs mt-0.5"><%= org %></div><% end %>
+              </td>
+              <td class="py-2 text-gray-700">
+                <% people = award["people"].to_a.filter_map { |person| person["name"].presence if person.is_a?(Hash) } %>
+                <%= people.any? ? people.join("、") : "—" %>
+              </td>
+            </tr>
+          <% end %>
+          <% if result["awards"].to_a.empty? %>
+            <tr><td colspan="4" class="py-3 text-gray-500">无获奖记录</td></tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </details>
+
+  <details class="mb-4">
+    <summary class="cursor-pointer font-semibold text-gray-800">人物（去重后）</summary>
+    <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+      <% result["awards"].to_a.flat_map { |award| award["people"].to_a }
+           .select { |person| person.is_a?(Hash) && person["name"].present? }
+           .uniq { |person| person["name"] }.each do |person| %>
+        <div class="rounded-lg border border-gray-100 p-3">
+          <p class="font-semibold text-gray-900">
+            <%= person["name"] %>
+            <% if person["role"].present? %><span class="text-sm font-normal text-gray-500">· <%= person["role"] %></span><% end %>
+          </p>
+          <% employment = person["employment"].to_a.filter_map { |job| [job["organization"], job["title"]].compact.reject(&:blank?).join(" · ") if job.is_a?(Hash) }.reject(&:blank?) %>
+          <% if employment.any? %>
+            <p class="text-sm text-gray-600 mt-1"><%= employment.join("；") %></p>
+          <% end %>
+          <% education = person["education"].to_a.filter_map { |edu| [edu["school"], edu["degree"], edu["major"]].compact.reject(&:blank?).join(" · ") if edu.is_a?(Hash) }.reject(&:blank?) %>
+          <% if education.any? %>
+            <p class="text-sm text-gray-600 mt-1"><%= education.join("；") %></p>
+          <% end %>
+          <% contact = person["contact"].to_h %>
+          <% if contact["email"].present? || contact["phone"].present? %>
+            <p class="text-sm text-gray-600 mt-1">
+              <%= [contact["email"], contact["phone"]].compact.reject(&:blank?).join(" · ") %>
+            </p>
+          <% end %>
+          <% roles = person.dig("tianyancha", "roles").to_a %>
+          <% if roles.any? %>
+            <p class="text-xs text-amber-700 mt-1.5">
+              工商任职：<%= roles.map { |role| "#{role['company']}（#{role['position']}）" }.join("、") %>
+            </p>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  </details>
+
+  <details class="mb-4">
+    <summary class="cursor-pointer font-semibold text-gray-800">公司工商档案（<%= result["companies"].to_a.length %> 家）</summary>
+    <div class="mt-3 overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead>
+          <tr class="text-left text-gray-500 border-b border-gray-100">
+            <th class="py-2 pr-4 font-medium">企业名称</th>
+            <th class="py-2 pr-4 font-medium">法定代表人</th>
+            <th class="py-2 pr-4 font-medium">注册资本</th>
+            <th class="py-2 pr-4 font-medium">状态</th>
+            <th class="py-2 font-medium">来源</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% result["companies"].to_a.each do |company| %>
+            <tr class="border-b border-gray-50">
+              <td class="py-2 pr-4 text-gray-700">
+                <%= company["name"] %>
+                <% if company["industry"].present? %><div class="text-gray-500 text-xs mt-0.5"><%= company["industry"] %></div><% end %>
+              </td>
+              <td class="py-2 pr-4 text-gray-700"><%= company["legal_person"].presence || "—" %></td>
+              <td class="py-2 pr-4 text-gray-700"><%= company["registered_capital"].presence || "—" %></td>
+              <td class="py-2 pr-4 text-gray-700"><%= company["status"].presence || "—" %></td>
+              <td class="py-2">
+                <% url = company.dig("source", "url").presence %>
+                <% if url %><%= link_to "天眼查", url, target: "_blank", rel: "noopener", class: "text-primary hover:underline" %><% else %>—<% end %>
+              </td>
+            </tr>
+          <% end %>
+          <% if result["companies"].to_a.empty? %>
+            <tr><td colspan="5" class="py-3 text-gray-500">无公司档案（未配置天眼查 Token 或没有识别到企业）</td></tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </details>
+
+  <details>
+    <summary class="cursor-pointer font-semibold text-gray-800">原始 JSON</summary>
+    <pre class="mt-3 rounded-lg bg-gray-900 text-gray-100 p-4 text-xs overflow-x-auto max-h-[32rem] overflow-y-auto"><%= JSON.pretty_generate(result, ensure_ascii: false) %></pre>
+  </details>
+</div>

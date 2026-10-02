@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="zh_CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>微信公众平台</title>
+</head>
+<body class="login_page">
+  <div class="login__type__container login__type__container__scan">
+    <div class="login__type__container__scan__tip">使用微信扫描二维码登录</div>
+    <img class="login__type__container__scan__qrcode"
+         src="https://mp.weixin.qq.com/cgi-bin/loginqrcode?action=getqrcode&param=420000"
+         alt="登录二维码">
+  </div>
+  <script>
+    // E2E mock 登录页：WechatMpNativeApiClient#request_qr_code 从这里提取
+    // qr_url（正则要求 loginqrcode?action=getqrcode&param=<数字>）和 uuid
+    //（正则要求带引号的 "uuid": "..." 形式）。
+    window.wx.commonData = {
+      "uuid": "e2e0001uuid",
+      "qr_url": "https://mp.weixin.qq.com/cgi-bin/loginqrcode?action=getqrcode&param=420000",
+      "lang": "zh_CN"
+    };
+  </script>
+</body>
+</html>

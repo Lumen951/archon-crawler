@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_30_000001) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_01_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -141,6 +141,25 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_30_000001) do
     t.index ["expires_at"], name: "index_device_codes_on_expires_at"
     t.index ["user_code"], name: "index_device_codes_on_user_code", unique: true
     t.index ["user_id"], name: "index_device_codes_on_user_id"
+  end
+
+  create_table "event_research_runs", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.integer "award_count"
+    t.integer "company_count"
+    t.datetime "completed_at"
+    t.datetime "created_at", null: false
+    t.text "error_message"
+    t.integer "people_count"
+    t.boolean "refresh_cache", default: false, null: false
+    t.jsonb "result"
+    t.datetime "started_at"
+    t.integer "status", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "created_at"], name: "index_event_research_runs_on_account_id_and_created_at"
+    t.index ["account_id"], name: "index_event_research_runs_on_account_id"
+    t.index ["account_id"], name: "index_event_research_runs_on_account_id_active", unique: true, where: "(status = ANY (ARRAY[0, 1]))"
+    t.index ["status"], name: "index_event_research_runs_on_status"
   end
 
   create_table "group_accounts", force: :cascade do |t|
@@ -416,6 +435,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_30_000001) do
   add_foreign_key "crawl_task_accounts", "accounts"
   add_foreign_key "crawl_task_accounts", "crawl_tasks"
   add_foreign_key "device_codes", "users"
+  add_foreign_key "event_research_runs", "accounts"
   add_foreign_key "group_accounts", "accounts"
   add_foreign_key "group_accounts", "groups"
   add_foreign_key "groups", "users"

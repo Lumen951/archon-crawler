@@ -1,0 +1,22 @@
+{
+  "base_resp": { "ret": 0, "err_msg": "ok" },
+  "list": [
+    {
+      "fakeid": "3876543210",
+      "nickname": "E2E演示公众号",
+      "alias": "e2edemo",
+      "round_head_img": "/e2e-assets/avatar-e2e.svg",
+      "service_type": 1,
+      "signature": "用于端到端回归测试的 mock 公众号"
+    },
+    {
+      "fakeid": "3876543211",
+      "nickname": "E2E演示公众号（分号）",
+      "alias": "e2edemo2",
+      "round_head_img": "/e2e-assets/avatar-e2e-2.svg",
+      "service_type": 1,
+      "signature": "同名第二个结果，验证多结果勾选"
+    }
+  ],
+  "total": 2
+}

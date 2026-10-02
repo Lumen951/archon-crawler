@@ -1,5 +1,6 @@
 require "json"
 require "open3"
+require "crawler_api_key_error"
 
 # Client for fetching Twitter tweets via the twitter-api-client Python library.
 # Calls the Python CLI wrapper (bin/twitter_fetch.py) which handles authentication
