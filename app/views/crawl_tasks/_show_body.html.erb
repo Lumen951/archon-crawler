@@ -3,14 +3,14 @@
   <div class="card">
     <div class="flex items-center justify-between mb-4">
       <div>
-        <h2 class="text-xl font-semibold text-gray-900">
+        <h2 class="text-xl font-semibold text-text-primary">
           <% if crawl_task.account_ids.nil? %>
             全部启用的帐号
           <% else %>
             <%= crawl_task.account_count %> 个帐号
           <% end %>
         </h2>
-        <p class="text-sm text-gray-600 mt-1">
+        <p class="text-sm text-text-secondary mt-1">
           <%= crawl_task.account_names.first(5).join("、") %>
           <% if crawl_task.account_count > 5 %>
             等 <%= crawl_task.account_count %> 个
@@ -33,8 +33,8 @@
 
     <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mt-6">
       <div>
-        <p class="text-sm text-gray-600">已抓取文章</p>
-        <p class="text-2xl font-bold text-gray-900">
+        <p class="text-sm text-text-secondary">已抓取文章</p>
+        <p class="text-2xl font-bold text-text-primary">
           <% if crawl_task.articles.any? %>
             <%= link_to articles_crawl_task_path(crawl_task), class: "text-brand hover:text-brand-dark font-semibold transition" do %>
               <%= crawl_task.progress %>
@@ -45,9 +45,9 @@
         </p>
       </div>
       <div>
-        <p class="text-sm text-gray-600">累计错误</p>
+        <p class="text-sm text-text-secondary">累计错误</p>
         <% if crawl_task.platform_error_counts.present? && crawl_task.platform_error_counts.any? %>
-          <p class="text-2xl font-bold <%= crawl_task.error_count > 0 ? 'text-red-600' : 'text-gray-900' %>"><%= crawl_task.error_count %></p>
+          <p class="text-2xl font-bold <%= crawl_task.error_count > 0 ? 'text-red-600' : 'text-text-primary' %>"><%= crawl_task.error_count %></p>
           <div class="mt-1 space-x-2">
             <% crawl_task.platform_error_counts.each do |platform, count| %>
               <% next if count.to_i.zero? %>
@@ -55,20 +55,20 @@
             <% end %>
           </div>
         <% else %>
-          <p class="text-2xl font-bold <%= crawl_task.error_count > 0 ? 'text-red-600' : 'text-gray-900' %>"><%= crawl_task.error_count %></p>
+          <p class="text-2xl font-bold <%= crawl_task.error_count > 0 ? 'text-red-600' : 'text-text-primary' %>"><%= crawl_task.error_count %></p>
         <% end %>
       </div>
       <div>
-        <p class="text-sm text-gray-600">开始时间</p>
-        <p class="text-lg font-semibold text-gray-900"><%= crawl_task.started_at&.strftime('%Y-%m-%d %H:%M') || '无' %></p>
+        <p class="text-sm text-text-secondary">开始时间</p>
+        <p class="text-lg font-semibold text-text-primary"><%= crawl_task.started_at&.strftime('%Y-%m-%d %H:%M') || '无' %></p>
       </div>
       <div>
-        <p class="text-sm text-gray-600">完成时间</p>
-        <p class="text-lg font-semibold text-gray-900"><%= crawl_task.completed_at&.strftime('%Y-%m-%d %H:%M') || '无' %></p>
+        <p class="text-sm text-text-secondary">完成时间</p>
+        <p class="text-lg font-semibold text-text-primary"><%= crawl_task.completed_at&.strftime('%Y-%m-%d %H:%M') || '无' %></p>
       </div>
       <div>
-        <p class="text-sm text-gray-600">总耗时</p>
-        <p class="text-lg font-semibold text-gray-900">
+        <p class="text-sm text-text-secondary">总耗时</p>
+        <p class="text-lg font-semibold text-text-primary">
           <% if crawl_task.completed_at && crawl_task.started_at %>
             <%= distance_of_time_in_words(crawl_task.started_at, crawl_task.completed_at) %>
           <% elsif crawl_task.running? && crawl_task.started_at %>
@@ -84,12 +84,12 @@
 
     <div class="grid grid-cols-2 md:grid-cols-2 gap-4 mt-4">
       <div>
-        <p class="text-sm text-gray-600">帐号并发</p>
-        <p class="text-lg font-semibold text-gray-900"><%= crawl_task.effective_account_concurrency %></p>
+        <p class="text-sm text-text-secondary">帐号并发</p>
+        <p class="text-lg font-semibold text-text-primary"><%= crawl_task.effective_account_concurrency %></p>
       </div>
       <div>
-        <p class="text-sm text-gray-600">文章并发</p>
-        <p class="text-lg font-semibold text-gray-900"><%= crawl_task.effective_article_concurrency %></p>
+        <p class="text-sm text-text-secondary">文章并发</p>
+        <p class="text-lg font-semibold text-text-primary"><%= crawl_task.effective_article_concurrency %></p>
       </div>
     </div>
 
@@ -105,11 +105,11 @@
   <% if crawl_task.crawl_task_accounts.any? %>
     <div class="card" data-controller="collapsible">
       <div class="flex items-center justify-between mb-4">
-        <h2 class="text-xl font-bold text-gray-900">帐号状态</h2>
+        <h2 class="text-xl font-bold text-text-primary">帐号状态</h2>
         <div class="flex items-center space-x-4 text-sm">
           <span class="text-green-600">✓ 完成 <%= crawl_task.completed_account_count %></span>
           <span class="text-yellow-600">● 进行中 <%= crawl_task.crawl_task_accounts.running.count %></span>
-          <span class="text-gray-500">○ 待处理 <%= crawl_task.crawl_task_accounts.pending.count %></span>
+          <span class="text-text-secondary">○ 待处理 <%= crawl_task.crawl_task_accounts.pending.count %></span>
           <% if crawl_task.failed_account_count > 0 %>
             <span class="text-red-600">✗ 失败 <%= crawl_task.failed_account_count %></span>
           <% end %>
@@ -151,28 +151,28 @@
   <!-- Recent Logs -->
   <div class="card">
     <div class="flex items-center justify-between mb-4">
-      <h2 class="text-xl font-bold text-gray-900">最近日志</h2>
+      <h2 class="text-xl font-bold text-text-primary">最近日志</h2>
       <%= link_to "查看所有日志 →", logs_crawl_task_path(crawl_task), class: "text-primary hover:underline text-sm font-medium" %>
     </div>
 
     <% if recent_logs.any? %>
       <div class="space-y-2 font-mono text-sm">
         <% recent_logs.each do |log| %>
-          <div class="flex items-start space-x-3 py-2 border-b border-gray-100 last:border-0">
-            <span class="text-xs text-gray-500 whitespace-nowrap">
+          <div class="flex items-start space-x-3 py-2 border-b border-border-primary last:border-0">
+            <span class="text-xs text-text-secondary whitespace-nowrap">
               <%= log.logged_at.strftime('%H:%M:%S') %>
             </span>
-            <span class="px-2 py-0.5 rounded text-xs font-medium <%= case log.level when 'error' then 'bg-red-100 text-red-800' when 'warn' then 'bg-yellow-100 text-yellow-800' when 'info' then 'bg-blue-100 text-blue-800' else 'bg-gray-100 text-gray-700' end %>">
+            <span class="px-2 py-0.5 rounded text-xs font-medium <%= case log.level when 'error' then 'bg-red-100 text-red-800' when 'warn' then 'bg-yellow-100 text-yellow-800' when 'info' then 'bg-blue-100 text-blue-800' else 'bg-bg-secondary text-text-primary' end %>">
               <%= log.level.upcase %>
             </span>
-            <span class="flex-1 <%= log.level == 'error' ? 'text-red-700' : 'text-gray-700' %>">
+            <span class="flex-1 <%= log.level == 'error' ? 'text-red-700' : 'text-text-primary' %>">
               <%= log.message %>
             </span>
           </div>
         <% end %>
       </div>
     <% else %>
-      <p class="text-gray-500 text-center py-8">
+      <p class="text-text-secondary text-center py-8">
         暂无日志
         <% unless Option.verbose_mode? %>
           <br>

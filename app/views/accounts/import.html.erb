@@ -1,8 +1,8 @@
 <div class="space-y-6">
   <div class="flex items-center justify-between">
     <div>
-      <h1 class="text-3xl font-bold text-gray-900">导入帐号</h1>
-      <p class="text-gray-600 mt-1">选择要导入的平台类型</p>
+      <h1 class="text-2xl font-bold text-text-primary">导入帐号</h1>
+      <p class="text-text-secondary mt-1">选择要导入的平台类型</p>
     </div>
     <%= link_to "← 返回帐号列表", accounts_path, class: "btn btn-secondary" %>
   </div>
@@ -11,15 +11,15 @@
     <!-- WeChat Card -->
     <%= link_to import_wechat_page_accounts_path, class: "card hover:shadow-lg transition-shadow cursor-pointer group" do %>
       <div class="flex items-center gap-4 mb-4">
-        <div class="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center text-2xl group-hover:bg-green-200 transition-colors">
+        <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center text-2xl group-hover:bg-green-200 transition-colors">
           💬
         </div>
         <div>
-          <h2 class="text-xl font-semibold text-gray-900">微信公众号</h2>
-          <p class="text-sm text-gray-500">WeChat Official Accounts</p>
+          <h2 class="text-xl font-semibold text-text-primary">微信公众号</h2>
+          <p class="text-sm text-text-secondary">WeChat Official Accounts</p>
         </div>
       </div>
-      <p class="text-gray-600 text-sm">通过公众号文章链接导入（支持多链接）</p>
+      <p class="text-text-secondary text-sm">通过公众号文章链接导入（支持多链接）</p>
       <div class="mt-4 flex items-center text-green-600 text-sm font-medium">
         开始导入
         <svg class="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -31,15 +31,15 @@
     <!-- RedNote Card -->
     <%= link_to import_rednote_page_accounts_path, class: "card hover:shadow-lg transition-shadow cursor-pointer group" do %>
       <div class="flex items-center gap-4 mb-4">
-        <div class="w-12 h-12 bg-rose-100 rounded-xl flex items-center justify-center text-2xl group-hover:bg-rose-200 transition-colors">
+        <div class="w-12 h-12 bg-rose-100 rounded-lg flex items-center justify-center text-2xl group-hover:bg-rose-200 transition-colors">
           📕
         </div>
         <div>
-          <h2 class="text-xl font-semibold text-gray-900">小红书</h2>
-          <p class="text-sm text-gray-500">RedNote (Xiaohongshu)</p>
+          <h2 class="text-xl font-semibold text-text-primary">小红书</h2>
+          <p class="text-sm text-text-secondary">RedNote (Xiaohongshu)</p>
         </div>
       </div>
-      <p class="text-gray-600 text-sm">支持搜索导入和 CSV 文件导入</p>
+      <p class="text-text-secondary text-sm">支持搜索导入和 CSV 文件导入</p>
       <div class="mt-4 flex items-center text-rose-600 text-sm font-medium">
         开始导入
         <svg class="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -51,15 +51,15 @@
     <!-- Twitter Card -->
     <%= link_to import_twitter_page_accounts_path, class: "card hover:shadow-lg transition-shadow cursor-pointer group" do %>
       <div class="flex items-center gap-4 mb-4">
-        <div class="w-12 h-12 bg-sky-100 rounded-xl flex items-center justify-center text-2xl group-hover:bg-sky-200 transition-colors">
+        <div class="w-12 h-12 bg-sky-100 rounded-lg flex items-center justify-center text-2xl group-hover:bg-sky-200 transition-colors">
           <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
         </div>
         <div>
-          <h2 class="text-xl font-semibold text-gray-900">Twitter</h2>
-          <p class="text-sm text-gray-500">Twitter / X</p>
+          <h2 class="text-xl font-semibold text-text-primary">Twitter</h2>
+          <p class="text-sm text-text-secondary">Twitter / X</p>
         </div>
       </div>
-      <p class="text-gray-600 text-sm">支持搜索导入和 CSV 文件导入</p>
+      <p class="text-text-secondary text-sm">支持搜索导入和 CSV 文件导入</p>
       <div class="mt-4 flex items-center text-sky-600 text-sm font-medium">
         开始导入
         <svg class="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -70,15 +70,15 @@
     <!-- Website Card -->
     <%= link_to import_website_page_accounts_path, class: "card hover:shadow-lg transition-shadow cursor-pointer group" do %>
       <div class="flex items-center gap-4 mb-4">
-        <div class="w-12 h-12 bg-violet-100 rounded-xl flex items-center justify-center text-2xl group-hover:bg-violet-200 transition-colors">
+        <div class="w-12 h-12 bg-violet-100 rounded-lg flex items-center justify-center text-2xl group-hover:bg-violet-200 transition-colors">
           🌐
         </div>
         <div>
-          <h2 class="text-xl font-semibold text-gray-900">官网</h2>
-          <p class="text-sm text-gray-500">Website Monitor</p>
+          <h2 class="text-xl font-semibold text-text-primary">官网</h2>
+          <p class="text-sm text-text-secondary">Website Monitor</p>
         </div>
       </div>
-      <p class="text-gray-600 text-sm">粘贴多个网址批量导入，跟踪 blog / research / announcement 等页面变化</p>
+      <p class="text-text-secondary text-sm">粘贴多个网址批量导入，跟踪 blog / research / announcement 等页面变化</p>
       <div class="mt-4 flex items-center text-violet-600 text-sm font-medium">
         开始导入
         <svg class="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -90,15 +90,15 @@
     <% if current_user_is_admin? %>
       <%= link_to import_event_page_accounts_path, class: "card hover:shadow-lg transition-shadow cursor-pointer group" do %>
         <div class="flex items-center gap-4 mb-4">
-          <div class="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center text-2xl group-hover:bg-amber-200 transition-colors">
+          <div class="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center text-2xl group-hover:bg-amber-200 transition-colors">
             🔎
           </div>
           <div>
-            <h2 class="text-xl font-semibold text-gray-900">活动研究</h2>
-            <p class="text-sm text-gray-500">Event Research</p>
+            <h2 class="text-xl font-semibold text-text-primary">活动研究</h2>
+            <p class="text-sm text-text-secondary">Event Research</p>
           </div>
         </div>
-        <p class="text-gray-600 text-sm">配置一个活动（奖项/赛事），一键调研获奖名单、人物与机构工商档案</p>
+        <p class="text-text-secondary text-sm">配置一个活动（奖项/赛事），一键调研获奖名单、人物与机构工商档案</p>
         <div class="mt-4 flex items-center text-amber-600 text-sm font-medium">
           开始导入
           <svg class="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -109,9 +109,9 @@
     <% end %>
   </div>
 
-  <div class="card bg-gray-50 border-gray-200">
-    <h3 class="font-semibold text-gray-900 mb-3">💡 导入提示</h3>
-    <ul class="space-y-2 text-sm text-gray-700">
+  <div class="card bg-bg-secondary border-border-primary">
+    <h3 class="font-semibold text-text-primary mb-3">💡 导入提示</h3>
+    <ul class="space-y-2 text-sm text-text-primary">
       <li>• 重复的帐号（相同标识符）将被自动跳过</li>
       <li>• 导入后可在 <a href="<%= accounts_path %>" class="text-primary hover:underline">帐号列表</a> 中查看和管理</li>
       <li>• 每个平台独立导入，某个平台导入失败不影响其他平台</li>

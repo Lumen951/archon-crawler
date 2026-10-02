@@ -8,7 +8,7 @@
       <% end %>
       · 共 <%= @crawl_task.articles.count %> 篇文章
     </p>
-    <p class="text-gray-600 mt-1">
+    <p class="text-text-secondary mt-1">
       <%= link_to "← 返回抓取任务", @crawl_task, class: "text-primary hover:underline" %>
     </p>
   </div>
@@ -16,7 +16,7 @@
   <% if @articles.any? %>
     <div class="space-y-3">
       <% @articles.each do |article| %>
-        <div class="bg-bg-card border border-border-primary rounded-xl p-4 hover:border-brand transition shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+        <div class="bg-bg-card border border-border-primary rounded-lg p-4 hover:border-brand transition">
           <div class="flex items-start gap-4">
             <% if article.cover_url.present? %>
               <img src="<%= article.cover_url %>" alt="" class="w-20 h-20 object-cover rounded-lg flex-shrink-0">
@@ -60,7 +60,7 @@
       </div>
     <% end %>
   <% else %>
-    <div class="bg-bg-card border border-border-primary rounded-2xl text-center py-12">
+    <div class="bg-bg-card border border-border-primary rounded-lg text-center py-12">
       <svg class="w-16 h-16 mx-auto text-text-muted mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"/>
       </svg>

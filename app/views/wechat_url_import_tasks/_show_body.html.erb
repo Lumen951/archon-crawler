@@ -2,39 +2,39 @@
   <div class="card">
     <div class="flex items-center justify-between mb-4">
       <div>
-        <h2 class="text-xl font-semibold text-gray-900">导入进度</h2>
-        <p class="text-sm text-gray-600 mt-1"><%= task.processed_count %> / <%= task.total_count %> 个链接已处理</p>
+        <h2 class="text-xl font-semibold text-text-primary">导入进度</h2>
+        <p class="text-sm text-text-secondary mt-1"><%= task.processed_count %> / <%= task.total_count %> 个链接已处理</p>
       </div>
       <%= render "shared/status_badge", status: task.status %>
     </div>
 
-    <div class="w-full bg-gray-200 rounded-full h-3 mb-4">
+    <div class="w-full bg-bg-secondary rounded-full h-3 mb-4">
       <div class="bg-primary h-3 rounded-full" style="width: <%= task.progress_percentage %>%"></div>
     </div>
 
     <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
-      <div class="rounded-lg bg-gray-50 p-3"><div class="text-2xl font-bold"><%= task.total_count %></div><div class="text-sm text-gray-600">总链接</div></div>
-      <div class="rounded-lg bg-green-50 p-3"><div class="text-2xl font-bold text-green-700"><%= task.created_count %></div><div class="text-sm text-gray-600">新导入</div></div>
-      <div class="rounded-lg bg-blue-50 p-3"><div class="text-2xl font-bold text-blue-700"><%= task.found_count %></div><div class="text-sm text-gray-600">已存在</div></div>
-      <div class="rounded-lg bg-red-50 p-3"><div class="text-2xl font-bold text-red-700"><%= task.failed_count %></div><div class="text-sm text-gray-600">失败</div></div>
+      <div class="rounded-lg bg-bg-secondary p-3"><div class="text-2xl font-bold"><%= task.total_count %></div><div class="text-sm text-text-secondary">总链接</div></div>
+      <div class="rounded-lg bg-green-50 p-3"><div class="text-2xl font-bold text-green-700"><%= task.created_count %></div><div class="text-sm text-text-secondary">新导入</div></div>
+      <div class="rounded-lg bg-brand-soft p-3"><div class="text-2xl font-bold text-brand-dark"><%= task.found_count %></div><div class="text-sm text-text-secondary">已存在</div></div>
+      <div class="rounded-lg bg-red-50 p-3"><div class="text-2xl font-bold text-red-700"><%= task.failed_count %></div><div class="text-sm text-text-secondary">失败</div></div>
     </div>
   </div>
 
   <div class="card">
-    <h2 class="text-xl font-semibold text-gray-900 mb-4">链接结果</h2>
+    <h2 class="text-xl font-semibold text-text-primary mb-4">链接结果</h2>
     <div class="space-y-3">
       <% task.items.order(:id).each do |item| %>
-        <div class="border border-gray-200 rounded-lg p-3">
+        <div class="border border-border-primary rounded-lg p-3">
           <div class="flex items-start justify-between gap-4">
-            <div class="break-all text-sm text-gray-800"><%= item.url %></div>
-            <span class="shrink-0 text-sm font-medium <%= item.created? ? 'text-green-700' : item.found? ? 'text-blue-700' : item.failed? ? 'text-red-700' : 'text-gray-500' %>">
+            <div class="break-all text-sm text-text-primary"><%= item.url %></div>
+            <span class="shrink-0 text-sm font-medium <%= item.created? ? 'text-green-700' : item.found? ? 'text-brand-dark' : item.failed? ? 'text-red-700' : 'text-text-secondary' %>">
               <%= item.created? ? "新导入" : item.found? ? "已存在" : item.failed? ? "失败" : "处理中" %>
             </span>
           </div>
           <% if item.error_message.present? %>
             <p class="mt-2 text-sm text-red-700"><%= item.error_message %></p>
           <% elsif item.account.present? %>
-            <p class="mt-2 text-sm text-gray-600"><%= item.account.nickname %></p>
+            <p class="mt-2 text-sm text-text-secondary"><%= item.account.nickname %></p>
           <% end %>
         </div>
       <% end %>

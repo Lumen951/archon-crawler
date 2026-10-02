@@ -1,0 +1,89 @@
+<%# GitLab 式深色侧边栏。桌面端常驻；移动端由 sidebar controller 抽屉化（见 layouts/application）。 %>
+<%
+  content_items = [
+    { label: "帐号",     path: accounts_path, active: nav_active?(accounts_path),
+      icon: "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" },
+    { label: "文章",     path: articles_path, active: nav_active?(articles_path),
+      icon: "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" },
+    { label: "抓取任务", path: crawl_tasks_path, active: nav_active?(crawl_tasks_path),
+      icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" },
+    { label: "正文下载", path: wechat_content_download_tasks_path, active: nav_active?(wechat_content_download_tasks_path),
+      icon: "M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" },
+    { label: "官网变更", path: monitor_changes_path,
+      active: nav_active?(monitor_changes_path, "/monitor_pages", "/monitor_page_versions"),
+      icon: "M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" },
+  ]
+
+  developer_items = [
+    { label: "MCP Server", path: mcp_guide_path, active: nav_active?(mcp_guide_path),
+      icon: "M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" },
+    { label: "API 文档", path: api_docs_path, active: nav_active?(api_docs_path),
+      icon: "M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" },
+  ]
+
+  admin_items = [
+    { label: "用户管理",   path: admin_users_path, active: nav_active?(admin_users_path),
+      icon: "M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" },
+    { label: "标签管理",   path: admin_tags_path, active: nav_active?(admin_tags_path),
+      icon: "M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" },
+    { label: "活跃度分析", path: admin_analytics_path, active: nav_active?(admin_analytics_path),
+      icon: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" },
+    { label: "MCP 日志",   path: admin_mcp_tool_calls_path, active: nav_active?(admin_mcp_tool_calls_path),
+      icon: "M13 10V3L4 14h7v7l9-11h-7z" },
+    { label: "MCP 客户端", path: admin_oauth_applications_path, active: nav_active?(admin_oauth_applications_path),
+      icon: "M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.04 3.5A13.916 13.916 0 0116 11a4 4 0 10-8 0c0 1.017-.07 2.019-.203 3m-2.04 3.5l.054-.09A13.916 13.916 0 018 11" },
+    { label: "设置",       path: admin_settings_path, active: nav_active?(admin_settings_path),
+      icon: "M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z" },
+    { label: "Jobs",       path: "/admin/jobs", active: nav_active?("/admin/jobs"),
+      icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" },
+  ]
+%>
+
+<nav class="flex min-h-full flex-col px-3 pt-3 pb-8" aria-label="主导航">
+  <ul class="space-y-0.5">
+    <li>
+      <%= link_to root_path, class: "sidebar-link #{'active' if request.path == '/'}" do %>
+        <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+        <span>仪表板</span>
+      <% end %>
+    </li>
+  </ul>
+
+  <p class="sidebar-section-title">内容源</p>
+  <ul class="space-y-0.5">
+    <% content_items.each do |item| %>
+      <li>
+        <%= link_to item[:path], class: "sidebar-link #{'active' if item[:active]}" do %>
+          <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="<%= item[:icon] %>"/></svg>
+          <span><%= item[:label] %></span>
+        <% end %>
+      </li>
+    <% end %>
+  </ul>
+
+  <p class="sidebar-section-title">开发者</p>
+  <ul class="space-y-0.5">
+    <% developer_items.each do |item| %>
+      <li>
+        <%= link_to item[:path], class: "sidebar-link #{'active' if item[:active]}" do %>
+          <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="<%= item[:icon] %>"/></svg>
+          <span><%= item[:label] %></span>
+        <% end %>
+      </li>
+    <% end %>
+  </ul>
+
+  <% if current_user_is_admin? %>
+    <p class="sidebar-section-title">管理</p>
+    <ul class="space-y-0.5">
+      <% admin_items.each do |item| %>
+        <li>
+          <%= link_to item[:path], class: "sidebar-link #{'active' if item[:active]}", target: item[:path] == "/admin/jobs" ? "_blank" : nil do %>
+            <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="<%= item[:icon] %>"/></svg>
+            <span><%= item[:label] %></span>
+          <% end %>
+        </li>
+      <% end %>
+    </ul>
+  <% end %>
+</nav>

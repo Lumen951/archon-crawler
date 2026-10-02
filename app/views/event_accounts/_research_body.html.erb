@@ -1,13 +1,13 @@
 <%# 轮询替换的研究主体：进行中横幅 + 启动表单 + 运行历史 + 选中运行详情 %>
 <div id="<%= dom_id(@account, :research_body) %>" class="space-y-6" data-task-status="<%= @active_run&.status || @run&.status || "none" %>">
   <% if @active_run %>
-    <div class="card border-blue-200 bg-blue-50">
+    <div class="card border-border-primary bg-brand-soft">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-3">
-          <span class="inline-block w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse"></span>
+          <span class="inline-block w-2.5 h-2.5 rounded-full bg-primary animate-pulse"></span>
           <div>
             <p class="font-semibold text-blue-900">一轮调研进行中（run#<%= @active_run.id %>）</p>
-            <p class="text-sm text-blue-700 mt-0.5">
+            <p class="text-sm text-brand-dark mt-0.5">
               开始于 <%= @active_run.started_at&.strftime('%H:%M:%S') || '等待调度' %>
               <% if @active_run.refresh_cache? %>· 本次忽略缓存<% end %>
             </p>
@@ -34,16 +34,16 @@
     <div class="card">
       <div class="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h2 class="text-lg font-semibold text-gray-900">启动调研</h2>
-          <p class="text-sm text-gray-600 mt-1">
+          <h2 class="text-lg font-semibold text-text-primary">启动调研</h2>
+          <p class="text-sm text-text-secondary mt-1">
             流程：Serper 搜索 → 抓取网页 → LLM 抽取 → 逐人补充资料 → 天眼查工商补全。
             结果是结构化 JSON 数据，报告请基于数据自行生成。
           </p>
         </div>
         <%= form_with url: start_research_event_account_path(@account), method: :post, class: "flex items-center gap-3" do %>
-          <label class="flex items-center gap-1.5 text-sm text-gray-700">
+          <label class="flex items-center gap-1.5 text-sm text-text-primary">
             <%= check_box_tag :refresh_cache, "1", false, disabled: @active_run.present?,
-                  class: "rounded border-gray-300 text-primary focus:ring-primary" %>
+                  class: "rounded border-border-primary text-primary focus:ring-primary" %>
             忽略缓存重新计算
           </label>
           <%= submit_tag @active_run.present? ? "调研进行中…" : (@runs.any? ? "重新启动调研" : "开始调研"),
@@ -51,7 +51,7 @@
                 class: "btn btn-primary" %>
         <% end %>
       </div>
-      <p class="text-xs text-gray-500 mt-3">
+      <p class="text-xs text-text-secondary mt-3">
         调研在后台异步执行（通常几分钟到十几分钟）。已抓取的网页与 LLM 结果会进缓存，
         中断后重新启动会从断点继续；勾选「忽略缓存」则全部重算。
       </p>
@@ -60,12 +60,12 @@
 
   <!-- 运行历史 -->
   <div class="card">
-    <h2 class="text-lg font-semibold text-gray-900 mb-3">调研记录</h2>
+    <h2 class="text-lg font-semibold text-text-primary mb-3">调研记录</h2>
     <% if @runs.any? %>
       <div class="overflow-x-auto">
         <table class="min-w-full text-sm">
           <thead>
-            <tr class="text-left text-gray-500 border-b border-gray-100">
+            <tr class="text-left text-text-secondary border-b border-border-primary">
               <th class="py-2 pr-4 font-medium">Run</th>
               <th class="py-2 pr-4 font-medium">状态</th>
               <th class="py-2 pr-4 font-medium">创建时间</th>
@@ -77,19 +77,19 @@
           </thead>
           <tbody>
             <% @runs.each do |run| %>
-              <tr class="<%= run == @run ? "bg-primary/5" : "" %> border-b border-gray-50">
+              <tr class="<%= run == @run ? "bg-primary/5" : "" %> border-b border-border-primary">
                 <td class="py-2.5 pr-4 font-mono text-xs">#<%= run.id %></td>
                 <td class="py-2.5 pr-4">
                   <span class="px-2 py-0.5 rounded text-xs font-medium <%= run.status_badge_class %>"><%= run.status %> </span>
                 </td>
-                <td class="py-2.5 pr-4 text-gray-600"><%= run.created_at.strftime('%m-%d %H:%M') %></td>
-                <td class="py-2.5 pr-4 text-gray-600">
+                <td class="py-2.5 pr-4 text-text-secondary"><%= run.created_at.strftime('%m-%d %H:%M') %></td>
+                <td class="py-2.5 pr-4 text-text-secondary">
                   <% if run.duration_seconds %><%= run.duration_seconds %>s<% else %>—<% end %>
                 </td>
-                <td class="py-2.5 pr-4 text-gray-600">
+                <td class="py-2.5 pr-4 text-text-secondary">
                   <%= [ run.award_count, run.people_count, run.company_count ].map { |count| count.nil? ? "—" : count }.join(" / ") %>
                 </td>
-                <td class="py-2.5 pr-4 text-gray-500 max-w-[280px] truncate" title="<%= run.error_message %>">
+                <td class="py-2.5 pr-4 text-text-secondary max-w-[280px] truncate" title="<%= run.error_message %>">
                   <%= run.error_message || (run.refresh_cache? ? "忽略缓存" : "") %>
                 </td>
                 <td class="py-2.5 text-right whitespace-nowrap">
@@ -104,7 +104,7 @@
         </table>
       </div>
     <% else %>
-      <p class="text-gray-500 text-sm">暂无调研记录</p>
+      <p class="text-text-secondary text-sm">暂无调研记录</p>
     <% end %>
   </div>
 
@@ -114,11 +114,11 @@
       <div class="card">
         <div class="flex items-start justify-between mb-4">
           <div>
-            <h2 class="text-lg font-semibold text-gray-900">
+            <h2 class="text-lg font-semibold text-text-primary">
               Run #<%= @run.id %>
               <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium <%= @run.status_badge_class %>"><%= @run.status %></span>
             </h2>
-            <p class="text-sm text-gray-600 mt-1">
+            <p class="text-sm text-text-secondary mt-1">
               开始 <%= @run.started_at&.strftime('%Y-%m-%d %H:%M:%S') || '未开始' %>
               · 结束 <%= @run.completed_at&.strftime('%H:%M:%S') || '—' %>
               <% if @run.duration_seconds %> · 耗时 <%= @run.duration_seconds %>s<% end %>
@@ -139,21 +139,21 @@
         <!-- 运行日志 -->
         <div class="mt-4">
           <div class="flex items-center justify-between mb-2">
-            <h3 class="text-sm font-semibold text-gray-700">运行日志（最近 50 条）</h3>
+            <h3 class="text-sm font-semibold text-text-primary">运行日志（最近 50 条）</h3>
             <%= link_to "查看全部日志", logs_event_account_path(@account, run_id: @run.id), class: "text-primary hover:underline text-sm" %>
           </div>
           <% if @recent_logs.any? %>
-            <div class="rounded-lg bg-gray-50 border border-gray-100 p-3 space-y-1.5 font-mono text-xs max-h-96 overflow-y-auto">
+            <div class="rounded-lg bg-bg-secondary border border-border-primary p-3 space-y-1.5 font-mono text-xs max-h-96 overflow-y-auto">
               <% @recent_logs.each do |log| %>
                 <div class="flex items-start gap-2">
-                  <span class="text-gray-400 whitespace-nowrap"><%= log.logged_at.strftime('%H:%M:%S') %></span>
-                  <span class="px-1 rounded font-medium whitespace-nowrap <%= case log.level when 'error' then 'bg-red-100 text-red-800' when 'warn' then 'bg-yellow-100 text-yellow-800' when 'info' then 'bg-blue-50 text-blue-700' else 'bg-gray-100 text-gray-500' end %>"><%= log.level.upcase %></span>
-                  <span class="<%= log.level == 'error' ? 'text-red-700' : 'text-gray-700' %> break-all"><%= log.message %></span>
+                  <span class="text-text-muted whitespace-nowrap"><%= log.logged_at.strftime('%H:%M:%S') %></span>
+                  <span class="px-1 rounded font-medium whitespace-nowrap <%= case log.level when 'error' then 'bg-red-100 text-red-800' when 'warn' then 'bg-yellow-100 text-yellow-800' when 'info' then 'bg-brand-soft text-brand-dark' else 'bg-bg-secondary text-text-secondary' end %>"><%= log.level.upcase %></span>
+                  <span class="<%= log.level == 'error' ? 'text-red-700' : 'text-text-primary' %> break-all"><%= log.message %></span>
                 </div>
               <% end %>
             </div>
           <% else %>
-            <p class="text-gray-500 text-sm">暂无日志</p>
+            <p class="text-text-secondary text-sm">暂无日志</p>
           <% end %>
         </div>
       </div>

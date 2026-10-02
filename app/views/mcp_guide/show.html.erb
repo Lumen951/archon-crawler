@@ -2,8 +2,8 @@
 
 <div class="max-w-4xl mx-auto px-4 py-8">
   <div class="mb-8">
-    <h1 class="text-3xl font-bold text-gray-900">MP-Crawler MCP Server</h1>
-    <p class="mt-2 text-gray-600">让 AI 助手直接查询和管理您的公众号、小红书、Twitter 账号</p>
+    <h1 class="text-2xl font-bold text-text-primary">MP-Crawler MCP Server</h1>
+    <p class="mt-1 text-sm text-text-secondary">让 AI 助手直接查询和管理您的公众号、小红书、Twitter 账号</p>
   </div>
 
   <% if @new_token.present? %>
@@ -34,97 +34,97 @@
 
   <!-- Step 1: Connect -->
   <section class="mb-10">
-    <h2 class="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-      <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-indigo-600 text-white text-sm font-bold">1</span>
+    <h2 class="text-xl font-semibold text-text-primary mb-4 flex items-center gap-2">
+      <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-primary text-white text-sm font-bold">1</span>
       连接 AI 客户端
     </h2>
 
     <div class="mb-5 flex items-center gap-2 text-sm">
-      <span class="shrink-0 text-gray-500">MCP 端点</span>
-      <code class="flex-1 font-mono text-gray-800 bg-gray-100 px-2 py-1 rounded break-all"><%= @mcp_endpoint_url %></code>
-      <button type="button" onclick="mcpCopy(this, <%= @mcp_endpoint_url.to_json %>)" class="shrink-0 text-xs text-indigo-600 hover:underline">复制</button>
+      <span class="shrink-0 text-text-secondary">MCP 端点</span>
+      <code class="flex-1 font-mono text-text-primary bg-bg-secondary px-2 py-1 rounded break-all"><%= @mcp_endpoint_url %></code>
+      <button type="button" onclick="mcpCopy(this, <%= @mcp_endpoint_url.to_json %>)" class="shrink-0 text-xs text-brand hover:underline">复制</button>
     </div>
 
     <!-- 方式一：OAuth -->
-    <div class="mb-4 rounded-lg border border-indigo-200 bg-indigo-50/50 p-4">
+    <div class="mb-4 rounded-lg border border-border-primary bg-brand-soft/50 p-4">
       <div class="flex items-center gap-2 mb-2">
-        <h3 class="font-semibold text-gray-900">方式一：OAuth 授权</h3>
-        <span class="text-xs px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">推荐</span>
+        <h3 class="font-semibold text-text-primary">方式一：OAuth 授权</h3>
+        <span class="text-xs px-2 py-0.5 rounded-full bg-brand-soft text-brand-dark">推荐</span>
       </div>
-      <p class="text-sm text-gray-600 mb-4">Claude Code、Codex 等支持 MCP 授权规范的客户端会自行注册并拉起浏览器授权，<strong>无需创建或粘贴 Token</strong>。</p>
+      <p class="text-sm text-text-secondary mb-4">Claude Code、Codex 等支持 MCP 授权规范的客户端会自行注册并拉起浏览器授权，<strong>无需创建或粘贴 Token</strong>。</p>
 
-      <p class="text-sm font-medium text-gray-700 mb-2">Claude Code</p>
-      <ol class="mb-4 space-y-2 text-sm text-gray-700 list-decimal list-inside">
+      <p class="text-sm font-medium text-text-primary mb-2">Claude Code</p>
+      <ol class="mb-4 space-y-2 text-sm text-text-primary list-decimal list-inside">
         <li>
           终端执行：
           <% claude_cmd = "claude mcp add --transport http mp-crawler #{@mcp_endpoint_url}" %>
-          <div class="mt-1 flex items-start gap-2 rounded-md border border-gray-200 bg-white px-3 py-2">
-            <code class="flex-1 overflow-x-auto text-xs font-mono text-gray-800 break-all"><%= claude_cmd %></code>
-            <button type="button" onclick="mcpCopy(this, <%= claude_cmd.to_json %>)" class="shrink-0 text-xs text-gray-400 hover:text-indigo-600">复制</button>
+          <div class="mt-1 flex items-start gap-2 rounded-md border border-border-primary bg-bg-card px-3 py-2">
+            <code class="flex-1 overflow-x-auto text-xs font-mono text-text-primary break-all"><%= claude_cmd %></code>
+            <button type="button" onclick="mcpCopy(this, <%= claude_cmd.to_json %>)" class="shrink-0 text-xs text-text-muted hover:text-brand">复制</button>
           </div>
         </li>
-        <li>进入 <code class="text-xs bg-white border px-1 rounded font-mono">claude</code>，输入 <code class="text-xs bg-white border px-1 rounded font-mono">/mcp</code>，选择 <code class="text-xs bg-white border px-1 rounded font-mono">mp-crawler</code> → <code class="text-xs bg-white border px-1 rounded font-mono">Authenticate</code></li>
+        <li>进入 <code class="text-xs bg-bg-card border px-1 rounded font-mono">claude</code>，输入 <code class="text-xs bg-bg-card border px-1 rounded font-mono">/mcp</code>，选择 <code class="text-xs bg-bg-card border px-1 rounded font-mono">mp-crawler</code> → <code class="text-xs bg-bg-card border px-1 rounded font-mono">Authenticate</code></li>
         <li>浏览器会自动打开授权页，登录并确认后即可使用</li>
       </ol>
 
-      <p class="text-sm font-medium text-gray-700 mb-2">Codex</p>
+      <p class="text-sm font-medium text-text-primary mb-2">Codex</p>
       <% codex_cmd = "codex mcp add mp-crawler --url #{@mcp_endpoint_url}\ncodex mcp login mp-crawler" %>
-      <div class="flex items-start gap-2 rounded-md border border-gray-200 bg-white px-3 py-2">
-        <pre class="flex-1 overflow-x-auto text-xs font-mono text-gray-800 leading-relaxed"><%= codex_cmd %></pre>
-        <button type="button" onclick="mcpCopy(this, <%= codex_cmd.to_json %>)" class="shrink-0 text-xs text-gray-400 hover:text-indigo-600">复制</button>
+      <div class="flex items-start gap-2 rounded-md border border-border-primary bg-bg-card px-3 py-2">
+        <pre class="flex-1 overflow-x-auto text-xs font-mono text-text-primary leading-relaxed"><%= codex_cmd %></pre>
+        <button type="button" onclick="mcpCopy(this, <%= codex_cmd.to_json %>)" class="shrink-0 text-xs text-text-muted hover:text-brand">复制</button>
       </div>
 
-      <div class="mt-4 rounded-md border border-indigo-100 bg-white/70 px-3 py-2">
-        <p class="text-xs text-gray-500 mb-1">首次授权的同意页会列出以下权限：</p>
-        <ul class="text-xs text-gray-600 space-y-0.5">
+      <div class="mt-4 rounded-md border border-border-primary bg-bg-card/70 px-3 py-2">
+        <p class="text-xs text-text-secondary mb-1">首次授权的同意页会列出以下权限：</p>
+        <ul class="text-xs text-text-secondary space-y-0.5">
           <% McpOauth::SCOPE_DESCRIPTIONS.each do |scope, description| %>
-            <li><code class="font-mono text-indigo-700"><%= scope %></code> — <%= description %></li>
+            <li><code class="font-mono text-brand-dark"><%= scope %></code> — <%= description %></li>
           <% end %>
         </ul>
-        <p class="text-xs text-gray-400 mt-1.5">access token 2 小时过期，客户端会用 refresh token 自动续期，不需要反复授权。</p>
+        <p class="text-xs text-text-muted mt-1.5">access token 2 小时过期，客户端会用 refresh token 自动续期，不需要反复授权。</p>
       </div>
     </div>
 
     <!-- 方式二：API Key -->
-    <details class="rounded-lg border border-gray-200" <%= "open" if @new_token.present? %>>
-      <summary class="px-4 py-3 cursor-pointer hover:bg-gray-50 flex items-center gap-2">
-        <h3 class="font-semibold text-gray-900">方式二：API Key</h3>
-        <span class="text-sm text-gray-500">适合脚本、CI，或不支持 OAuth 的客户端（Claude Desktop、Cursor、VS Code）</span>
+    <details class="rounded-lg border border-border-primary" <%= "open" if @new_token.present? %>>
+      <summary class="px-4 py-3 cursor-pointer hover:bg-bg-secondary flex items-center gap-2">
+        <h3 class="font-semibold text-text-primary">方式二：API Key</h3>
+        <span class="text-sm text-text-secondary">适合脚本、CI，或不支持 OAuth 的客户端（Claude Desktop、Cursor、VS Code）</span>
       </summary>
 
       <div class="px-4 pb-4">
         <% if current_user %>
           <%= form_with url: create_token_mcp_guide_path, method: :post, class: "flex items-end gap-3 mb-4" do |f| %>
             <div>
-              <label class="block text-sm text-gray-600 mb-1">Token 名称</label>
+              <label class="block text-sm text-text-secondary mb-1">Token 名称</label>
               <%= f.text_field :token_name, value: "MCP Client", class: "border rounded px-3 py-1.5 text-sm w-48" %>
             </div>
-            <%= f.submit "创建 Token", class: "bg-indigo-600 text-white text-sm px-4 py-1.5 rounded hover:bg-indigo-700 cursor-pointer" %>
+            <%= f.submit "创建 Token", class: "btn btn-primary cursor-pointer" %>
           <% end %>
 
           <% if @api_keys.any? %>
             <table class="text-sm w-full mb-4">
-              <thead><tr class="text-left text-gray-500"><th class="pb-2">名称</th><th class="pb-2">Token</th><th class="pb-2">创建时间</th><th class="pb-2"></th></tr></thead>
+              <thead><tr class="text-left text-text-secondary"><th class="pb-2">名称</th><th class="pb-2">Token</th><th class="pb-2">创建时间</th><th class="pb-2"></th></tr></thead>
               <tbody>
                 <% @api_keys.each do |key| %>
                   <tr class="border-t">
                     <td class="py-2"><%= key.name %></td>
-                    <td class="py-2 font-mono text-gray-500">
+                    <td class="py-2 font-mono text-text-secondary">
                       <% if key.active? %>
                         <span><%= key.token.to_s[0..7] %>****</span>
                         <button type="button"
                                 onclick="mcpCopy(this, '<%= key.token %>')"
-                                class="ml-2 text-xs text-indigo-600 hover:underline">复制</button>
+                                class="ml-2 text-xs text-brand hover:underline">复制</button>
                       <% else %>
-                        <span class="text-gray-400"><%= key.token.to_s[0..7] %>****</span>
+                        <span class="text-text-muted"><%= key.token.to_s[0..7] %>****</span>
                       <% end %>
                     </td>
-                    <td class="py-2 text-gray-500"><%= key.created_at.strftime("%Y-%m-%d %H:%M") %></td>
+                    <td class="py-2 text-text-secondary"><%= key.created_at.strftime("%Y-%m-%d %H:%M") %></td>
                     <td class="py-2">
                       <% if key.active? %>
                         <%= button_to "撤销", revoke_token_mcp_guide_path(id: key.id), method: :delete, class: "text-red-600 hover:underline text-sm", data: { turbo_confirm: "确定撤销 Token \"#{key.name}\"？" } %>
                       <% else %>
-                        <span class="text-gray-400 text-sm">已撤销</span>
+                        <span class="text-text-muted text-sm">已撤销</span>
                       <% end %>
                     </td>
                   </tr>
@@ -133,18 +133,18 @@
             </table>
           <% end %>
 
-          <p class="text-sm text-gray-600 mb-3">把下面这句话发给你的 AI 客户端，它会自动帮你完成配置：</p>
+          <p class="text-sm text-text-secondary mb-3">把下面这句话发给你的 AI 客户端，它会自动帮你完成配置：</p>
           <% install_prompt = "请用 CLI 命令帮我添加一个 MCP Server，参数如下：name: mp-crawler，url: #{@mcp_endpoint_url}，type: http，authorization: Bearer #{@new_token || 'YOUR_TOKEN'}，scope: project。请用 CLI 完成操作，不要直接创建或者修改 json，如果 Bearer Token 没有提供，或者是 placeholder，请提示用户输入。" %>
-          <div class="group/p relative flex items-start gap-2 p-4 rounded-lg border border-gray-200 bg-gray-50 hover:bg-white hover:border-gray-300 hover:shadow-sm transition-all cursor-pointer"
+          <div class="group/p relative flex items-start gap-2 p-4 rounded-lg border border-border-primary bg-bg-secondary hover:bg-bg-card hover:border-border-primary hover:shadow-sm transition-all cursor-pointer"
                onclick="copyPrompt(this, <%= install_prompt.to_json %>)">
-            <p class="flex-1 text-sm text-gray-700 leading-relaxed font-mono"><%= install_prompt %></p>
-            <button class="copy-btn shrink-0 px-2 py-1 text-xs font-medium text-gray-400 bg-white border border-gray-200 rounded opacity-0 group-hover/p:opacity-100 transition-all whitespace-nowrap">复制</button>
+            <p class="flex-1 text-sm text-text-primary leading-relaxed font-mono"><%= install_prompt %></p>
+            <button class="copy-btn shrink-0 px-2 py-1 text-xs font-medium text-text-muted bg-bg-card border border-border-primary rounded opacity-0 group-hover/p:opacity-100 transition-all whitespace-nowrap">复制</button>
           </div>
           <% if @new_token.blank? %>
-            <p class="text-xs text-gray-400 mt-2">先在上方创建 Token（或点「复制」取用已有 Token），替换提示语中的 <code class="bg-gray-100 px-1 rounded">YOUR_TOKEN</code>。</p>
+            <p class="text-xs text-text-muted mt-2">先在上方创建 Token（或点「复制」取用已有 Token），替换提示语中的 <code class="bg-bg-secondary px-1 rounded">YOUR_TOKEN</code>。</p>
           <% end %>
 
-          <div class="mt-5 pt-4 border-t border-gray-200">
+          <div class="mt-5 pt-4 border-t border-border-primary">
             <% json_token = @new_token.presence || "YOUR_API_KEY" %>
             <% mcp_config_json = JSON.pretty_generate(
                  "mcpServers" => {
@@ -155,30 +155,30 @@
                    }
                  }
                ) %>
-            <p class="text-sm font-medium text-gray-700 mb-1">或者：直接填写 JSON 配置</p>
-            <p class="text-sm text-gray-600 mb-3">
+            <p class="text-sm font-medium text-text-primary mb-1">或者：直接填写 JSON 配置</p>
+            <p class="text-sm text-text-secondary mb-3">
               没有 CLI、也在网页里配置 MCP 的客户端（Cursor、VS Code、Claude Desktop、Cherry Studio 等），
               把下面的 JSON 粘贴进它的 MCP 配置文件即可。
             </p>
             <div class="relative group/j">
-              <pre class="overflow-x-auto rounded-md border border-gray-200 bg-gray-900 text-gray-100 px-3 py-2.5 text-xs font-mono leading-relaxed"><%= mcp_config_json %></pre>
+              <pre class="overflow-x-auto rounded-md border border-border-primary bg-gray-900 text-gray-100 px-3 py-2.5 text-xs font-mono leading-relaxed"><%= mcp_config_json %></pre>
               <button type="button" onclick="mcpCopy(this, <%= mcp_config_json.to_json %>)"
-                      class="absolute top-2 right-2 px-2 py-1 text-xs text-gray-300 bg-white/10 border border-white/20 rounded opacity-0 group-hover/j:opacity-100 transition-all hover:bg-white/20">复制</button>
+                      class="absolute top-2 right-2 px-2 py-1 text-xs text-gray-300 bg-bg-card/10 border border-white/20 rounded opacity-0 group-hover/j:opacity-100 transition-all hover:bg-bg-card/20">复制</button>
             </div>
-            <ul class="mt-2 text-xs text-gray-400 space-y-0.5">
-              <li>根键是 <code class="bg-gray-100 px-1 rounded">mcpServers</code>；若客户端的配置文件用别的根键（如 VS Code 的 <code class="bg-gray-100 px-1 rounded">servers</code>），保留内层 <code class="bg-gray-100 px-1 rounded">mp-crawler</code> 那段即可。</li>
+            <ul class="mt-2 text-xs text-text-muted space-y-0.5">
+              <li>根键是 <code class="bg-bg-secondary px-1 rounded">mcpServers</code>；若客户端的配置文件用别的根键（如 VS Code 的 <code class="bg-bg-secondary px-1 rounded">servers</code>），保留内层 <code class="bg-bg-secondary px-1 rounded">mp-crawler</code> 那段即可。</li>
               <% if @new_token.present? %>
                 <li>配置里已填入刚创建的 Token，请立即保存。</li>
               <% else %>
-                <li>把 <code class="bg-gray-100 px-1 rounded">YOUR_API_KEY</code> 换成你的 Token。</li>
+                <li>把 <code class="bg-bg-secondary px-1 rounded">YOUR_API_KEY</code> 换成你的 Token。</li>
               <% end %>
               <li>Token 即密码，别提交到公开仓库或分享给他人。</li>
             </ul>
           </div>
 
-          <p class="text-xs text-gray-400 mt-3">API Key 不会过期，请妥善保管；不再需要时记得撤销。</p>
+          <p class="text-xs text-text-muted mt-3">API Key 不会过期，请妥善保管；不再需要时记得撤销。</p>
         <% else %>
-          <p class="text-gray-600">请先 <%= link_to "登录", new_session_path, class: "text-indigo-600 underline" %> 后创建 Token</p>
+          <p class="text-text-secondary">请先 <%= link_to "登录", new_session_path, class: "text-brand underline" %> 后创建 Token</p>
         <% end %>
       </div>
     </details>
@@ -186,8 +186,8 @@
 
   <!-- Step 2: Tools -->
   <section class="mb-10">
-    <h2 class="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-      <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-indigo-600 text-white text-sm font-bold">2</span>
+    <h2 class="text-xl font-semibold text-text-primary mb-4 flex items-center gap-2">
+      <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-primary text-white text-sm font-bold">2</span>
       可用工具
     </h2>
 
@@ -258,33 +258,33 @@
 
       <% tools.each do |tool| %>
         <details class="border rounded-lg">
-          <summary class="px-4 py-3 cursor-pointer hover:bg-gray-50 flex items-center gap-3">
-            <code class="text-sm font-mono text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded"><%= tool[:name] %></code>
+          <summary class="px-4 py-3 cursor-pointer hover:bg-bg-secondary flex items-center gap-3">
+            <code class="text-sm font-mono text-brand-dark bg-bg-secondary px-2 py-0.5 rounded"><%= tool[:name] %></code>
             <span class="text-xs px-2 py-0.5 rounded-full
               <%= case tool[:badge]
-                  when '查询' then 'bg-blue-100 text-blue-700'
+                  when '查询' then 'bg-blue-100 text-brand-dark'
                   when '详情' then 'bg-green-100 text-green-700'
                   when '操作' then 'bg-orange-100 text-orange-700'
                   when '统计' then 'bg-purple-100 text-purple-700'
                   end %>"><%= tool[:badge] %></span>
-            <span class="text-sm text-gray-600"><%= tool[:desc] %></span>
+            <span class="text-sm text-text-secondary"><%= tool[:desc] %></span>
           </summary>
           <div class="px-4 pb-4">
             <% if tool[:params].any? %>
               <table class="text-sm w-full mt-2">
-                <thead><tr class="text-left text-gray-500"><th class="pb-1">参数</th><th class="pb-1">必填</th><th class="pb-1">说明</th></tr></thead>
+                <thead><tr class="text-left text-text-secondary"><th class="pb-1">参数</th><th class="pb-1">必填</th><th class="pb-1">说明</th></tr></thead>
                 <tbody>
                   <% tool[:params].each do |p| %>
                     <tr class="border-t">
                       <td class="py-1 font-mono text-sm"><%= p[0] %></td>
-                      <td class="py-1"><span class="<%= p[1] == '必填' ? 'text-red-600' : 'text-gray-400' %>"><%= p[1] %></span></td>
-                      <td class="py-1 text-gray-600"><%= p[2] %></td>
+                      <td class="py-1"><span class="<%= p[1] == '必填' ? 'text-red-600' : 'text-text-muted' %>"><%= p[1] %></span></td>
+                      <td class="py-1 text-text-secondary"><%= p[2] %></td>
                     </tr>
                   <% end %>
                 </tbody>
               </table>
             <% else %>
-              <p class="text-sm text-gray-500 mt-2">无参数</p>
+              <p class="text-sm text-text-secondary mt-2">无参数</p>
             <% end %>
           </div>
         </details>
@@ -294,7 +294,7 @@
 
   <!-- Example Prompts -->
   <section class="mb-10">
-    <h2 class="text-xl font-semibold text-gray-900 mb-4">示例 Prompt</h2>
+    <h2 class="text-xl font-semibold text-text-primary mb-4">示例 Prompt</h2>
     <div class="space-y-2">
       <% prompts = [
         "帮我看看哪些公众号已经停更超过 90 天，列出来",
@@ -305,9 +305,9 @@
         "把所有活跃的微信公众号标记为「重点」标签，先告诉我有多少个",
       ] %>
       <% prompts.each do |p| %>
-        <div class="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
-          <span class="text-sm text-gray-800 flex-1"><%= p %></span>
-          <button onclick="navigator.clipboard.writeText(this.previousElementSibling.textContent).then(()=>this.textContent='已复制')" class="text-xs text-gray-500 hover:text-indigo-600">复制</button>
+        <div class="flex items-center gap-2 p-3 bg-bg-secondary rounded-lg">
+          <span class="text-sm text-text-primary flex-1"><%= p %></span>
+          <button onclick="navigator.clipboard.writeText(this.previousElementSibling.textContent).then(()=>this.textContent='已复制')" class="text-xs text-text-secondary hover:text-brand">复制</button>
         </div>
       <% end %>
     </div>

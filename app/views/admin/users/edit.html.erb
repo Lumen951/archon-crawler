@@ -1,13 +1,13 @@
 <div class="flex justify-center">
   <div class="w-full max-w-2xl">
-    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
-      <div class="p-6 border-b border-slate-200">
-        <h3 class="text-xl font-bold text-slate-900">编辑用户</h3>
+    <div class="bg-bg-card rounded-lg border border-border-primary shadow-sm">
+      <div class="p-6 border-b border-border-primary">
+        <h3 class="text-xl font-bold text-text-primary">编辑用户</h3>
       </div>
       <div class="p-6">
         <%= form_with model: [:admin, @user], local: true do |form| %>
           <% if @user.errors.any? %>
-            <div class="mb-4 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-xl text-sm">
+            <div class="mb-4 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg text-sm">
               <p class="font-semibold mb-1"><%= @user.errors.count %>个错误阻止了保存：</p>
               <ul class="list-disc list-inside space-y-0.5">
                 <% @user.errors.full_messages.each do |message| %>
@@ -18,48 +18,48 @@
           <% end %>
 
           <div class="mb-4">
-            <%= form.label :email_address, "邮箱", class: "block text-sm font-medium text-slate-700 mb-1" %>
-            <%= form.email_field :email_address, class: "w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200", required: true %>
+            <%= form.label :email_address, "邮箱", class: "block text-sm font-medium text-text-primary mb-1" %>
+            <%= form.email_field :email_address, class: "form-input", required: true %>
           </div>
 
           <div class="mb-4">
-            <%= form.label :name, "姓名", class: "block text-sm font-medium text-slate-700 mb-1" %>
-            <%= form.text_field :name, class: "w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200" %>
+            <%= form.label :name, "姓名", class: "block text-sm font-medium text-text-primary mb-1" %>
+            <%= form.text_field :name, class: "form-input" %>
           </div>
 
           <div class="mb-6">
-            <%= form.label :role, "角色", class: "block text-sm font-medium text-slate-700 mb-1" %>
-            <%= form.select :role, User.roles.keys.map { |role| [role == "admin" ? "管理员" : "用户", role] }, {}, class: "w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200" %>
+            <%= form.label :role, "角色", class: "block text-sm font-medium text-text-primary mb-1" %>
+            <%= form.select :role, User.roles.keys.map { |role| [role == "admin" ? "管理员" : "用户", role] }, {}, class: "form-input" %>
           </div>
 
-          <hr class="my-6 border-slate-200">
+          <hr class="my-6 border-border-primary">
 
           <div class="mb-4">
-            <%= form.label :password, "新密码（留空则不修改）", class: "block text-sm font-medium text-slate-700 mb-1" %>
-            <%= form.password_field :password, class: "w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200", autocomplete: "new-password" %>
+            <%= form.label :password, "新密码（留空则不修改）", class: "block text-sm font-medium text-text-primary mb-1" %>
+            <%= form.password_field :password, class: "form-input", autocomplete: "new-password" %>
           </div>
 
           <div class="mb-6">
-            <%= form.label :password_confirmation, "确认新密码", class: "block text-sm font-medium text-slate-700 mb-1" %>
-            <%= form.password_field :password_confirmation, class: "w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200", autocomplete: "new-password" %>
+            <%= form.label :password_confirmation, "确认新密码", class: "block text-sm font-medium text-text-primary mb-1" %>
+            <%= form.password_field :password_confirmation, class: "form-input", autocomplete: "new-password" %>
           </div>
 
-          <hr class="my-6 border-slate-200">
+          <hr class="my-6 border-border-primary">
 
           <div class="mb-6">
-            <h4 class="text-sm font-medium text-slate-700 mb-3">通知设置</h4>
+            <h4 class="text-sm font-medium text-text-primary mb-3">通知设置</h4>
             <label class="flex items-center gap-2">
               <%= hidden_field_tag "user[settings][notify_api_key_expiry]", "0" %>
               <%= check_box_tag "user[settings][notify_api_key_expiry]", "1", @user.notify_api_key_expiry?,
-                    class: "rounded border-slate-300 text-blue-600 focus:ring-blue-500" %>
-              <span class="text-sm text-slate-700">抓取平台 API Key 过期时邮件通知</span>
+                    class: "rounded border-border-primary text-brand focus:ring-brand/30" %>
+              <span class="text-sm text-text-primary">抓取平台 API Key 过期时邮件通知</span>
             </label>
-            <p class="text-xs text-slate-500 mt-1 ml-6">开启后，当抓取平台 API Key 过期时系统将每日发送一封提醒邮件</p>
+            <p class="text-xs text-text-secondary mt-1 ml-6">开启后，当抓取平台 API Key 过期时系统将每日发送一封提醒邮件</p>
           </div>
 
           <div class="flex gap-3">
-            <%= form.submit "更新用户", class: "px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-semibold cursor-pointer" %>
-            <%= link_to "取消", admin_user_path(@user), class: "px-5 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors text-sm font-semibold" %>
+            <%= form.submit "更新用户", class: "btn btn-primary cursor-pointer" %>
+            <%= link_to "取消", admin_user_path(@user), class: "px-5 py-2.5 bg-bg-card border border-border-primary text-text-primary rounded-lg hover:bg-bg-secondary transition-colors text-sm font-semibold" %>
           </div>
         <% end %>
       </div>

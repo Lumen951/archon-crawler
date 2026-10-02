@@ -1,10 +1,10 @@
 <div class="space-y-8">
   <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
     <div>
-      <h2 class="text-3xl font-bold text-text-primary">标签管理</h2>
-      <p class="text-text-secondary mt-2"><%= @tags.size %> 个标签</p>
+      <h2 class="text-2xl font-bold text-text-primary">标签管理</h2>
+      <p class="mt-1 text-sm text-text-secondary"><%= @tags.size %> 个标签</p>
     </div>
-    <%= button_to refresh_counts_admin_tags_path, method: :post, class: "h-10 px-5 rounded-xl border border-border-primary bg-bg-card hover:border-brand hover:text-brand font-semibold text-sm transition inline-flex items-center justify-center gap-2" do %>
+    <%= button_to refresh_counts_admin_tags_path, method: :post, class: "btn btn-default gap-2" do %>
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
       </svg>
@@ -14,7 +14,7 @@
 
   <% if @tags.any? %>
     <!-- Desktop Table -->
-    <div class="hidden md:block bg-bg-card border border-border-primary rounded-2xl overflow-hidden shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+    <div class="hidden md:block bg-bg-card border border-border-primary rounded-lg overflow-hidden">
       <table class="min-w-full divide-y divide-border-primary">
         <thead class="bg-bg-secondary">
           <tr>
@@ -45,7 +45,7 @@
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-right">
                 <div class="flex items-center justify-end gap-2">
-                  <%= link_to edit_admin_tag_path(tag), class: "h-8 px-3 rounded-lg border border-border-primary bg-bg-card hover:border-brand hover:text-brand text-xs font-semibold transition inline-flex items-center" do %>
+                  <%= link_to edit_admin_tag_path(tag), class: "btn btn-default btn-sm" do %>
                     编辑
                   <% end %>
                   <%= button_to admin_tag_path(tag), method: :delete, data: { turbo_confirm: "确定删除标签「#{tag.name}」？将移除 #{tag.tag_accounts_count} 个帐号关联。" }, class: "h-8 px-3 rounded-lg border border-red-200 bg-bg-card text-red-600 hover:border-red-400 hover:bg-red-50 text-xs font-semibold transition" do %>
@@ -62,7 +62,7 @@
     <!-- Mobile Cards -->
     <div class="md:hidden space-y-4">
       <% @tags.each do |tag| %>
-        <div class="bg-bg-card border border-border-primary rounded-xl p-4 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+        <div class="bg-bg-card border border-border-primary rounded-lg p-4">
           <div class="flex items-center gap-2 mb-2">
             <span class="w-4 h-4 rounded-full flex-shrink-0" style="background-color: <%= tag.color %>"></span>
             <span class="text-sm font-semibold text-text-primary"><%= tag.name %></span>
@@ -83,7 +83,7 @@
       <% end %>
     </div>
   <% else %>
-    <div class="bg-bg-card border border-border-primary rounded-2xl text-center py-12 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+    <div class="bg-bg-card border border-border-primary rounded-lg text-center py-12">
       <p class="text-text-secondary mb-2">暂无标签</p>
       <p class="text-text-muted text-sm">在帐号管理页面批量打标签时会自动创建</p>
     </div>

@@ -1,851 +1,905 @@
-<div class="space-y-6">
+<%
+  # 左侧子导航分组；ok 为 nil 表示该项无配置状态
+  settings_groups = [
+    {
+      title: "账号与会话",
+      items: [
+        { id: "wechat", label: "微信读书", ok: @weread_native_session_valid },
+        { id: "rednote", label: "小红书", ok: @rednote_api_key.present? || @rednote_web_session_valid },
+        { id: "twitter", label: "Twitter", ok: @twitter_ct0.present? && @twitter_auth_token.present? },
+        { id: "browser-login", label: "远程浏览器", ok: nil },
+      ],
+    },
+    {
+      title: "API 密钥",
+      items: [
+        { id: "tikhub", label: "TikHub", ok: @tikhub_api_key.present? },
+        { id: "tianyancha", label: "天眼查", ok: @tianyancha_api_key.present? },
+        { id: "serper", label: "Serper", ok: @serper_api_key.present? },
+        { id: "website-render", label: "官网渲染兜底", ok: @website_render_fallbacks.present? || @scrapingant_api_key.present? },
+        { id: "openai", label: "OpenAI / LLM", ok: @openai_api_key.present? },
+      ],
+    },
+    {
+      title: "抓取策略",
+      items: [
+        { id: "crawl", label: "并发与配额", ok: nil },
+        { id: "platform-toggles", label: "平台开关", ok: nil },
+        { id: "logging", label: "日志", ok: nil },
+      ],
+    },
+    {
+      title: "集成推送",
+      items: [
+        { id: "feishu", label: "飞书推送", ok: @feishu_enabled && @feishu_app_id.present? && @feishu_receive_id.present? },
+      ],
+    },
+  ]
+%>
+
+<div class="max-w-6xl space-y-6">
   <div>
-    <h1 class="text-3xl font-bold text-gray-900">设置</h1>
-    <p class="text-gray-600 mt-1">配置您的 API 密钥和系统设置</p>
+    <h1 class="text-2xl font-bold text-text-primary">设置</h1>
+    <p class="text-sm text-text-secondary mt-1">配置抓取会话、API 密钥与平台策略</p>
   </div>
 
-  <!-- Table of Contents -->
-  <nav class="card">
-    <h2 class="text-sm font-semibold text-gray-700 mb-3">目录</h2>
-    <div class="flex flex-wrap gap-2">
-      <a href="#wechat" class="px-3 py-1.5 text-sm rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition">微信 API</a>
-      <a href="#rednote" class="px-3 py-1.5 text-sm rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition">小红书</a>
-      <a href="#twitter" class="px-3 py-1.5 text-sm rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition">Twitter</a>
-      <a href="#tikhub" class="px-3 py-1.5 text-sm rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition">TikHub</a>
-      <a href="#tianyancha" class="px-3 py-1.5 text-sm rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition">天眼查</a>
-      <a href="#serper" class="px-3 py-1.5 text-sm rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition">Serper</a>
-      <a href="#website-render" class="px-3 py-1.5 text-sm rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition">官网渲染兜底</a>
-      <a href="#browser-login" class="px-3 py-1.5 text-sm rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition">远程浏览器登录</a>
-      <a href="#openai" class="px-3 py-1.5 text-sm rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition">OpenAI / LLM</a>
-      <a href="#crawl" class="px-3 py-1.5 text-sm rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition">抓取设置</a>
-      <a href="#logging" class="px-3 py-1.5 text-sm rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition">日志设置</a>
-      <a href="#platform-toggles" class="px-3 py-1.5 text-sm rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition">平台开关</a>
-      <a href="#feishu" class="px-3 py-1.5 text-sm rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition">飞书推送</a>
-    </div>
-  </nav>
-
-  <!-- WeChat API Provider Section -->
-  <div class="card" id="wechat">
-    <h2 class="text-xl font-bold text-gray-900 mb-4">微信 API 设置</h2>
-
-    <!-- Tabs：其余 provider（mp_native / dajiala / profile_ext / weread 转发池）已下线，仅保留 WeRead 直连 -->
-    <% active_tab = 'weread_native' %>
-    <div class="border-b border-gray-200 mb-4">
-      <nav class="flex gap-0 -mb-px" role="tablist">
-        <button class="wechat-tab px-4 py-2 text-sm font-medium border-b-2 rounded-t-lg transition border-primary text-primary" data-tab="weread_native" role="tab">WeRead 直连</button>
-      </nav>
-    </div>
-
-    <!-- WeRead Native Panel -->
-    <div id="weread_native" class="wechat-panel" data-tab-panel="weread_native" role="tabpanel">
-      <p class="text-sm text-gray-500 mb-4">
-        直连微信读书网页版（weread.qq.com），通过扫码登录获取会话 Cookie，无需转发服务。会话有效期<%= weread_native_session_ttl_label %>，失效时会通过飞书推送提醒。
-        <br>注意：微信读书网页版已下线历史列表，每个公众号每次仅能抓取「最新一篇」文章。
-      </p>
-
-      <%= render "admin/settings/weread_native_panel" %>
-
-      <div class="border-t border-gray-200 my-4 pt-4">
-        <p class="text-sm font-medium text-gray-700 mb-2">备用登录方式</p>
-        <%= render "admin/settings/browser_login", provider_key: "weread_native",
-              hint: "远程浏览器的 profile 会记住 Cookie，会话过期后重开多数时候免扫码。" %>
-      </div>
-    </div>
-  </div>
-
-  <!-- RedNote API Key -->
-  <div class="card" id="rednote">
-    <h2 class="text-xl font-bold text-gray-900 mb-4">小红书 API 密钥</h2>
-
-    <% if @rednote_api_key.present? %>
-      <div class="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-sm font-medium text-green-900">当前 API 密钥</p>
-            <p class="text-sm text-green-700 mt-1 font-mono"><%= mask_api_key(@rednote_api_key) %></p>
-            <% if @rednote_key_check %>
-              <p class="text-sm mt-1">
-                上次验证：
-                <% if @rednote_key_check[:valid] == true %>
-                  <span class="text-green-700 font-semibold">✓ 有效</span>
-                <% elsif @rednote_key_check[:valid] == false %>
-                  <span class="text-red-700 font-semibold">✗ 无效</span>
-                <% else %>
-                  <span class="text-yellow-700 font-semibold">? 验证失败</span>
-                <% end %>
-                <span class="text-gray-500 text-xs ml-1">(<%= Time.parse(@rednote_key_check[:checked_at]).strftime('%Y-%m-%d %H:%M') %>)</span>
-              </p>
+  <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:gap-8" data-controller="settings-nav">
+    <%# 左侧子导航：桌面端 sticky 纵向列表，移动端横向滚动 %>
+    <nav class="flex gap-1 overflow-x-auto pb-1 lg:flex-col lg:gap-0.5 lg:overflow-visible lg:w-60 lg:shrink-0 lg:sticky lg:top-20 lg:pb-0"
+         aria-label="设置分区">
+      <% settings_groups.each do |group| %>
+        <p class="hidden lg:block px-3 pt-4 pb-1 text-[11px] font-semibold uppercase tracking-wider text-text-muted"><%= group[:title] %></p>
+        <% group[:items].each do |item| %>
+          <button type="button"
+                  class="settings-nav-link whitespace-nowrap <%= 'active' if item[:id] == 'wechat' %>"
+                  data-settings-nav-target="link"
+                  data-panel-id="<%= item[:id] %>"
+                  data-action="click->settings-nav#switch">
+            <% if !item[:ok].nil? %>
+              <span class="status-dot <%= item[:ok] ? 'ok' : 'pending' %>"></span>
             <% end %>
-          </div>
-          <%= button_to "验证接口", validate_rednote_key_admin_settings_path, method: :post,
-              class: "text-sm px-3 py-1.5 rounded bg-green-600 text-white hover:bg-green-700 transition self-start" %>
-        </div>
-      </div>
-    <% end %>
-
-    <%= form_with url: admin_settings_path, method: :patch, class: "space-y-4" do |f| %>
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">API 密钥</label>
-        <%= text_field_tag :rednote_api_key, nil,
-            class: "w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent",
-            placeholder: "输入小红书 API 密钥" %>
-      </div>
-
-      <div class="flex items-center justify-end">
-        <button type="submit" class="btn btn-primary">保存小红书密钥</button>
-      </div>
-    <% end %>
-
-    <!-- 网页版 Cookie（远程浏览器登录，为直连抓取预留） -->
-    <div class="border-t border-gray-200 my-4 pt-4">
-      <h3 class="text-lg font-semibold text-gray-800 mb-2">网页版登录态（Cookie）</h3>
-      <p class="text-sm text-gray-500 mb-3">
-        当前抓取走付费 API，无需登录；这里保存的网页版 Cookie 为后续免付费直连抓取预留。本地有效期<%= rednote_web_session_ttl_label %>，过期后重新登录即可。
-      </p>
-
-      <%= render "admin/settings/rednote_web_panel" %>
-
-      <%= render "admin/settings/browser_login", provider_key: "rednote_web",
-            hint: "打开远程浏览器后，用小红书 App 扫描页面上的二维码；扫码成功后请点弹窗里的「保存登录态」完成保存。" %>
-    </div>
-  </div>
-
-  <!-- Twitter Cookies -->
-  <div class="card" id="twitter">
-    <h2 class="text-xl font-bold text-gray-900 mb-4">Twitter Cookies</h2>
-
-    <% if @twitter_ct0.present? && @twitter_auth_token.present? %>
-      <div class="mb-4 p-4 bg-sky-50 border border-sky-200 rounded-lg">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-sm font-medium text-sky-900">当前 Cookies</p>
-            <p class="text-sm text-sky-700 mt-1 font-mono">ct0: <%= mask_api_key(@twitter_ct0) %></p>
-            <p class="text-sm text-sky-700 mt-1 font-mono">auth_token: <%= mask_api_key(@twitter_auth_token) %></p>
-            <% if @twitter_proxy.present? %>
-              <p class="text-sm text-sky-700 mt-1 font-mono">代理: <%= mask_api_key(@twitter_proxy) %></p>
-            <% end %>
-            <% if @twitter_key_check %>
-              <p class="text-sm mt-1">
-                上次验证：
-                <% if @twitter_key_check[:valid] == true %>
-                  <span class="text-green-700 font-semibold">✓ 有效</span>
-                <% elsif @twitter_key_check[:valid] == false %>
-                  <span class="text-red-700 font-semibold">✗ 无效</span>
-                <% else %>
-                  <span class="text-yellow-700 font-semibold">? 验证失败</span>
-                <% end %>
-                <span class="text-gray-500 text-xs ml-1">(<%= Time.parse(@twitter_key_check[:checked_at]).strftime('%Y-%m-%d %H:%M') %>)</span>
-              </p>
-            <% end %>
-          </div>
-          <%= button_to "验证接口", validate_twitter_key_admin_settings_path, method: :post,
-              class: "text-sm px-3 py-1.5 rounded bg-sky-600 text-white hover:bg-sky-700 transition self-start" %>
-        </div>
-      </div>
-    <% else %>
-      <div class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-        <p class="text-sm text-yellow-800">未配置 Twitter cookies。请在下方添加。</p>
-        <p class="text-xs text-yellow-700 mt-1">从浏览器中获取 x.com 的 ct0 和 auth_token cookies</p>
-      </div>
-    <% end %>
-
-    <%= form_with url: admin_settings_path, method: :patch, class: "space-y-4" do |f| %>
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">ct0 Cookie</label>
-        <%= text_field_tag :twitter_ct0, nil,
-            class: "w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent",
-            placeholder: "输入 ct0 cookie 值" %>
-      </div>
-
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">auth_token Cookie</label>
-        <%= text_field_tag :twitter_auth_token, nil,
-            class: "w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent",
-            placeholder: "输入 auth_token cookie 值" %>
-      </div>
-
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">代理服务器（可选）</label>
-        <%= text_field_tag :twitter_proxy, @twitter_proxy,
-            class: "w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent",
-            placeholder: "http://user:pass@host:port 或留空" %>
-        <p class="mt-1 text-sm text-gray-500">
-          HTTP/HTTPS 代理地址，格式：http://user:pass@host:port（留空则不使用代理）
-        </p>
-      </div>
-
-      <div class="flex items-center justify-end">
-        <button type="submit" class="btn btn-primary">保存 Twitter Cookies</button>
-      </div>
-    <% end %>
-  </div>
-
-  <!-- TikHub API Key -->
-  <div class="card" id="tikhub">
-    <h2 class="text-xl font-bold text-gray-900 mb-4">TikHub API 密钥</h2>
-    <p class="text-sm text-gray-600 mb-4">用于小红书用户搜索功能（按名称搜索帐号）</p>
-
-    <% if @tikhub_api_key.present? %>
-      <div class="mb-4 p-4 bg-purple-50 border border-purple-200 rounded-lg">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-sm font-medium text-purple-900">当前 API 密钥</p>
-            <p class="text-sm text-purple-700 mt-1 font-mono"><%= mask_api_key(@tikhub_api_key) %></p>
-            <% if @tikhub_key_check %>
-              <p class="text-sm mt-1">
-                上次验证：
-                <% if @tikhub_key_check[:valid] == true %>
-                  <span class="text-green-700 font-semibold">✓ 有效</span>
-                <% elsif @tikhub_key_check[:valid] == false %>
-                  <span class="text-red-700 font-semibold">✗ 无效</span>
-                <% else %>
-                  <span class="text-yellow-700 font-semibold">? 验证失败</span>
-                <% end %>
-                <span class="text-gray-500 text-xs ml-1">(<%= Time.parse(@tikhub_key_check[:checked_at]).strftime('%Y-%m-%d %H:%M') %>)</span>
-              </p>
-            <% end %>
-          </div>
-          <%= button_to "验证接口", validate_tikhub_key_admin_settings_path, method: :post,
-              class: "text-sm px-3 py-1.5 rounded bg-purple-600 text-white hover:bg-purple-700 transition self-start" %>
-        </div>
-      </div>
-    <% else %>
-      <div class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-        <p class="text-sm text-yellow-800">未配置 TikHub API 密钥。小红书按名称搜索功能将不可用。</p>
-        <p class="text-xs text-yellow-700 mt-1">从 <a href="https://tikhub.io" target="_blank" class="text-primary hover:underline">tikhub.io</a> 获取 API Token</p>
-      </div>
-    <% end %>
-
-    <%= form_with url: admin_settings_path, method: :patch, class: "space-y-4" do |f| %>
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">API Token</label>
-        <%= text_field_tag :tikhub_api_key, nil,
-            class: "w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent",
-            placeholder: "输入 TikHub API Token" %>
-        <p class="mt-1 text-sm text-gray-500">
-          从 <a href="https://tikhub.io" target="_blank" class="text-primary hover:underline">tikhub.io</a> 用户中心获取 API Token
-        </p>
-      </div>
-
-      <div class="flex items-center justify-end">
-        <button type="submit" class="btn btn-primary">保存 TikHub 密钥</button>
-      </div>
-    <% end %>
-  </div>
-
-  <!-- Tianyancha API Key -->
-  <div class="card" id="tianyancha">
-    <h2 class="text-xl font-bold text-gray-900 mb-4">天眼查 API 密钥</h2>
-    <p class="text-sm text-gray-600 mb-4">用于 event_research 补全机构工商档案（法人、注册资本、统一社会信用代码、成立时间、存续状态、公开联系方式）</p>
-
-    <% if @tianyancha_api_key.present? %>
-      <div class="mb-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
-        <p class="text-sm font-medium text-orange-900">当前 API Token</p>
-        <p class="text-sm text-orange-700 mt-1 font-mono"><%= mask_api_key(@tianyancha_api_key) %></p>
-      </div>
-    <% else %>
-      <div class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-        <p class="text-sm text-yellow-800">未配置天眼查 API Token。event_research 仍可运行，但会跳过工商信息补全。</p>
-      </div>
-    <% end %>
-
-    <%= form_with url: admin_settings_path, method: :patch, class: "space-y-4" do |f| %>
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">API Token</label>
-        <%= text_field_tag :tianyancha_api_key, nil,
-            class: "w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent",
-            placeholder: "输入天眼查 API Token" %>
-        <p class="mt-1 text-sm text-gray-500">
-          从 <a href="https://open.tianyancha.com" target="_blank" class="text-primary hover:underline">open.tianyancha.com</a> 控制台获取 Token
-        </p>
-      </div>
-
-      <div class="flex items-center justify-end">
-        <button type="submit" class="btn btn-primary">保存天眼查 Token</button>
-      </div>
-    <% end %>
-  </div>
-
-  <!-- Serper API Key -->
-  <div class="card" id="serper">
-    <h2 class="text-xl font-bold text-gray-900 mb-4">Serper API 密钥</h2>
-    <p class="text-sm text-gray-600 mb-4">用于活动调研的 Google 搜索（搜索获奖名单、人物资料等来源页面）</p>
-
-    <% if @serper_api_key.present? %>
-      <div class="mb-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
-        <p class="text-sm font-medium text-orange-900">当前 API Key</p>
-        <p class="text-sm text-orange-700 mt-1 font-mono"><%= mask_api_key(@serper_api_key) %></p>
-      </div>
-    <% else %>
-      <div class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-        <p class="text-sm text-yellow-800">未配置 Serper API Key。活动调研无法启动（搜索是调研的第一步）。</p>
-      </div>
-    <% end %>
-
-    <%= form_with url: admin_settings_path, method: :patch, class: "space-y-4" do |f| %>
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">API Key</label>
-        <%= text_field_tag :serper_api_key, nil,
-            class: "w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent",
-            placeholder: "输入 Serper API Key" %>
-        <p class="mt-1 text-sm text-gray-500">
-          从 <a href="https://serper.dev" target="_blank" class="text-primary hover:underline">serper.dev</a> 控制台获取 API Key。本地开发也可用环境变量 SERPER_API_KEY。
-        </p>
-      </div>
-
-      <div class="flex items-center justify-end">
-        <button type="submit" class="btn btn-primary">保存 Serper Key</button>
-      </div>
-    <% end %>
-  </div>
-
-  <!-- Website Render Fallback (Local Browser + ScrapingAnt) -->
-  <div class="card" id="website-render">
-    <h2 class="text-xl font-bold text-gray-900 mb-4">官网抓取渲染兜底</h2>
-    <p class="text-sm text-gray-600 mb-4">
-      官网抓取默认走直连 HTTP，不消耗额度。只有当直连拿到的响应里
-      <code class="bg-gray-100 px-1 rounded">crawl_rule</code> 一条内容都提取不出来时（JS 渲染页面的典型特征），
-      才会按配置的顺序依次尝试渲染兜底。不依赖 crawl_rule 的抓取（sitemap 发现、站点信息补全等）永不调用渲染兜底。
-    </p>
-
-    <%= form_with url: admin_settings_path, method: :patch, class: "space-y-6" do |f| %>
-      <!-- Render Fallback Provider Selection -->
-      <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
-        <label class="block text-sm font-semibold text-gray-900 mb-3">渲染兜底方式（按顺序尝试）</label>
-        <div class="space-y-2">
-          <label class="flex items-start gap-3 p-3 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
-            <%= check_box_tag "website_render_fallbacks[]", "local_headless",
-                @website_render_fallbacks.include?("local_headless"),
-                id: "fallback_local", class: "mt-1" %>
-            <div class="flex-1">
-              <div class="text-sm font-medium text-gray-900">本地 Headless Browser（推荐优先）</div>
-              <div class="text-xs text-gray-600 mt-1">
-                使用本机 Chrome/Chromium 渲染页面，不消耗 API 额度，但占用本地 CPU/内存。
-                需要系统已安装 Chrome 或 Chromium 浏览器。
-              </div>
-            </div>
-          </label>
-
-          <label class="flex items-start gap-3 p-3 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
-            <%= check_box_tag "website_render_fallbacks[]", "scrapingant",
-                @website_render_fallbacks.include?("scrapingant"),
-                id: "fallback_scrapingant", class: "mt-1" %>
-            <div class="flex-1">
-              <div class="text-sm font-medium text-gray-900">ScrapingAnt API（付费兜底）</div>
-              <div class="text-xs text-gray-600 mt-1">
-                通过 ScrapingAnt 渲染页面，每次约消耗 10 credits。
-                适合作为本地浏览器不可用或失败时的兜底。需要配置 API Key（见下方）。
-              </div>
-            </div>
-          </label>
-        </div>
-        <p class="text-xs text-gray-500 mt-3">
-          💡 推荐配置：先勾选「本地 Headless Browser」，再勾选「ScrapingAnt」作为兜底。
-          直连 HTTP 提取失败时会按顺序依次尝试，任一成功即停止。
-        </p>
-      </div>
-
-      <!-- ScrapingAnt API Key -->
-      <div class="border-t border-gray-200 pt-4">
-        <h3 class="text-base font-semibold text-gray-900 mb-3">ScrapingAnt API Key</h3>
-
-        <% if @scrapingant_api_key.present? %>
-          <div class="mb-4 p-4 bg-cyan-50 border border-cyan-200 rounded-lg">
-            <p class="text-sm font-medium text-cyan-900">当前 API 密钥</p>
-            <p class="text-sm text-cyan-700 mt-1 font-mono"><%= mask_api_key(@scrapingant_api_key) %></p>
-          </div>
-        <% else %>
-          <div class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <p class="text-sm text-yellow-800">未配置 ScrapingAnt API Key。如上方勾选了 ScrapingAnt，则该兜底不可用。</p>
-            <p class="text-xs text-yellow-700 mt-1">从 <a href="https://app.scrapingant.com" target="_blank" class="text-primary hover:underline">app.scrapingant.com</a> 获取 API Key</p>
-          </div>
+            <span><%= item[:label] %></span>
+          </button>
         <% end %>
+      <% end %>
+    </nav>
 
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">API Key</label>
-          <%= text_field_tag :scrapingant_api_key, nil,
-              class: "w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent",
-              placeholder: "输入 ScrapingAnt API Key（留空则保持不变）" %>
-          <p class="mt-1 text-sm text-gray-500">
-            只在兜底时调用，每次约消耗 10 credits。兜底次数受各帐号规则中的
-            <code class="bg-gray-100 px-1 rounded">limits.max_items</code> 与
-            <code class="bg-gray-100 px-1 rounded">limits.interval_seconds</code> 约束。
+    <%# 面板区：一次显示一个分区，全部表单保持挂载 %>
+    <div class="flex-1 min-w-0 space-y-6">
+      <%# ── 微信读书（直连） ── %>
+      <section class="panel scroll-mt-20" data-settings-nav-target="panel" data-panel-id="wechat" id="wechat">
+        <div class="panel-header">
+          <h2 class="panel-title">微信读书（直连）</h2>
+          <p class="text-sm text-text-secondary mt-1">
+            直连微信读书网页版（weread.qq.com），通过扫码登录获取会话 Cookie，无需转发服务。会话有效期<%= weread_native_session_ttl_label %>，失效时会通过飞书推送提醒。
+            微信读书网页版已下线历史列表，每个公众号每次仅能抓取「最新一篇」文章。
           </p>
         </div>
-      </div>
+        <div class="panel-body space-y-4">
+          <%= render "admin/settings/weread_native_panel" %>
 
-      <div class="flex items-center justify-end">
-        <button type="submit" class="btn btn-primary">保存渲染兜底配置</button>
-      </div>
-    <% end %>
-  </div>
-
-  <!-- Crawl Settings -->
-  <div class="card" id="crawl">
-    <h2 class="text-xl font-bold text-gray-900 mb-4">抓取设置</h2>
-
-    <%= form_with url: admin_settings_path, method: :patch, class: "space-y-4" do |f| %>
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">默认账号并发数</label>
-        <input type="number" name="default_account_concurrency" value="<%= @default_account_concurrency %>" min="1" max="20"
-               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
-        <p class="mt-1 text-sm text-gray-500">
-          同时抓取的帐号数量（1-20）。数值越高速度越快，但系统负载也越大。
-        </p>
-      </div>
-
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">默认文章并发数</label>
-        <input type="number" name="default_article_concurrency" value="<%= @default_article_concurrency %>" min="5" max="50"
-               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
-        <p class="mt-1 text-sm text-gray-500">
-          每个帐号抓取时的并发请求数（5-50）。数值越高速度越快，但 API 负载也越大。
-        </p>
-      </div>
-
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">最大抓取页数</label>
-        <input type="number" name="max_crawl_pages" value="<%= @max_crawl_pages %>" min="1" max="100"
-               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
-        <p class="mt-1 text-sm text-gray-500">
-          每个帐号最多抓取的文章页数（1-100）。每页约20篇文章。
-        </p>
-      </div>
-
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">每日抓取配额（按平台）</label>
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div>
-            <label class="block text-xs font-medium text-gray-500 mb-1">微信公众号</label>
-            <input type="number" name="daily_crawl_budget_wechat" value="<%= @daily_crawl_budget_wechat %>" min="1" max="5000"
-                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-gray-500 mb-1">小红书</label>
-            <input type="number" name="daily_crawl_budget_rednote" value="<%= @daily_crawl_budget_rednote %>" min="1" max="5000"
-                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-gray-500 mb-1">Twitter</label>
-            <input type="number" name="daily_crawl_budget_twitter" value="<%= @daily_crawl_budget_twitter %>" min="1" max="5000"
-                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-gray-500 mb-1">官网</label>
-            <input type="number" name="daily_crawl_budget_website" value="<%= @daily_crawl_budget_website %>" min="1" max="5000"
-                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+          <div class="border-t border-border-primary pt-4">
+            <p class="text-sm font-semibold text-text-primary mb-2">备用登录方式</p>
+            <%= render "admin/settings/browser_login", provider_key: "weread_native",
+                  hint: "远程浏览器的 profile 会记住 Cookie，会话过期后重开多数时候免扫码。" %>
           </div>
         </div>
-        <p class="mt-1 text-sm text-gray-500">
-          每次定时抓取各平台最多处理的帐号数量。按活跃度分层调度，仅抓取“到期”的帐号，超出配额的顺延到下次，避免触发反爬限制。
-        </p>
-      </div>
+      </section>
 
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">速率限制（滑动窗口）</label>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-xs font-medium text-gray-500 mb-1">微信正文下载（次数）</label>
-              <input type="number" name="wechat_download_rate_limit" value="<%= @wechat_download_rate_limit %>" min="1" max="120"
-                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
-            </div>
-            <div>
-              <label class="block text-xs font-medium text-gray-500 mb-1">窗口（秒）</label>
-              <input type="number" name="wechat_download_rate_window" value="<%= @wechat_download_rate_window %>" min="10" max="3600"
-                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
-            </div>
-          </div>
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-xs font-medium text-gray-500 mb-1">微信读书直连（次数）</label>
-              <input type="number" name="weread_native_list_rate_limit" value="<%= @weread_native_list_rate_limit %>" min="1" max="120"
-                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
-            </div>
-            <div>
-              <label class="block text-xs font-medium text-gray-500 mb-1">窗口（秒）</label>
-              <input type="number" name="weread_native_list_rate_window" value="<%= @weread_native_list_rate_window %>" min="10" max="3600"
-                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
-            </div>
-          </div>
+      <%# ── 小红书 ── %>
+      <section class="panel scroll-mt-20 hidden" data-settings-nav-target="panel" data-panel-id="rednote" id="rednote">
+        <div class="panel-header">
+          <h2 class="panel-title">小红书</h2>
+          <p class="text-sm text-text-secondary mt-1">配置小红书 API 密钥、采集通道与网页版登录态</p>
         </div>
-        <p class="mt-1 text-sm text-gray-500">
-          每个窗口期内最多发起 N 次请求，避免触发反爬限制。微信正文下载（直访 mp.weixin.qq.com）默认 20 次/60 秒；
-          微信读书直连列表/正文接口默认 30 次/60 秒。配置变更后立即生效，无需重启。
-        </p>
-      </div>
+        <div class="panel-body space-y-4">
+          <% if @rednote_api_key.present? %>
+            <div class="notice notice-success flex items-start justify-between gap-3">
+              <div>
+                <p class="font-medium">当前 API 密钥</p>
+                <p class="mt-0.5 font-mono"><%= mask_api_key(@rednote_api_key) %></p>
+                <% if @rednote_key_check %>
+                  <p class="mt-0.5">
+                    上次验证：
+                    <% if @rednote_key_check[:valid] == true %>
+                      <span class="font-semibold text-green-700">✓ 有效</span>
+                    <% elsif @rednote_key_check[:valid] == false %>
+                      <span class="font-semibold text-red-700">✗ 无效</span>
+                    <% else %>
+                      <span class="font-semibold text-yellow-700">? 验证失败</span>
+                    <% end %>
+                    <span class="text-text-muted text-xs ml-1">(<%= Time.parse(@rednote_key_check[:checked_at]).strftime('%Y-%m-%d %H:%M') %>)</span>
+                  </p>
+                <% end %>
+              </div>
+              <%= button_to "验证接口", validate_rednote_key_admin_settings_path, method: :post,
+                  class: "btn btn-default btn-sm shrink-0 self-center" %>
+            </div>
+          <% else %>
+            <div class="notice notice-warning">未配置小红书 API 密钥，请在下方添加。</div>
+          <% end %>
 
-      <div>
-        <label class="flex items-start space-x-3 cursor-pointer">
-          <input type="hidden" name="wechat_content_browser_fallback" value="0">
-          <input type="checkbox" name="wechat_content_browser_fallback" value="1" <%= 'checked' if @wechat_content_browser_fallback %>
-                 class="mt-0.5 w-5 h-5 text-primary border-gray-300 rounded focus:ring-2 focus:ring-primary">
-          <div>
-            <span class="text-sm font-medium text-gray-700">环境验证拦截时改用真实浏览器下载</span>
-            <p class="text-xs text-gray-500 mt-1">
-              正文下载遇到「当前环境异常，需要验证」时，自动改用服务端的真实 Chromium 打开文章页抓取（复用远程浏览器登录环境里的人工验证结果）。
-              浏览器路径更慢且串行，仅作兜底；若浏览器内仍被拦截，请到设置页「远程浏览器登录」完成一次环境验证后重试。
+          <%= form_with url: admin_settings_path, method: :patch do %>
+            <div class="form-row">
+              <div>
+                <label class="form-label">API 密钥</label>
+                <p class="form-hint">走 RednoteApiClient 按次计费，稳定无需登录</p>
+              </div>
+              <div>
+                <%= text_field_tag :rednote_api_key, nil, class: "form-input",
+                    placeholder: "输入小红书 API 密钥" %>
+              </div>
+            </div>
+            <div class="flex flex-wrap items-center justify-end gap-2 pt-1">
+              <button type="submit" class="btn btn-primary">保存小红书密钥</button>
+            </div>
+          <% end %>
+
+          <div class="border-t border-border-primary pt-4">
+            <h3 class="text-sm font-semibold text-text-primary">采集通道</h3>
+            <%= form_with url: admin_settings_path, method: :patch, class: "mt-2 space-y-2" do %>
+              <label class="flex items-start gap-2.5 p-3 rounded-md border border-border-primary hover:bg-bg-secondary cursor-pointer text-sm">
+                <%= radio_button_tag :rednote_crawl_provider, "api", @rednote_crawl_provider == "api" %>
+                <span>
+                  <span class="font-medium">付费 API（默认）</span>
+                  <span class="text-text-secondary">— 走 RednoteApiClient，按次计费，稳定无需登录</span>
+                </span>
+              </label>
+              <label class="flex items-start gap-2.5 p-3 rounded-md border border-border-primary hover:bg-bg-secondary cursor-pointer text-sm">
+                <%= radio_button_tag :rednote_crawl_provider, "browser", @rednote_crawl_provider == "browser" %>
+                <span>
+                  <span class="font-medium">浏览器直连</span>
+                  <span class="text-text-secondary">— 真实浏览器打开主页/详情页，免 API 额度；需先在下方保存网页版登录态，触发风控时会明确失败</span>
+                </span>
+              </label>
+              <div class="flex justify-end pt-1">
+                <button type="submit" class="btn btn-primary">保存采集通道</button>
+              </div>
+            <% end %>
+          </div>
+
+          <div class="border-t border-border-primary pt-4">
+            <h3 class="text-sm font-semibold text-text-primary">网页版登录态（Cookie）</h3>
+            <p class="form-hint mb-3">
+              切换到「浏览器直连」采集时必需；付费 API 通道无需登录。本地有效期<%= rednote_web_session_ttl_label %>，过期后重新登录即可。
             </p>
+
+            <%= render "admin/settings/rednote_web_panel" %>
+
+            <%= render "admin/settings/browser_login", provider_key: "rednote_web",
+                  hint: "打开远程浏览器后，用小红书 App 扫描页面上的二维码；扫码成功后请点弹窗里的「保存登录态」完成保存。" %>
           </div>
-        </label>
-      </div>
+        </div>
+      </section>
 
-      <button type="submit" class="btn btn-primary">更新设置</button>
-    <% end %>
-  </div>
+      <%# ── Twitter ── %>
+      <section class="panel scroll-mt-20 hidden" data-settings-nav-target="panel" data-panel-id="twitter" id="twitter">
+        <div class="panel-header">
+          <h2 class="panel-title">Twitter Cookies</h2>
+          <p class="text-sm text-text-secondary mt-1">配置 x.com 的登录 Cookie 与代理</p>
+        </div>
+        <div class="panel-body">
+          <% if @twitter_ct0.present? && @twitter_auth_token.present? %>
+            <div class="notice notice-info flex items-start justify-between gap-3 mb-4">
+              <div>
+                <p class="font-medium">当前 Cookies</p>
+                <p class="mt-0.5 font-mono">ct0: <%= mask_api_key(@twitter_ct0) %></p>
+                <p class="mt-0.5 font-mono">auth_token: <%= mask_api_key(@twitter_auth_token) %></p>
+                <% if @twitter_proxy.present? %>
+                  <p class="mt-0.5 font-mono">代理: <%= mask_api_key(@twitter_proxy) %></p>
+                <% end %>
+                <% if @twitter_key_check %>
+                  <p class="mt-0.5">
+                    上次验证：
+                    <% if @twitter_key_check[:valid] == true %>
+                      <span class="font-semibold text-green-700">✓ 有效</span>
+                    <% elsif @twitter_key_check[:valid] == false %>
+                      <span class="font-semibold text-red-700">✗ 无效</span>
+                    <% else %>
+                      <span class="font-semibold text-yellow-700">? 验证失败</span>
+                    <% end %>
+                    <span class="text-text-muted text-xs ml-1">(<%= Time.parse(@twitter_key_check[:checked_at]).strftime('%Y-%m-%d %H:%M') %>)</span>
+                  </p>
+                <% end %>
+              </div>
+              <%= button_to "验证接口", validate_twitter_key_admin_settings_path, method: :post,
+                  class: "btn btn-default btn-sm shrink-0 self-center" %>
+            </div>
+          <% else %>
+            <div class="notice notice-warning mb-4">
+              未配置 Twitter cookies，请在下方添加。从浏览器中获取 x.com 的 ct0 和 auth_token cookies。
+            </div>
+          <% end %>
 
-  <!-- Logging Settings -->
-  <div class="card" id="logging">
-    <h2 class="text-xl font-bold text-gray-900 mb-4">日志设置</h2>
+          <%= form_with url: admin_settings_path, method: :patch do %>
+            <div class="form-row">
+              <div>
+                <label class="form-label">ct0 Cookie</label>
+              </div>
+              <div>
+                <%= text_field_tag :twitter_ct0, nil, class: "form-input", placeholder: "输入 ct0 cookie 值" %>
+              </div>
+            </div>
+            <div class="form-row">
+              <div>
+                <label class="form-label">auth_token Cookie</label>
+              </div>
+              <div>
+                <%= text_field_tag :twitter_auth_token, nil, class: "form-input", placeholder: "输入 auth_token cookie 值" %>
+              </div>
+            </div>
+            <div class="form-row">
+              <div>
+                <label class="form-label">代理服务器（可选）</label>
+                <p class="form-hint">HTTP/HTTPS 代理地址，格式：http://user:pass@host:port（留空则不使用代理）</p>
+              </div>
+              <div>
+                <%= text_field_tag :twitter_proxy, @twitter_proxy, class: "form-input",
+                    placeholder: "http://user:pass@host:port 或留空" %>
+              </div>
+            </div>
+            <div class="flex flex-wrap items-center justify-end gap-2 pt-1">
+              <button type="submit" class="btn btn-primary">保存 Twitter Cookies</button>
+            </div>
+          <% end %>
+        </div>
+      </section>
 
-    <%= form_with url: admin_settings_path, method: :patch, class: "space-y-4" do |f| %>
-      <div>
-        <label class="flex items-center space-x-3 cursor-pointer">
-          <input type="hidden" name="verbose_mode" value="0">
-          <input type="checkbox" name="verbose_mode" value="1" <%= 'checked' if @verbose_mode %>
-                 class="w-5 h-5 text-primary border-gray-300 rounded focus:ring-2 focus:ring-primary">
-          <div>
-            <span class="text-sm font-medium text-gray-700">启用详细日志</span>
-            <p class="text-xs text-gray-500">在抓取期间记录详细信息（调试级别）</p>
-          </div>
-        </label>
-      </div>
-
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">日志保留天数</label>
-        <input type="number" name="log_retention_days" value="<%= @log_retention_days %>" min="1" max="90"
-               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
-        <p class="mt-1 text-sm text-gray-500">
-          自动删除超过此天数的日志（1-90）
-        </p>
-      </div>
-
-      <button type="submit" class="btn btn-primary">更新日志设置</button>
-    <% end %>
-  </div>
-
-  <!-- Remote Browser Login -->
-  <div class="card" id="browser-login">
-    <h2 class="text-xl font-bold text-gray-900 mb-4">远程浏览器登录</h2>
-    <p class="text-sm text-gray-500 mb-4">
-      在服务端容器里启动真实 Chromium，用于扫码登录微信公众号平台、小红书网页版、微信读书直连。
-      设置页会轮询截图并转发点击/键盘操作，登录成功后 Cookie 自动写入对应会话槽位。
-    </p>
-
-    <%= form_with url: admin_settings_path, method: :patch, class: "space-y-3" do |f| %>
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">登录浏览器代理（可选）</label>
-        <input type="text" name="browser_login_proxy" value="<%= @browser_login_proxy %>" autocomplete="off"
-               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-               placeholder="例如 http://127.0.0.1:7890 或 socks5://192.168.1.10:1080，留空直连">
-        <p class="text-xs text-gray-500 mt-1">
-          服务器机房 IP 常被小红书等平台风控标记（登录时报 300012「IP 存在风险」）。给登录浏览器配置住宅/本地代理可绕开，
-          对所有平台的登录浏览器生效，保存后需重新打开登录会话。带账号密码的代理请先在本地转为无认证入口。
-        </p>
-      </div>
-
-      <label class="flex items-center space-x-3 cursor-pointer">
-        <input type="hidden" name="browser_login_headed" value="0">
-        <input type="checkbox" name="browser_login_headed" value="1" <%= 'checked' if @browser_login_headed %>
-               class="w-5 h-5 text-primary border-gray-300 rounded focus:ring-2 focus:ring-primary">
-        <div>
-          <span class="text-sm font-medium text-gray-700">有界面模式（Xvfb 虚拟显示）</span>
-          <p class="text-xs text-gray-500">
-            默认 headless（UA 已自动伪装成正常 Chrome）。若登录页仍提示环境异常或被风控，开启此项进一步降低自动化特征。
+      <%# ── 远程浏览器登录 ── %>
+      <section class="panel scroll-mt-20 hidden" data-settings-nav-target="panel" data-panel-id="browser-login" id="browser-login">
+        <div class="panel-header">
+          <h2 class="panel-title">远程浏览器登录</h2>
+          <p class="text-sm text-text-secondary mt-1">
+            在服务端容器里启动真实 Chromium，用于扫码登录微信公众号平台、小红书网页版、微信读书直连。
+            设置页会轮询截图并转发点击/键盘操作，登录成功后 Cookie 自动写入对应会话槽位。
           </p>
         </div>
-      </label>
+        <div class="panel-body">
+          <%= form_with url: admin_settings_path, method: :patch do %>
+            <div class="form-row">
+              <div>
+                <label class="form-label">登录浏览器代理（可选）</label>
+                <p class="form-hint">
+                  服务器机房 IP 常被小红书等平台风控标记（登录时报 300012「IP 存在风险」）。给登录浏览器配置住宅/本地代理可绕开，
+                  对所有平台的登录浏览器生效，保存后需重新打开登录会话。带账号密码的代理请先在本地转为无认证入口。
+                </p>
+              </div>
+              <div>
+                <input type="text" name="browser_login_proxy" value="<%= @browser_login_proxy %>" autocomplete="off"
+                       class="form-input" placeholder="例如 http://127.0.0.1:7890 或 socks5://192.168.1.10:1080，留空直连">
+              </div>
+            </div>
 
-      <button type="submit" class="btn btn-primary">保存</button>
-    <% end %>
-  </div>
+            <div class="form-row">
+              <div>
+                <span class="form-label">有界面模式（Xvfb 虚拟显示）</span>
+                <p class="form-hint">
+                  默认 headless（UA 已自动伪装成正常 Chrome）。若登录页仍提示环境异常或被风控，开启此项进一步降低自动化特征。
+                </p>
+              </div>
+              <div class="flex items-center">
+                <input type="hidden" name="browser_login_headed" value="0">
+                <label class="flex items-center gap-2 text-sm cursor-pointer">
+                  <input type="checkbox" name="browser_login_headed" value="1" <%= 'checked' if @browser_login_headed %>
+                         class="w-4 h-4 text-primary border-border-secondary rounded focus:ring-brand/30">
+                  开启
+                </label>
+              </div>
+            </div>
 
-  <!-- Platform Crawl Toggle Section -->
-  <div class="card" id="platform-toggles">
-    <h2 class="text-xl font-bold text-gray-900 mb-4">平台抓取开关</h2>
-    <p class="text-sm text-gray-500 mb-4">启用或禁用特定平台的帐号抓取。禁用的平台将在抓取任务中被跳过。</p>
+            <div class="flex flex-wrap items-center justify-end gap-2 pt-1">
+              <button type="submit" class="btn btn-primary">保存</button>
+            </div>
+          <% end %>
+        </div>
+      </section>
 
-    <%= form_with url: admin_settings_path, method: :patch, class: "space-y-3" do |f| %>
-      <div>
-        <label class="flex items-center space-x-3 cursor-pointer">
-          <input type="hidden" name="crawl_wechat_enabled" value="0">
-          <input type="checkbox" name="crawl_wechat_enabled" value="1" <%= 'checked' if @crawl_wechat_enabled %>
-                 class="w-5 h-5 text-green-600 border-gray-300 rounded focus:ring-2 focus:ring-green-500">
-          <div>
-            <span class="text-sm font-medium text-gray-700">微信公众号</span>
-            <p class="text-xs text-gray-500">启用微信公众号文章抓取</p>
+      <%# ── TikHub ── %>
+      <section class="panel scroll-mt-20 hidden" data-settings-nav-target="panel" data-panel-id="tikhub" id="tikhub">
+        <div class="panel-header">
+          <h2 class="panel-title">TikHub API 密钥</h2>
+          <p class="text-sm text-text-secondary mt-1">用于小红书用户搜索功能（按名称搜索帐号）</p>
+        </div>
+        <div class="panel-body">
+          <% if @tikhub_api_key.present? %>
+            <div class="notice notice-success flex items-start justify-between gap-3 mb-4">
+              <div>
+                <p class="font-medium">当前 API 密钥</p>
+                <p class="mt-0.5 font-mono"><%= mask_api_key(@tikhub_api_key) %></p>
+                <% if @tikhub_key_check %>
+                  <p class="mt-0.5">
+                    上次验证：
+                    <% if @tikhub_key_check[:valid] == true %>
+                      <span class="font-semibold text-green-700">✓ 有效</span>
+                    <% elsif @tikhub_key_check[:valid] == false %>
+                      <span class="font-semibold text-red-700">✗ 无效</span>
+                    <% else %>
+                      <span class="font-semibold text-yellow-700">? 验证失败</span>
+                    <% end %>
+                    <span class="text-text-muted text-xs ml-1">(<%= Time.parse(@tikhub_key_check[:checked_at]).strftime('%Y-%m-%d %H:%M') %>)</span>
+                  </p>
+                <% end %>
+              </div>
+              <%= button_to "验证接口", validate_tikhub_key_admin_settings_path, method: :post,
+                  class: "btn btn-default btn-sm shrink-0 self-center" %>
+            </div>
+          <% else %>
+            <div class="notice notice-warning mb-4">
+              未配置 TikHub API 密钥，小红书按名称搜索功能将不可用。从
+              <a href="https://tikhub.io" target="_blank" class="text-brand hover:underline">tikhub.io</a> 获取 API Token。
+            </div>
+          <% end %>
+
+          <%= form_with url: admin_settings_path, method: :patch do %>
+            <div class="form-row">
+              <div>
+                <label class="form-label">API Token</label>
+                <p class="form-hint">从 <a href="https://tikhub.io" target="_blank" class="text-brand hover:underline">tikhub.io</a> 用户中心获取 API Token</p>
+              </div>
+              <div>
+                <%= text_field_tag :tikhub_api_key, nil, class: "form-input", placeholder: "输入 TikHub API Token" %>
+              </div>
+            </div>
+            <div class="flex flex-wrap items-center justify-end gap-2 pt-1">
+              <button type="submit" class="btn btn-primary">保存 TikHub 密钥</button>
+            </div>
+          <% end %>
+        </div>
+      </section>
+
+      <%# ── 天眼查 ── %>
+      <section class="panel scroll-mt-20 hidden" data-settings-nav-target="panel" data-panel-id="tianyancha" id="tianyancha">
+        <div class="panel-header">
+          <h2 class="panel-title">天眼查 API 密钥</h2>
+          <p class="text-sm text-text-secondary mt-1">用于 event_research 补全机构工商档案（法人、注册资本、统一社会信用代码、成立时间、存续状态、公开联系方式）</p>
+        </div>
+        <div class="panel-body">
+          <% if @tianyancha_api_key.present? %>
+            <div class="notice notice-success mb-4">
+              <p class="font-medium">当前 API Token</p>
+              <p class="mt-0.5 font-mono"><%= mask_api_key(@tianyancha_api_key) %></p>
+            </div>
+          <% else %>
+            <div class="notice notice-warning mb-4">未配置天眼查 API Token。event_research 仍可运行，但会跳过工商信息补全。</div>
+          <% end %>
+
+          <%= form_with url: admin_settings_path, method: :patch do %>
+            <div class="form-row">
+              <div>
+                <label class="form-label">API Token</label>
+                <p class="form-hint">从 <a href="https://open.tianyancha.com" target="_blank" class="text-brand hover:underline">open.tianyancha.com</a> 控制台获取 Token</p>
+              </div>
+              <div>
+                <%= text_field_tag :tianyancha_api_key, nil, class: "form-input", placeholder: "输入天眼查 API Token" %>
+              </div>
+            </div>
+            <div class="flex flex-wrap items-center justify-end gap-2 pt-1">
+              <button type="submit" class="btn btn-primary">保存天眼查 Token</button>
+            </div>
+          <% end %>
+        </div>
+      </section>
+
+      <%# ── Serper ── %>
+      <section class="panel scroll-mt-20 hidden" data-settings-nav-target="panel" data-panel-id="serper" id="serper">
+        <div class="panel-header">
+          <h2 class="panel-title">Serper API 密钥</h2>
+          <p class="text-sm text-text-secondary mt-1">用于活动调研的 Google 搜索（搜索获奖名单、人物资料等来源页面）</p>
+        </div>
+        <div class="panel-body">
+          <% if @serper_api_key.present? %>
+            <div class="notice notice-success mb-4">
+              <p class="font-medium">当前 API Key</p>
+              <p class="mt-0.5 font-mono"><%= mask_api_key(@serper_api_key) %></p>
+            </div>
+          <% else %>
+            <div class="notice notice-warning mb-4">未配置 Serper API Key。活动调研无法启动（搜索是调研的第一步）。</div>
+          <% end %>
+
+          <%= form_with url: admin_settings_path, method: :patch do %>
+            <div class="form-row">
+              <div>
+                <label class="form-label">API Key</label>
+                <p class="form-hint">
+                  从 <a href="https://serper.dev" target="_blank" class="text-brand hover:underline">serper.dev</a>
+                  控制台获取 API Key。本地开发也可用环境变量 SERPER_API_KEY。
+                </p>
+              </div>
+              <div>
+                <%= text_field_tag :serper_api_key, nil, class: "form-input", placeholder: "输入 Serper API Key" %>
+              </div>
+            </div>
+            <div class="flex flex-wrap items-center justify-end gap-2 pt-1">
+              <button type="submit" class="btn btn-primary">保存 Serper Key</button>
+            </div>
+          <% end %>
+        </div>
+      </section>
+
+      <%# ── 官网渲染兜底 ── %>
+      <section class="panel scroll-mt-20 hidden" data-settings-nav-target="panel" data-panel-id="website-render" id="website-render">
+        <div class="panel-header">
+          <h2 class="panel-title">官网抓取渲染兜底</h2>
+          <p class="text-sm text-text-secondary mt-1">
+            官网抓取默认走直连 HTTP，不消耗额度。只有当直连拿到的响应里
+            <code class="bg-bg-secondary px-1 rounded">crawl_rule</code> 一条内容都提取不出来时（JS 渲染页面的典型特征），
+            才会按配置的顺序依次尝试渲染兜底。不依赖 crawl_rule 的抓取（sitemap 发现、站点信息补全等）永不调用渲染兜底。
+          </p>
+        </div>
+        <div class="panel-body">
+          <%= form_with url: admin_settings_path, method: :patch do %>
+            <div class="form-row">
+              <div>
+                <span class="form-label">渲染兜底方式（按顺序尝试）</span>
+                <p class="form-hint">💡 推荐先勾选「本地 Headless Browser」，再勾选「ScrapingAnt」作为兜底。任一成功即停止。</p>
+              </div>
+              <div class="space-y-2">
+                <label class="flex items-start gap-3 p-3 bg-bg-card border border-border-primary rounded-md hover:bg-bg-secondary cursor-pointer">
+                  <%= check_box_tag "website_render_fallbacks[]", "local_headless",
+                      @website_render_fallbacks.include?("local_headless"),
+                      id: "fallback_local", class: "mt-0.5 w-4 h-4 text-primary border-border-secondary rounded focus:ring-brand/30" %>
+                  <span class="flex-1">
+                    <span class="block text-sm font-medium text-text-primary">本地 Headless Browser（推荐优先）</span>
+                    <span class="block text-xs text-text-secondary mt-0.5">
+                      使用本机 Chrome/Chromium 渲染页面，不消耗 API 额度，但占用本地 CPU/内存。需要系统已安装 Chrome 或 Chromium 浏览器。
+                    </span>
+                  </span>
+                </label>
+
+                <label class="flex items-start gap-3 p-3 bg-bg-card border border-border-primary rounded-md hover:bg-bg-secondary cursor-pointer">
+                  <%= check_box_tag "website_render_fallbacks[]", "scrapingant",
+                      @website_render_fallbacks.include?("scrapingant"),
+                      id: "fallback_scrapingant", class: "mt-0.5 w-4 h-4 text-primary border-border-secondary rounded focus:ring-brand/30" %>
+                  <span class="flex-1">
+                    <span class="block text-sm font-medium text-text-primary">ScrapingAnt API（付费兜底）</span>
+                    <span class="block text-xs text-text-secondary mt-0.5">
+                      通过 ScrapingAnt 渲染页面，每次约消耗 10 credits。适合作为本地浏览器不可用或失败时的兜底。需要配置 API Key（见下方）。
+                    </span>
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div>
+                <label class="form-label">ScrapingAnt API Key</label>
+                <p class="form-hint">
+                  只在兜底时调用，每次约消耗 10 credits。兜底次数受各帐号规则中的
+                  <code class="bg-bg-secondary px-1 rounded">limits.max_items</code> 与
+                  <code class="bg-bg-secondary px-1 rounded">limits.interval_seconds</code> 约束。
+                  <% if @scrapingant_api_key.present? %>
+                    当前已配置：<span class="font-mono"><%= mask_api_key(@scrapingant_api_key) %></span>
+                  <% else %>
+                    未配置；如上方勾选了 ScrapingAnt，则该兜底不可用。可从
+                    <a href="https://app.scrapingant.com" target="_blank" class="text-brand hover:underline">app.scrapingant.com</a> 获取。
+                  <% end %>
+                </p>
+              </div>
+              <div>
+                <%= text_field_tag :scrapingant_api_key, nil, class: "form-input",
+                    placeholder: "输入 ScrapingAnt API Key（留空则保持不变）" %>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-end gap-2 pt-1">
+              <button type="submit" class="btn btn-primary">保存渲染兜底配置</button>
+            </div>
+          <% end %>
+        </div>
+      </section>
+
+      <%# ── OpenAI / LLM ── %>
+      <section class="panel scroll-mt-20 hidden" data-settings-nav-target="panel" data-panel-id="openai" id="openai">
+        <div class="panel-header">
+          <h2 class="panel-title">OpenAI / LLM 配置</h2>
+          <p class="text-sm text-text-secondary mt-1">用于网站监控的语义分析功能（通过 MiraclePlus OpenAI 代理调用）</p>
+        </div>
+        <div class="panel-body">
+          <% if @openai_api_key.present? %>
+            <div class="notice notice-success mb-4">
+              <p class="font-medium">当前 API 密钥</p>
+              <p class="mt-0.5 font-mono"><%= mask_api_key(@openai_api_key) %></p>
+              <p class="mt-0.5 text-text-secondary">
+                模型：<code class="bg-bg-card px-1.5 py-0.5 rounded text-xs"><%= @openai_model %></code>
+                · 代理：<code class="bg-bg-card px-1.5 py-0.5 rounded text-xs"><%= @openai_proxy_url %></code>
+              </p>
+            </div>
+          <% else %>
+            <div class="notice notice-warning mb-4">未配置 OpenAI API 密钥，语义分析功能将不可用。</div>
+          <% end %>
+
+          <%= form_with url: admin_settings_path, method: :patch do %>
+            <div class="form-row">
+              <div>
+                <label class="form-label">API 密钥</label>
+                <p class="form-hint">通过 MiraclePlus OpenAI 代理访问，密钥仅存于数据库</p>
+              </div>
+              <div>
+                <%= text_field_tag :openai_api_key, nil, class: "form-input",
+                    placeholder: "输入 OpenAI API 密钥（留空则保持不变）" %>
+              </div>
+            </div>
+            <div class="form-row">
+              <div>
+                <label class="form-label">模型</label>
+                <p class="form-hint">默认：<code class="bg-bg-secondary px-1 rounded"><%= Option::OPENAI_DEFAULT_MODEL %></code></p>
+              </div>
+              <div>
+                <%= text_field_tag :openai_model, @openai_model, class: "form-input", placeholder: "openai/gpt-5.2" %>
+              </div>
+            </div>
+            <div class="form-row">
+              <div>
+                <label class="form-label">代理 URL</label>
+                <p class="form-hint">默认：<code class="bg-bg-secondary px-1 rounded"><%= Option::OPENAI_DEFAULT_PROXY_URL %></code></p>
+              </div>
+              <div>
+                <%= text_field_tag :openai_proxy_url, @openai_proxy_url, class: "form-input",
+                    placeholder: "https://openai-proxy.miracleplus.com/v1" %>
+              </div>
+            </div>
+            <div class="flex flex-wrap items-center justify-end gap-2 pt-1">
+              <button type="submit" class="btn btn-primary">保存 OpenAI 配置</button>
+            </div>
+          <% end %>
+        </div>
+      </section>
+
+      <%# ── 抓取设置 ── %>
+      <section class="panel scroll-mt-20 hidden" data-settings-nav-target="panel" data-panel-id="crawl" id="crawl">
+        <div class="panel-header">
+          <h2 class="panel-title">并发与配额</h2>
+          <p class="text-sm text-text-secondary mt-1">控制抓取并发、每日配额与速率限制。更高的并发 = 更快的抓取速度，但更容易触发速率限制。</p>
+        </div>
+        <div class="panel-body">
+          <%= form_with url: admin_settings_path, method: :patch do %>
+            <div class="form-row">
+              <div>
+                <label class="form-label">默认账号并发数</label>
+                <p class="form-hint">同时抓取的帐号数量（1-20）。数值越高速度越快，但系统负载也越大。</p>
+              </div>
+              <div>
+                <input type="number" name="default_account_concurrency" value="<%= @default_account_concurrency %>" min="1" max="20" class="form-input max-w-40">
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div>
+                <label class="form-label">默认文章并发数</label>
+                <p class="form-hint">每个帐号抓取时的并发请求数（5-50）。数值越高速度越快，但 API 负载也越大。</p>
+              </div>
+              <div>
+                <input type="number" name="default_article_concurrency" value="<%= @default_article_concurrency %>" min="5" max="50" class="form-input max-w-40">
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div>
+                <label class="form-label">最大抓取页数</label>
+                <p class="form-hint">每个帐号最多抓取的文章页数（1-100）。每页约 20 篇文章。</p>
+              </div>
+              <div>
+                <input type="number" name="max_crawl_pages" value="<%= @max_crawl_pages %>" min="1" max="100" class="form-input max-w-40">
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div>
+                <span class="form-label">每日抓取配额（按平台）</span>
+                <p class="form-hint">
+                  每次定时抓取各平台最多处理的帐号数量。按活跃度分层调度，仅抓取“到期”的帐号，超出配额的顺延到下次，避免触发反爬限制。
+                </p>
+              </div>
+              <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <div>
+                  <label class="block text-xs font-medium text-text-secondary mb-1">微信公众号</label>
+                  <input type="number" name="daily_crawl_budget_wechat" value="<%= @daily_crawl_budget_wechat %>" min="1" max="5000" class="form-input">
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-text-secondary mb-1">小红书</label>
+                  <input type="number" name="daily_crawl_budget_rednote" value="<%= @daily_crawl_budget_rednote %>" min="1" max="5000" class="form-input">
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-text-secondary mb-1">Twitter</label>
+                  <input type="number" name="daily_crawl_budget_twitter" value="<%= @daily_crawl_budget_twitter %>" min="1" max="5000" class="form-input">
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-text-secondary mb-1">官网</label>
+                  <input type="number" name="daily_crawl_budget_website" value="<%= @daily_crawl_budget_website %>" min="1" max="5000" class="form-input">
+                </div>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div>
+                <span class="form-label">速率限制（滑动窗口）</span>
+                <p class="form-hint">
+                  每个窗口期内最多发起 N 次请求，避免触发反爬限制。微信正文下载（直访 mp.weixin.qq.com）默认 20 次/60 秒；
+                  微信读书直连列表/正文接口默认 30 次/60 秒。配置变更后立即生效，无需重启。
+                </p>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-xs font-medium text-text-secondary mb-1">微信正文下载（次数）</label>
+                    <input type="number" name="wechat_download_rate_limit" value="<%= @wechat_download_rate_limit %>" min="1" max="120" class="form-input">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-text-secondary mb-1">窗口（秒）</label>
+                    <input type="number" name="wechat_download_rate_window" value="<%= @wechat_download_rate_window %>" min="10" max="3600" class="form-input">
+                  </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-xs font-medium text-text-secondary mb-1">微信读书直连（次数）</label>
+                    <input type="number" name="weread_native_list_rate_limit" value="<%= @weread_native_list_rate_limit %>" min="1" max="120" class="form-input">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-text-secondary mb-1">窗口（秒）</label>
+                    <input type="number" name="weread_native_list_rate_window" value="<%= @weread_native_list_rate_window %>" min="10" max="3600" class="form-input">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div>
+                <span class="form-label">环境验证拦截时改用真实浏览器下载</span>
+                <p class="form-hint">
+                  正文下载遇到「当前环境异常，需要验证」时，自动改用服务端的真实 Chromium 打开文章页抓取（复用远程浏览器登录环境里的人工验证结果）。
+                  浏览器路径更慢且串行，仅作兜底；若浏览器内仍被拦截，请到「远程浏览器登录」完成一次环境验证后重试。
+                </p>
+              </div>
+              <div class="flex items-center">
+                <input type="hidden" name="wechat_content_browser_fallback" value="0">
+                <label class="flex items-center gap-2 text-sm cursor-pointer">
+                  <input type="checkbox" name="wechat_content_browser_fallback" value="1" <%= 'checked' if @wechat_content_browser_fallback %>
+                         class="w-4 h-4 text-primary border-border-secondary rounded focus:ring-brand/30">
+                  开启
+                </label>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-end gap-2 pt-1">
+              <button type="submit" class="btn btn-primary">更新设置</button>
+            </div>
+          <% end %>
+        </div>
+      </section>
+
+      <%# ── 平台抓取开关 ── %>
+      <section class="panel scroll-mt-20 hidden" data-settings-nav-target="panel" data-panel-id="platform-toggles" id="platform-toggles">
+        <div class="panel-header">
+          <h2 class="panel-title">平台抓取开关</h2>
+          <p class="text-sm text-text-secondary mt-1">启用或禁用特定平台的帐号抓取。禁用的平台将在抓取任务中被跳过。</p>
+        </div>
+        <div class="panel-body">
+          <%= form_with url: admin_settings_path, method: :patch do %>
+            <div class="form-row">
+              <div>
+                <span class="form-label">微信公众号</span>
+                <p class="form-hint">启用微信公众号文章抓取</p>
+              </div>
+              <div class="flex items-center">
+                <input type="hidden" name="crawl_wechat_enabled" value="0">
+                <label class="flex items-center gap-2 text-sm cursor-pointer">
+                  <input type="checkbox" name="crawl_wechat_enabled" value="1" <%= 'checked' if @crawl_wechat_enabled %>
+                         class="w-4 h-4 text-success border-border-secondary rounded focus:ring-success/30">
+                  启用
+                </label>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div>
+                <span class="form-label">小红书</span>
+                <p class="form-hint">启用小红书笔记抓取</p>
+              </div>
+              <div class="flex items-center">
+                <input type="hidden" name="crawl_rednote_enabled" value="0">
+                <label class="flex items-center gap-2 text-sm cursor-pointer">
+                  <input type="checkbox" name="crawl_rednote_enabled" value="1" <%= 'checked' if @crawl_rednote_enabled %>
+                         class="w-4 h-4 text-rose-500 border-border-secondary rounded focus:ring-rose-500/30">
+                  启用
+                </label>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div>
+                <span class="form-label">Twitter</span>
+                <p class="form-hint">启用 Twitter 推文抓取</p>
+              </div>
+              <div class="flex items-center">
+                <input type="hidden" name="crawl_twitter_enabled" value="0">
+                <label class="flex items-center gap-2 text-sm cursor-pointer">
+                  <input type="checkbox" name="crawl_twitter_enabled" value="1" <%= 'checked' if @crawl_twitter_enabled %>
+                         class="w-4 h-4 text-sky-500 border-border-secondary rounded focus:ring-sky-500/30">
+                  启用
+                </label>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div>
+                <span class="form-label">官网</span>
+                <p class="form-hint">启用官网监控页面抓取</p>
+              </div>
+              <div class="flex items-center">
+                <input type="hidden" name="crawl_website_enabled" value="0">
+                <label class="flex items-center gap-2 text-sm cursor-pointer">
+                  <input type="checkbox" name="crawl_website_enabled" value="1" <%= 'checked' if @crawl_website_enabled %>
+                         class="w-4 h-4 text-violet-500 border-border-secondary rounded focus:ring-violet-500/30">
+                  启用
+                </label>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-end gap-2 pt-1">
+              <button type="submit" class="btn btn-primary">更新平台开关</button>
+            </div>
+          <% end %>
+        </div>
+      </section>
+
+      <%# ── 日志设置 ── %>
+      <section class="panel scroll-mt-20 hidden" data-settings-nav-target="panel" data-panel-id="logging" id="logging">
+        <div class="panel-header">
+          <h2 class="panel-title">日志设置</h2>
+        </div>
+        <div class="panel-body">
+          <%= form_with url: admin_settings_path, method: :patch do %>
+            <div class="form-row">
+              <div>
+                <span class="form-label">启用详细日志</span>
+                <p class="form-hint">在抓取期间记录详细信息（调试级别）</p>
+              </div>
+              <div class="flex items-center">
+                <input type="hidden" name="verbose_mode" value="0">
+                <label class="flex items-center gap-2 text-sm cursor-pointer">
+                  <input type="checkbox" name="verbose_mode" value="1" <%= 'checked' if @verbose_mode %>
+                         class="w-4 h-4 text-primary border-border-secondary rounded focus:ring-brand/30">
+                  开启
+                </label>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div>
+                <label class="form-label">日志保留天数</label>
+                <p class="form-hint">自动删除超过此天数的日志（1-90）</p>
+              </div>
+              <div>
+                <input type="number" name="log_retention_days" value="<%= @log_retention_days %>" min="1" max="90" class="form-input max-w-40">
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-end gap-2 pt-1">
+              <button type="submit" class="btn btn-primary">更新日志设置</button>
+            </div>
+          <% end %>
+        </div>
+      </section>
+
+      <%# ── 飞书推送 ── %>
+      <section class="panel scroll-mt-20 hidden" data-settings-nav-target="panel" data-panel-id="feishu" id="feishu">
+        <div class="panel-header">
+          <h2 class="panel-title">飞书推送</h2>
+          <p class="text-sm text-text-secondary mt-1">
+            每天定时提醒扫码登录：微信读书（无条件推送，用于扩充账号池）与微信公众号平台（仅在会话失效时推送）。
+            推送方式可选单二维码（推一张码）或交互卡片（成员各自点击后私聊二维码）。
+          </p>
+        </div>
+        <div class="panel-body">
+          <% if @feishu_enabled && @feishu_app_id.present? && @feishu_receive_id.present? %>
+            <div class="notice notice-success mb-4">
+              <p class="font-medium">✓ 已启用</p>
+              <p class="mt-0.5 text-text-secondary">目标：<span class="font-mono"><%= @feishu_receive_id_type %></span> / <%= @feishu_receive_id %></p>
+            </div>
+          <% else %>
+            <div class="notice notice-warning mb-4">未配置飞书推送。配置完成后，每天将自动提醒登录微信读书账号。</div>
+          <% end %>
+
+          <%= form_with url: admin_settings_path, method: :patch, id: "feishu_settings_form" do %>
+            <div class="form-row">
+              <div>
+                <span class="form-label">启用飞书推送</span>
+              </div>
+              <div class="flex items-center">
+                <input type="hidden" name="feishu_enabled" value="0">
+                <label class="flex items-center gap-2 text-sm cursor-pointer">
+                  <input type="checkbox" name="feishu_enabled" value="1" <%= 'checked' if @feishu_enabled %>
+                         class="w-4 h-4 text-primary border-border-secondary rounded focus:ring-brand/30">
+                  开启
+                </label>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div>
+                <label class="form-label">App ID</label>
+              </div>
+              <div>
+                <input type="text" name="feishu_app_id" value="<%= @feishu_app_id %>" class="form-input" placeholder="cli_xxxxxxxxxxxxxxxx">
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div>
+                <label class="form-label">App Secret</label>
+              </div>
+              <div>
+                <input type="password" name="feishu_app_secret" value="<%= @feishu_app_secret %>" autocomplete="off"
+                       class="form-input" placeholder="留空则保持不变">
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div>
+                <label class="form-label">推送目标 ID</label>
+              </div>
+              <div>
+                <input type="text" name="feishu_receive_id" value="<%= @feishu_receive_id %>" class="form-input"
+                       placeholder="私聊填 open_id，群填 chat_id">
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div>
+                <label class="form-label">目标类型</label>
+              </div>
+              <div>
+                <select name="feishu_receive_id_type" class="form-input max-w-60">
+                  <option value="open_id" <%= 'selected' if @feishu_receive_id_type == 'open_id' %>>私聊（open_id）</option>
+                  <option value="chat_id" <%= 'selected' if @feishu_receive_id_type == 'chat_id' %>>群聊（chat_id）</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div>
+                <label class="form-label">扫码登录推送方式</label>
+                <p class="form-hint">微信读书与微信公众号平台共用此设置。选择「交互卡片」可让多人各自扫码，微信读书借此形成账号池。</p>
+              </div>
+              <div>
+                <select name="feishu_login_mode" class="form-input max-w-60">
+                  <option value="qr" <%= 'selected' if @feishu_login_mode != 'card' %>>单二维码（推一张码到群里）</option>
+                  <option value="card" <%= 'selected' if @feishu_login_mode == 'card' %>>交互卡片（成员点击后私聊各自二维码）</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div>
+                <label class="form-label">Encrypt Key（回调验签）</label>
+              </div>
+              <div>
+                <input type="password" name="feishu_encrypt_key" value="<%= @feishu_encrypt_key %>" autocomplete="off"
+                       class="form-input" placeholder="留空则保持不变；从飞书后台「事件与回调 → 加密策略」获取">
+              </div>
+            </div>
+          <% end %>
+
+          <div class="mt-4">
+            <p class="form-hint mb-1">卡片回调地址（交互卡片模式下需在飞书后台配置）</p>
+            <code class="block px-3 py-2 bg-bg-secondary rounded-md text-xs text-text-secondary break-all"><%= @feishu_callback_url %></code>
           </div>
-        </label>
-      </div>
 
-      <div>
-        <label class="flex items-center space-x-3 cursor-pointer">
-          <input type="hidden" name="crawl_rednote_enabled" value="0">
-          <input type="checkbox" name="crawl_rednote_enabled" value="1" <%= 'checked' if @crawl_rednote_enabled %>
-                 class="w-5 h-5 text-rose-500 border-gray-300 rounded focus:ring-2 focus:ring-rose-500">
-          <div>
-            <span class="text-sm font-medium text-gray-700">小红书</span>
-            <p class="text-xs text-gray-500">启用小红书笔记抓取</p>
+          <div class="mt-4 flex flex-wrap items-center gap-3">
+            <button type="submit" form="feishu_settings_form" class="btn btn-primary">保存飞书配置</button>
+            <%= button_to "测试推送", test_feishu_admin_settings_path, method: :post,
+                class: "btn btn-default" %>
+            <p class="text-xs text-text-muted">保存配置后点击测试，检查飞书是否收到消息</p>
           </div>
-        </label>
-      </div>
 
-      <div>
-        <label class="flex items-center space-x-3 cursor-pointer">
-          <input type="hidden" name="crawl_twitter_enabled" value="0">
-          <input type="checkbox" name="crawl_twitter_enabled" value="1" <%= 'checked' if @crawl_twitter_enabled %>
-                 class="w-5 h-5 text-sky-500 border-gray-300 rounded focus:ring-2 focus:ring-sky-500">
-          <div>
-            <span class="text-sm font-medium text-gray-700">Twitter</span>
-            <p class="text-xs text-gray-500">启用 Twitter 推文抓取</p>
+          <div class="mt-4 p-3 bg-bg-secondary border border-border-primary rounded-md text-xs text-text-secondary space-y-1">
+            <p>• 需在 <a href="https://open.feishu.cn" target="_blank" class="text-brand hover:underline">飞书开放平台</a> 创建自建应用，开通「机器人」能力与「获取与上传图片资源」权限，并发布应用版本。</p>
+            <p>• 私聊推送需获取你的 open_id（应用需具备获取用户 ID 权限）。</p>
+            <p>• 群推送需将目标类型改为 chat_id，并填入群的 chat_id。</p>
+            <p>• 交互卡片模式需在飞书后台配置「卡片回调地址」（上方所示地址）与 Encrypt Key。</p>
           </div>
-        </label>
-      </div>
-
-      <div>
-        <label class="flex items-center space-x-3 cursor-pointer">
-          <input type="hidden" name="crawl_website_enabled" value="0">
-          <input type="checkbox" name="crawl_website_enabled" value="1" <%= 'checked' if @crawl_website_enabled %>
-                 class="w-5 h-5 text-violet-500 border-gray-300 rounded focus:ring-2 focus:ring-violet-500">
-          <div>
-            <span class="text-sm font-medium text-gray-700">官网</span>
-            <p class="text-xs text-gray-500">启用官网监控页面抓取</p>
-          </div>
-        </label>
-      </div>
-
-      <button type="submit" class="btn btn-primary">更新平台开关</button>
-    <% end %>
-  </div>
-
-  <!-- OpenAI / LLM Settings -->
-  <div class="card" id="openai">
-    <h2 class="text-xl font-bold text-gray-900 mb-4">OpenAI / LLM 配置</h2>
-    <p class="text-sm text-gray-600 mb-4">
-      用于网站监控的语义分析功能（通过 MiraclePlus OpenAI 代理调用）
-    </p>
-
-    <% if @openai_api_key.present? %>
-      <div class="mb-4 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
-        <p class="text-sm font-medium text-indigo-900">当前 API 密钥</p>
-        <p class="text-sm text-indigo-700 mt-1 font-mono"><%= mask_api_key(@openai_api_key) %></p>
-        <p class="text-sm mt-1 text-gray-600">
-          模型：<code class="bg-white px-2 py-0.5 rounded text-xs"><%= @openai_model %></code>
-        </p>
-        <p class="text-sm mt-1 text-gray-600">
-          代理：<code class="bg-white px-2 py-0.5 rounded text-xs"><%= @openai_proxy_url %></code>
-        </p>
-      </div>
-    <% else %>
-      <div class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-        <p class="text-sm text-yellow-800">未配置 OpenAI API 密钥。语义分析功能将不可用。</p>
-      </div>
-    <% end %>
-
-    <%= form_with url: admin_settings_path, method: :patch, class: "space-y-4" do |f| %>
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">API 密钥</label>
-        <%= text_field_tag :openai_api_key, nil,
-            class: "w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent",
-            placeholder: "输入 OpenAI API 密钥（留空则保持不变）" %>
-        <p class="mt-1 text-sm text-gray-500">
-          通过 MiraclePlus OpenAI 代理访问，密钥仅存于数据库
-        </p>
-      </div>
-
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">模型</label>
-        <%= text_field_tag :openai_model, @openai_model,
-            class: "w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent",
-            placeholder: "openai/gpt-5.2" %>
-        <p class="mt-1 text-sm text-gray-500">
-          默认：<code class="bg-gray-100 px-1 rounded"><%= Option::OPENAI_DEFAULT_MODEL %></code>
-        </p>
-      </div>
-
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">代理 URL</label>
-        <%= text_field_tag :openai_proxy_url, @openai_proxy_url,
-            class: "w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent",
-            placeholder: "https://openai-proxy.miracleplus.com/v1" %>
-        <p class="mt-1 text-sm text-gray-500">
-          默认：<code class="bg-gray-100 px-1 rounded"><%= Option::OPENAI_DEFAULT_PROXY_URL %></code>
-        </p>
-      </div>
-
-      <div class="flex items-center justify-end">
-        <button type="submit" class="btn btn-primary">保存 OpenAI 配置</button>
-      </div>
-    <% end %>
-  </div>
-
-  <!-- Feishu Push -->
-  <div class="card" id="feishu">
-    <h2 class="text-xl font-bold text-gray-900 mb-4">飞书推送</h2>
-    <p class="text-sm text-gray-600 mb-4">
-      每天定时提醒扫码登录：微信读书（无条件推送，用于扩充账号池）与微信公众号平台（仅在会话失效时推送）。
-      推送方式可选单二维码（推一张码）或交互卡片（成员各自点击后私聊二维码）。
-    </p>
-
-    <% if @feishu_enabled && @feishu_app_id.present? && @feishu_receive_id.present? %>
-      <div class="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-        <p class="text-sm font-medium text-green-900">✓ 已启用</p>
-        <p class="text-sm mt-1 text-gray-600">目标：<span class="font-mono"><%= @feishu_receive_id_type %></span> / <%= @feishu_receive_id %></p>
-      </div>
-    <% else %>
-      <div class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-        <p class="text-sm text-yellow-800">未配置飞书推送。配置完成后，每天将自动提醒登录微信读书账号。</p>
-      </div>
-    <% end %>
-
-    <%= form_with url: admin_settings_path, method: :patch, id: "feishu_settings_form", class: "space-y-4" do |f| %>
-      <div>
-        <label class="flex items-center space-x-3 cursor-pointer">
-          <input type="hidden" name="feishu_enabled" value="0">
-          <input type="checkbox" name="feishu_enabled" value="1" <%= 'checked' if @feishu_enabled %>
-                 class="w-5 h-5 text-primary border-gray-300 rounded focus:ring-2 focus:ring-primary">
-          <span class="text-sm font-medium text-gray-700">启用飞书推送</span>
-        </label>
-      </div>
-
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">App ID</label>
-        <input type="text" name="feishu_app_id" value="<%= @feishu_app_id %>"
-               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-               placeholder="cli_xxxxxxxxxxxxxxxx">
-      </div>
-
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">App Secret</label>
-        <input type="password" name="feishu_app_secret" value="<%= @feishu_app_secret %>" autocomplete="off"
-               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-               placeholder="留空则保持不变">
-      </div>
-
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">推送目标 ID</label>
-        <input type="text" name="feishu_receive_id" value="<%= @feishu_receive_id %>"
-               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-               placeholder="私聊填 open_id，群填 chat_id">
-      </div>
-
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">目标类型</label>
-        <select name="feishu_receive_id_type"
-                class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
-          <option value="open_id" <%= 'selected' if @feishu_receive_id_type == 'open_id' %>>私聊（open_id）</option>
-          <option value="chat_id" <%= 'selected' if @feishu_receive_id_type == 'chat_id' %>>群聊（chat_id）</option>
-        </select>
-      </div>
-
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">扫码登录推送方式</label>
-        <select name="feishu_login_mode"
-                class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
-          <option value="qr" <%= 'selected' if @feishu_login_mode != 'card' %>>单二维码（推一张码到群里）</option>
-          <option value="card" <%= 'selected' if @feishu_login_mode == 'card' %>>交互卡片（成员点击后私聊各自二维码）</option>
-        </select>
-        <p class="text-xs text-gray-500 mt-1">微信读书与微信公众号平台共用此设置。选择「交互卡片」可让多人各自扫码，微信读书借此形成账号池。</p>
-      </div>
-
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">Encrypt Key（回调验签）</label>
-        <input type="password" name="feishu_encrypt_key" value="<%= @feishu_encrypt_key %>" autocomplete="off"
-               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-               placeholder="留空则保持不变；从飞书后台「事件与回调 → 加密策略」获取">
-      </div>
-
-    <% end %>
-
-    <div class="mb-4">
-      <p class="text-sm text-gray-700 mb-1">卡片回调地址（交互卡片模式下需在飞书后台配置）</p>
-      <code class="block px-3 py-2 bg-gray-100 rounded text-xs text-gray-700 break-all"><%= @feishu_callback_url %></code>
+        </div>
+      </section>
     </div>
-
-    <div class="flex items-center gap-3">
-      <button type="submit" form="feishu_settings_form" class="btn btn-primary">保存飞书配置</button>
-      <%= button_to "测试推送", test_feishu_admin_settings_path, method: :post,
-          class: "text-sm px-3 py-1.5 rounded bg-indigo-600 text-white hover:bg-indigo-700 transition" %>
-      <p class="text-xs text-gray-500">保存配置后点击测试，检查飞书是否收到消息</p>
-    </div>
-
-    <div class="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-600 space-y-1">
-      <p>• 需在 <a href="https://open.feishu.cn" target="_blank" class="text-primary hover:underline">飞书开放平台</a> 创建自建应用，开通「机器人」能力与「获取与上传图片资源」权限，并发布应用版本。</p>
-      <p>• 私聊推送需获取你的 open_id（应用需具备获取用户 ID 权限）。</p>
-      <p>• 群推送需将目标类型改为 chat_id，并填入群的 chat_id。</p>
-      <p>• 交互卡片模式需在飞书后台配置「卡片回调地址」（上方所示地址）与 Encrypt Key。</p>
-    </div>
-  </div>
-
-  <!-- Info Section -->
-  <div class="card bg-gray-50" id="info">
-    <h3 class="font-semibold text-gray-900 mb-2">重要说明</h3>
-    <ul class="space-y-2 text-sm text-gray-600">
-      <li>• <strong>MP 原生</strong>：扫码登录微信公众号平台后台，Cookie/Token 有效期<%= wechat_mp_session_ttl_label %>，过期需重新扫码（每天会自动体检并通过飞书提醒）</li>
-      <li>• <strong>Dajiala</strong>：使用公众号名称抓取文章，无需 fakeid；如遇频率限制可切换回 MP 原生</li>
-      <li>• <strong>Profile Ext</strong>：使用 mitmproxy 抓包凭证，有效期约 25 分钟，过期需重新抓包</li>
-      <li>• 搜索导入功能需要先扫码登录 MP 原生</li>
-      <li>• <strong>远程浏览器登录</strong>：在服务端容器里打开真实 Chromium，设置页轮询截图并转发操作，适合扫码接口失效时兜底；Cookie 会写入对应会话槽位（含小红书网页版）</li>
-      <li>• 更高的并发数 = 更快的抓取速度，但可能触发速率限制</li>
-    </ul>
   </div>
 </div>
-
-<script>
-  // WeChat Tab Switcher
-  (function() {
-    const tabs = document.querySelectorAll('.wechat-tab');
-    const panels = document.querySelectorAll('.wechat-panel');
-
-    tabs.forEach(tab => {
-      tab.addEventListener('click', () => {
-        const target = tab.dataset.tab;
-
-        // Deactivate all tabs
-        tabs.forEach(t => {
-          t.classList.remove('border-primary', 'text-primary');
-          t.classList.add('border-transparent', 'text-gray-500');
-        });
-
-        // Activate clicked tab
-        tab.classList.remove('border-transparent', 'text-gray-500');
-        tab.classList.add('border-primary', 'text-primary');
-
-        // Show target panel, hide others
-        panels.forEach(p => {
-          if (p.dataset.tabPanel === target) {
-            p.classList.remove('hidden');
-          } else {
-            p.classList.add('hidden');
-          }
-        });
-      });
-    });
-  })();
-</script>
-
-<script>
-  // Hash → WeChat tab 切换：支持 /admin/settings#weread 等锚点直达
-  // 微信读书推送里的 settings 链接会带 #weread，加载后自动切到 WeRead Tab 并滚动过去。
-  (function() {
-    function activateTabFromHash() {
-      const hash = window.location.hash;
-      if (!hash || hash === '#') return;
-
-      const tabName = hash.replace('#', '');
-      const tab = document.querySelector(`.wechat-tab[data-tab="${tabName}"]`);
-      if (!tab) return; // 非 wechat tab 的锚点（如 #feishu）交给浏览器原生滚动
-
-      tab.click();
-
-      const target = document.querySelector(`[data-tab-panel="${tabName}"]`) ||
-                     document.getElementById(tabName);
-      if (target) {
-        setTimeout(() => target.scrollIntoView({ block: 'start' }), 0);
-      }
-    }
-
-    document.addEventListener('DOMContentLoaded', activateTabFromHash);
-    document.addEventListener('turbo:load', activateTabFromHash);
-  })();
-</script>

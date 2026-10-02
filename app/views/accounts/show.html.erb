@@ -22,7 +22,7 @@
                class="flex items-center gap-2 group">
             <h1 data-inline-edit-target="display"
                 data-action="click->inline-edit#edit"
-                class="text-2xl sm:text-3xl font-bold text-text-primary cursor-pointer hover:opacity-80 transition-opacity">
+                class="text-2xl sm:text-2xl font-bold text-text-primary cursor-pointer hover:opacity-80 transition-opacity">
               <%= @account.nickname %>
             </h1>
             <span data-edit-icon class="text-text-secondary opacity-0 group-hover:opacity-100 transition-opacity">
@@ -57,11 +57,11 @@
           <% if @account.website? %>
             <%= button_to rediscover_account_path(@account), method: :post,
                   form: { data: { turbo_confirm: "重新发现会清空该网站的监控页面、版本和变更历史，然后重新抓取。确定继续？" } },
-                  class: "h-9 px-4 rounded-lg border border-border-primary bg-bg-card hover:border-brand hover:text-brand text-sm font-semibold transition" do %>
+                  class: "btn btn-default" do %>
               重新发现
             <% end %>
           <% end %>
-          <%= button_to toggle_status_account_path(@account), method: :post, class: "h-9 px-4 rounded-lg border border-border-primary bg-bg-card hover:border-brand hover:text-brand text-sm font-semibold transition" do %>
+          <%= button_to toggle_status_account_path(@account), method: :post, class: "btn btn-default" do %>
             <%= @account.active? ? "停用" : "启用" %>
           <% end %>
           <%= button_to account_path(@account), method: :delete,
@@ -85,7 +85,7 @@
               管理标签
             </button>
           </div>
-          <div data-dropdown-target="panel" class="hidden mt-2 p-4 bg-bg-card border border-border-primary rounded-xl shadow-lg max-w-md">
+          <div data-dropdown-target="panel" class="hidden mt-2 p-4 bg-bg-card border border-border-primary rounded-lg shadow-lg max-w-md">
             <!-- Current tags with remove -->
             <% if @account.tags.any? %>
               <div class="mb-3">
@@ -114,7 +114,7 @@
                     placeholder="输入标签名称..."
                     class="w-full h-9 px-3 rounded-lg border border-border-primary bg-bg-secondary text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand/30">
                   <div data-tag-input-target="dropdown"
-                       class="hidden absolute top-full left-0 right-0 mt-1 bg-bg-card border border-border-primary rounded-xl shadow-lg max-h-48 overflow-y-auto z-50">
+                       class="hidden absolute top-full left-0 right-0 mt-1 bg-bg-card border border-border-primary rounded-lg shadow-lg max-h-48 overflow-y-auto z-50">
                   </div>
                   <div data-tag-input-target="chips" class="hidden"></div>
                   <div data-tag-input-target="hiddenFields"></div>
@@ -132,7 +132,7 @@
 
   <!-- Stats -->
   <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-    <div class="bg-bg-card border border-border-primary rounded-xl p-5 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+    <div class="bg-bg-card border border-border-primary rounded-lg p-5">
       <div class="text-sm font-medium text-text-secondary">活跃度</div>
       <div class="mt-2">
         <% score = @account.activity_score.to_i %>
@@ -143,31 +143,31 @@
               when :slow    then 'bg-yellow-100 text-yellow-700'
               when :dormant then 'bg-orange-100 text-orange-700'
               when :dead    then 'bg-red-100 text-red-600'
-              when :uncrawled then 'bg-gray-100 text-gray-400'
-              else 'bg-gray-100 text-gray-500'
+              when :uncrawled then 'bg-bg-secondary text-text-muted'
+              else 'bg-bg-secondary text-text-secondary'
               end %>">
-          <%= { active: '🟢', slow: '🟡', dormant: '🟠', dead: '🔴', never: '⚪', uncrawled: '🌫️' }[status] %>&nbsp;<%= score %>
+          <%= score %>
         </span>
         <span class="ml-1 text-xs text-text-muted"><%= { active: '活跃', slow: '减速', dormant: '停更', dead: '失活', never: '无文章', uncrawled: '从未抓取' }[status] %></span>
       </div>
     </div>
 
-    <div class="bg-bg-card border border-border-primary rounded-xl p-5 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+    <div class="bg-bg-card border border-border-primary rounded-lg p-5">
       <div class="text-sm font-medium text-text-secondary">文章总数</div>
-      <div class="mt-2 text-3xl font-bold text-text-primary"><%= @account.total_articles %></div>
+      <div class="mt-2 text-2xl font-bold text-text-primary"><%= @account.total_articles %></div>
     </div>
 
-    <div class="bg-bg-card border border-border-primary rounded-xl p-5 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+    <div class="bg-bg-card border border-border-primary rounded-lg p-5">
       <div class="text-sm font-medium text-text-secondary">7 天发布</div>
-      <div class="mt-2 text-3xl font-bold <%= @account.articles_last_7_days > 0 ? 'text-green-600' : 'text-text-muted' %>"><%= @account.articles_last_7_days %></div>
+      <div class="mt-2 text-2xl font-bold <%= @account.articles_last_7_days > 0 ? 'text-green-600' : 'text-text-muted' %>"><%= @account.articles_last_7_days %></div>
     </div>
 
-    <div class="bg-bg-card border border-border-primary rounded-xl p-5 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+    <div class="bg-bg-card border border-border-primary rounded-lg p-5">
       <div class="text-sm font-medium text-text-secondary">30 天发布</div>
-      <div class="mt-2 text-3xl font-bold <%= @account.articles_last_30_days > 0 ? 'text-text-primary' : 'text-text-muted' %>"><%= @account.articles_last_30_days %></div>
+      <div class="mt-2 text-2xl font-bold <%= @account.articles_last_30_days > 0 ? 'text-text-primary' : 'text-text-muted' %>"><%= @account.articles_last_30_days %></div>
     </div>
 
-    <div class="bg-bg-card border border-border-primary rounded-xl p-5 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+    <div class="bg-bg-card border border-border-primary rounded-lg p-5">
       <div class="text-sm font-medium text-text-secondary">最近发布</div>
       <div class="mt-2 text-lg font-semibold text-text-primary">
         <% if @account.last_published_at %>
@@ -180,14 +180,14 @@
       </div>
     </div>
 
-    <div class="bg-bg-card border border-border-primary rounded-xl p-5 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+    <div class="bg-bg-card border border-border-primary rounded-lg p-5">
       <div class="text-sm font-medium text-text-secondary">最后抓取</div>
       <div class="mt-2 text-lg font-semibold text-text-primary">
         <%= @account.last_crawled_at ? time_ago_in_words(@account.last_crawled_at) + '前' : '从未抓取' %>
       </div>
     </div>
 
-    <div class="bg-bg-card border border-border-primary rounded-xl p-5 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+    <div class="bg-bg-card border border-border-primary rounded-lg p-5">
       <div class="text-sm font-medium text-text-secondary">下次抓取</div>
       <div class="mt-2 text-lg font-semibold text-text-primary">
         <% if @account.next_crawl_at && @account.next_crawl_at > Time.current %>
@@ -201,7 +201,7 @@
 
   <!-- WeRead mpId Section (WechatAccount only) -->
   <% if @account.wechat? %>
-    <div class="bg-bg-card border border-border-primary rounded-xl p-6 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+    <div class="bg-bg-card border border-border-primary rounded-lg p-6">
       <h3 class="text-lg font-semibold text-text-primary mb-3">WeRead 配置</h3>
       <div class="mb-3">
         <span class="text-sm text-text-secondary">当前 mpId：</span>
@@ -234,7 +234,7 @@
 
   <!-- Website Monitor Section (WebsiteAccount only) -->
   <% if @account.website? %>
-    <section class="bg-bg-card border border-border-primary rounded-xl p-6 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+    <section class="bg-bg-card border border-border-primary rounded-lg p-6">
       <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
         <h3 class="text-lg font-semibold text-text-primary">抓取规则</h3>
         <div class="flex items-center gap-2">
@@ -258,7 +258,7 @@
             </button>
             <% if @account.crawl_mode == "listing" %>
               <div class="flex items-center gap-2">
-                <button type="submit" formaction="<%= generate_crawl_rule_account_path(@account) %>" formmethod="post" class="h-9 px-4 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-sm font-semibold transition">
+                <button type="submit" formaction="<%= generate_crawl_rule_account_path(@account) %>" formmethod="post" class="btn btn-primary">
                   生成规则
                 </button>
                 <p class="text-sm text-text-muted">生成规则仅适用于 Listing 抓取模式</p>
@@ -269,7 +269,7 @@
       <% end %>
     </section>
 
-    <div class="bg-bg-card border border-border-primary rounded-xl p-6 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+    <div class="bg-bg-card border border-border-primary rounded-lg p-6">
       <div class="flex items-center justify-between mb-4">
         <h3 class="text-lg font-semibold text-text-primary">监控页面</h3>
         <div class="flex items-center gap-3 text-sm">
@@ -330,7 +330,7 @@
     </div>
 
     <% if @monitor_changes.any? %>
-      <div class="bg-bg-card border border-border-primary rounded-xl p-6 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+      <div class="bg-bg-card border border-border-primary rounded-lg p-6">
         <div class="flex items-center justify-between mb-4">
           <h3 class="text-lg font-semibold text-text-primary">最近变更</h3>
           <%= link_to "查看全部", monitor_changes_path(account_id: @account.id), class: "text-sm text-brand hover:text-brand-dark transition" %>
@@ -370,10 +370,10 @@
           </svg>
           <%= text_field_tag :keyword, params[:keyword],
                 placeholder: "搜索该账号的文章标题或摘要…",
-                class: "w-full h-11 pl-10 pr-4 rounded-xl border border-border-primary bg-bg-secondary text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent transition" %>
+                class: "w-full h-11 pl-10 pr-4 rounded-lg border border-border-primary bg-bg-secondary text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent transition" %>
         </div>
         <button type="submit"
-                class="h-11 px-5 rounded-xl bg-brand text-white hover:bg-brand-dark font-semibold text-sm transition inline-flex items-center justify-center gap-2 shadow-[0_7px_16px_rgba(59,130,246,.14)]">
+                class="btn btn-primary">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
           </svg>
@@ -384,7 +384,7 @@
 
     <% if @articles.any? %>
       <!-- Desktop Table -->
-      <div class="hidden md:block bg-bg-card border border-border-primary rounded-2xl overflow-hidden shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+      <div class="hidden md:block bg-bg-card border border-border-primary rounded-lg overflow-hidden">
         <table class="min-w-full divide-y divide-border-primary">
           <thead class="bg-bg-secondary">
             <tr>
@@ -421,7 +421,7 @@
       <!-- Mobile Cards -->
       <div class="md:hidden space-y-3">
         <% @articles.each do |article| %>
-          <div class="bg-bg-card border border-border-primary rounded-xl p-4 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+          <div class="bg-bg-card border border-border-primary rounded-lg p-4">
             <div class="flex items-start justify-between gap-2">
               <%= link_to article_path(article), target: "_blank", rel: "noopener noreferrer", class: "block flex-1" do %>
                 <h3 class="font-semibold text-text-primary mb-2 line-clamp-2"><%= article.title %></h3>
@@ -456,7 +456,7 @@
         </div>
       <% end %>
     <% else %>
-      <div class="bg-bg-card border border-border-primary rounded-2xl text-center py-12 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+      <div class="bg-bg-card border border-border-primary rounded-lg text-center py-12">
         <svg class="w-16 h-16 mx-auto text-text-muted mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
         </svg>

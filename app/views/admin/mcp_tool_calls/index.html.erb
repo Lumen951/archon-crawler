@@ -1,7 +1,7 @@
 <div class="space-y-6">
   <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-    <h2 class="text-3xl font-bold text-text-primary">MCP 使用日志</h2>
-    <%= link_to admin_analytics_path, class: "h-10 px-5 rounded-xl bg-bg-card border border-border-primary text-text-secondary hover:border-brand hover:text-brand font-semibold text-sm transition inline-flex items-center justify-center gap-2" do %>
+    <h2 class="text-2xl font-bold text-text-primary">MCP 使用日志</h2>
+    <%= link_to admin_analytics_path, class: "btn btn-default" do %>
       返回管理首页
     <% end %>
   </div>
@@ -14,33 +14,33 @@
   </div>
 
   <%# ── 筛选 ── %>
-  <%= search_form_for @q, url: admin_mcp_tool_calls_path, html: { method: :get, class: "bg-bg-card border border-border-primary rounded-2xl shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)] p-4" } do |f| %>
+  <%= search_form_for @q, url: admin_mcp_tool_calls_path, html: { method: :get, class: "bg-bg-card border border-border-primary rounded-lg p-4" } do |f| %>
     <div class="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
       <div>
         <label class="block text-xs font-semibold text-text-secondary mb-1">用户邮箱</label>
-        <%= f.search_field :user_email_address_cont, placeholder: "包含…", class: "w-full px-3 py-2 border border-border-primary bg-bg-card rounded-lg text-sm text-text-primary focus:border-brand focus:ring-brand" %>
+        <%= f.search_field :user_email_address_cont, placeholder: "包含…", class: "form-input" %>
       </div>
       <div>
         <label class="block text-xs font-semibold text-text-secondary mb-1">工具</label>
-        <%= f.select :tool_name_eq, options_for_select(@tool_names, params.dig(:q, :tool_name_eq)), { include_blank: "全部" }, class: "w-full px-3 py-2 border border-border-primary bg-bg-card rounded-lg text-sm text-text-primary focus:border-brand focus:ring-brand" %>
+        <%= f.select :tool_name_eq, options_for_select(@tool_names, params.dig(:q, :tool_name_eq)), { include_blank: "全部" }, class: "form-input" %>
       </div>
       <div>
         <label class="block text-xs font-semibold text-text-secondary mb-1">方法</label>
-        <%= f.select :method_eq, options_for_select(@methods, params.dig(:q, :method_eq)), { include_blank: "全部" }, class: "w-full px-3 py-2 border border-border-primary bg-bg-card rounded-lg text-sm text-text-primary focus:border-brand focus:ring-brand" %>
+        <%= f.select :method_eq, options_for_select(@methods, params.dig(:q, :method_eq)), { include_blank: "全部" }, class: "form-input" %>
       </div>
       <div>
         <label class="block text-xs font-semibold text-text-secondary mb-1">状态</label>
-        <%= f.select :status_eq, options_for_select([["成功", 0], ["失败", 1]], params.dig(:q, :status_eq)), { include_blank: "全部" }, class: "w-full px-3 py-2 border border-border-primary bg-bg-card rounded-lg text-sm text-text-primary focus:border-brand focus:ring-brand" %>
+        <%= f.select :status_eq, options_for_select([["成功", 0], ["失败", 1]], params.dig(:q, :status_eq)), { include_blank: "全部" }, class: "form-input" %>
       </div>
       <div class="flex gap-2">
-        <%= f.submit "筛选", class: "h-10 px-5 rounded-xl bg-brand text-white hover:bg-brand-dark font-semibold text-sm transition cursor-pointer shadow-[0_7px_16px_rgba(59,130,246,.14)]" %>
-        <%= link_to "重置", admin_mcp_tool_calls_path, class: "h-10 px-5 rounded-xl bg-bg-card border border-border-primary text-text-secondary hover:border-brand hover:text-brand font-semibold text-sm transition inline-flex items-center justify-center" %>
+        <%= f.submit "筛选", class: "btn btn-primary cursor-pointer" %>
+        <%= link_to "重置", admin_mcp_tool_calls_path, class: "btn btn-default" %>
       </div>
     </div>
   <% end %>
 
   <%# ── 列表 ── %>
-  <div class="bg-bg-card border border-border-primary rounded-2xl overflow-hidden shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+  <div class="bg-bg-card border border-border-primary rounded-lg overflow-hidden">
     <div class="overflow-x-auto">
       <table class="w-full text-sm">
         <thead class="bg-bg-secondary text-xs text-text-secondary uppercase">
@@ -96,11 +96,11 @@
   <% if @page > 1 || @has_next %>
     <div class="flex justify-between items-center">
       <% if @page > 1 %>
-        <%= link_to "← 上一页", admin_mcp_tool_calls_path(params.to_unsafe_h.merge(page: @page - 1).except(:controller, :action)), class: "h-10 px-5 rounded-xl bg-bg-card border border-border-primary text-text-secondary hover:border-brand hover:text-brand font-semibold text-sm transition inline-flex items-center justify-center" %>
+        <%= link_to "← 上一页", admin_mcp_tool_calls_path(params.to_unsafe_h.merge(page: @page - 1).except(:controller, :action)), class: "btn btn-default" %>
       <% else %><span></span><% end %>
       <span class="text-sm text-text-secondary">第 <%= @page %> 页</span>
       <% if @has_next %>
-        <%= link_to "下一页 →", admin_mcp_tool_calls_path(params.to_unsafe_h.merge(page: @page + 1).except(:controller, :action)), class: "h-10 px-5 rounded-xl bg-bg-card border border-border-primary text-text-secondary hover:border-brand hover:text-brand font-semibold text-sm transition inline-flex items-center justify-center" %>
+        <%= link_to "下一页 →", admin_mcp_tool_calls_path(params.to_unsafe_h.merge(page: @page + 1).except(:controller, :action)), class: "btn btn-default" %>
       <% else %><span></span><% end %>
     </div>
   <% end %>

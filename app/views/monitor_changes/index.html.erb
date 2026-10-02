@@ -1,24 +1,24 @@
 <div class="space-y-6">
   <div class="flex items-center justify-between">
     <div>
-      <h1 class="text-3xl font-bold text-text-primary">官网变更</h1>
-      <p class="text-text-secondary mt-2">每次检查检测到的页面变化，按时间倒序。首次检查只建立基线，不产生变更。</p>
+      <h1 class="text-2xl font-bold text-text-primary">官网变更</h1>
+      <p class="mt-1 text-sm text-text-secondary">每次检查检测到的页面变化，按时间倒序。首次检查只建立基线，不产生变更。</p>
     </div>
     <div class="flex items-center gap-2">
       <% if @account %>
-        <%= link_to "← 全部网站", monitor_changes_path, class: "h-10 px-4 rounded-xl border border-border-primary font-semibold inline-flex items-center" %>
+        <%= link_to "← 全部网站", monitor_changes_path, class: "h-10 px-4 rounded-lg border border-border-primary font-semibold inline-flex items-center" %>
       <% end %>
       <% if params[:important].present? %>
-        <%= link_to "显示全部", monitor_changes_path, class: "h-10 px-4 rounded-xl border border-border-primary font-semibold inline-flex items-center" %>
+        <%= link_to "显示全部", monitor_changes_path, class: "h-10 px-4 rounded-lg border border-border-primary font-semibold inline-flex items-center" %>
       <% else %>
-        <%= link_to "只看重要", monitor_changes_path(important: 1), class: "h-10 px-4 rounded-xl border border-border-primary font-semibold inline-flex items-center" %>
+        <%= link_to "只看重要", monitor_changes_path(important: 1), class: "h-10 px-4 rounded-lg border border-border-primary font-semibold inline-flex items-center" %>
       <% end %>
     </div>
   </div>
 
   <div class="space-y-4">
     <% @changes.each do |change| %>
-      <article class="bg-bg-card border border-border-primary rounded-2xl p-5">
+      <article class="bg-bg-card border border-border-primary rounded-lg p-5">
         <div class="flex items-start justify-between gap-4">
           <div class="min-w-0">
             <div class="text-sm text-brand">
@@ -41,7 +41,7 @@
       </article>
     <% end %>
     <% if @changes.empty? %>
-      <div class="bg-bg-card border border-border-primary rounded-2xl p-10 text-center text-text-secondary">
+      <div class="bg-bg-card border border-border-primary rounded-lg p-10 text-center text-text-secondary">
         暂无变更记录。对官网帐号执行「立即抓取」建立基线后，内容变化会出现在这里。
       </div>
     <% end %>

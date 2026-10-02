@@ -1,0 +1,11 @@
+<%# Toast 容器 — Turbo Streams 在此追加提示；初始 flash 由 toast Stimulus controller 转换 %>
+<%
+  flash_messages = {}
+  flash_messages["success"] = flash[:success] || flash[:notice] if flash[:success].present? || flash[:notice].present?
+  flash_messages["error"]   = flash[:error]   || flash[:alert]  if flash[:error].present?   || flash[:alert].present?
+  flash_messages["warning"] = flash[:warning]                   if flash[:warning].present?
+%>
+<div id="toasts" data-controller="toast" data-toast-target="container"
+     class="fixed bottom-6 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none"
+     <% if flash_messages.any? %>data-flash="<%= flash_messages.to_json %>"<% end %>>
+</div>

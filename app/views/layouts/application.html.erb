@@ -25,53 +25,31 @@
   </head>
 
   <body class="min-h-screen flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased">
-    <%= render 'shared/header' %>
-
-    <main class="flex-1 w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8 <%= 'pb-20 md:pb-8' if current_user %>">
-      <%# Toast container — Turbo Streams append here; initial flashes are converted by Stimulus %>
-      <%
-        flash_messages = {}
-        flash_messages["success"] = flash[:success] || flash[:notice] if flash[:success].present? || flash[:notice].present?
-        flash_messages["error"]   = flash[:error]   || flash[:alert]  if flash[:error].present?   || flash[:alert].present?
-        flash_messages["warning"] = flash[:warning]                   if flash[:warning].present?
-      %>
-      <div id="toasts" data-controller="toast" data-toast-target="container"
-           class="fixed bottom-20 md:bottom-6 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none"
-           <% if flash_messages.any? %>data-flash="<%= flash_messages.to_json %>"<% end %>>
-      </div>
-      <%= yield %>
-    </main>
-
     <% if current_user %>
-      <!-- Mobile Bottom Navigation -->
-      <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-bg-header backdrop-blur-md border-t border-border-primary z-40">
-        <div class="flex items-center justify-around h-16 px-2">
-          <%= link_to root_path, class: "flex flex-col items-center justify-center flex-1 h-full transition #{current_page?(root_path) ? 'text-brand' : 'text-text-secondary'}" do %>
-            <svg class="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
-            </svg>
-            <span class="text-xs font-medium">仪表板</span>
-          <% end %>
-          <%= link_to accounts_path, class: "flex flex-col items-center justify-center flex-1 h-full transition #{current_page?(accounts_path) ? 'text-brand' : 'text-text-secondary'}" do %>
-            <svg class="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
-            </svg>
-            <span class="text-xs font-medium">帐号</span>
-          <% end %>
-          <%= link_to crawl_tasks_path, class: "flex flex-col items-center justify-center flex-1 h-full transition #{current_page?(crawl_tasks_path) ? 'text-brand' : 'text-text-secondary'}" do %>
-            <svg class="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-            </svg>
-            <span class="text-xs font-medium">任务</span>
-          <% end %>
-          <%= link_to wechat_content_download_tasks_path, class: "flex flex-col items-center justify-center flex-1 h-full transition #{current_page?(wechat_content_download_tasks_path) ? 'text-brand' : 'text-text-secondary'}" do %>
-            <svg class="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-            </svg>
-            <span class="text-xs font-medium">正文</span>
-          <% end %>
+      <%# GitLab 式外壳：通栏顶栏在最上方，下方为深色侧边栏（钉住不随内容滚动，移动端抽屉）+ 内容区 %>
+      <div class="flex min-h-screen flex-1 flex-col" data-controller="sidebar">
+        <%= render 'shared/header' %>
+
+        <div class="flex flex-1">
+          <aside data-sidebar-target="panel"
+                 class="fixed top-0 bottom-0 left-0 z-40 w-60 -translate-x-full overflow-y-auto bg-bg-card border-r border-border-primary transition-transform duration-200 ease-out lg:sticky lg:top-12 lg:bottom-auto lg:translate-x-0 lg:h-[calc(100vh-3rem)] lg:shrink-0">
+            <%= render 'shared/sidebar' %>
+          </aside>
+          <div data-sidebar-target="overlay" data-action="click->sidebar#close"
+               class="fixed inset-0 z-20 hidden bg-black/50 lg:hidden"></div>
+
+          <main class="min-w-0 flex-1 px-4 sm:px-6 lg:px-8 py-6">
+            <%= render 'shared/toasts' %>
+            <%= yield %>
+          </main>
         </div>
-      </nav>
+      </div>
+    <% else %>
+      <%= render 'shared/header' %>
+      <main class="flex-1 w-full px-4 sm:px-6 lg:px-8 py-6">
+        <%= render 'shared/toasts' %>
+        <%= yield %>
+      </main>
     <% end %>
   </body>
 </html>

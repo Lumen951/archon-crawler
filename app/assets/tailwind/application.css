@@ -10,6 +10,7 @@
 
   --color-border-primary:   var(--border-primary);
   --color-border-secondary: var(--border-secondary);
+  --color-border-strong:    var(--border-strong);
 
   --color-text-primary:   var(--text-primary);
   --color-text-secondary: var(--text-secondary);
@@ -27,32 +28,33 @@
 
 @layer base {
   :root {
-    --brand: #3b82f6;
-    --brand-dark: #2563eb;
+    /* GitLab(Pajamas) 风格中性色：浅灰页面底 + 纯白卡片 + 细边框，扁平低阴影 */
+    --brand: #2563eb;
+    --brand-dark: #1d4ed8;
     --brand-soft: #eff6ff;
 
-    --bg-page: #f7f8fb;
+    --bg-page: #fafafa;
     --bg-surface: #ffffff;
-    --bg-muted: #f0f3f7;
+    --bg-muted: #f1f2f4;
     --bg-primary: var(--bg-page);
     --bg-secondary: var(--bg-muted);
     --bg-card: var(--bg-surface);
-    --bg-header: rgba(255, 255, 255, 0.86);
+    --bg-header: rgba(255, 255, 255, 0.92);
 
-    --border: #dde3ec;
-    --border-strong: #cbd4df;
+    --border: #dcdcde;
+    --border-strong: #bfbfc3;
     --border-primary: var(--border);
     --border-secondary: var(--border-strong);
 
-    --text-main: #1f2933;
+    --text-main: #1f1e24;
     --text-primary: var(--text-main);
-    --text-secondary: #6b7280;
-    --text-muted: #9ca3af;
+    --text-secondary: #737278;
+    --text-muted: #8c9196;
 
     --color-primary: #2563eb;
-    --color-success: #10b981;
-    --color-warning: #f59e0b;
-    --color-error: #ef4444;
+    --color-success: #108548;
+    --color-warning: #c17d10;
+    --color-error: #d64545;
   }
 
   html {
@@ -67,26 +69,22 @@
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
-  ::-webkit-scrollbar-thumb:hover { background: var(--border-secondary); }
+  ::-webkit-scrollbar-thumb:hover { background: #919599; }
 
   ::selection { background: var(--brand); color: white; }
 
   :focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 }
 
+/* 顶栏：扁平，仅底边框，去投影 */
 header {
   background-color: var(--bg-header) !important;
   border-color: var(--border-primary) !important;
-  box-shadow: 0 1px 0 rgba(255,255,255,.76), 0 14px 42px rgba(15, 23, 42, .045);
-}
-
-@supports not (backdrop-filter: blur(1px)) {
-  header { background-color: var(--bg-surface) !important; }
 }
 
 @layer components {
   .status-badge {
-    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+    @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium;
   }
 
   .status-badge.success {
@@ -109,31 +107,154 @@ header {
     @apply bg-gray-100 text-gray-800;
   }
 
+  /* 紧凑按钮（GitLab default/confirm 风格） */
   .btn {
-    @apply px-4 py-2 rounded-lg font-medium transition-colors duration-200;
+    @apply inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-md text-sm font-semibold transition-colors duration-150;
   }
 
   .btn-primary {
-    @apply bg-primary text-white hover:bg-blue-700;
+    @apply bg-primary text-white border border-transparent hover:bg-brand-dark;
+  }
+
+  /* GitLab default：白底描边 */
+  .btn-default {
+    @apply bg-bg-card text-text-primary border border-border-secondary hover:bg-bg-secondary hover:border-border-strong;
   }
 
   .btn-secondary {
-    @apply bg-gray-200 text-gray-800 hover:bg-gray-300;
+    @apply bg-bg-secondary text-text-primary border border-transparent hover:bg-[var(--border)];
   }
 
   .btn-danger {
-    @apply bg-red-600 text-white hover:bg-red-700;
+    @apply bg-error text-white border border-transparent hover:bg-red-700;
   }
 
   .btn-warning {
-    @apply bg-yellow-500 text-white hover:bg-yellow-600;
+    @apply bg-warning text-white border border-transparent hover:bg-amber-600;
   }
 
+  .btn-sm {
+    @apply h-7 px-2.5 text-xs;
+  }
+
+  /* 卡片：细边框小圆角，无重投影 */
   .card {
-    @apply bg-bg-card border border-border-primary rounded-[24px] p-6 shadow-sm;
+    @apply bg-bg-card border border-border-primary rounded-lg p-5;
   }
 
   .stat-card {
-    @apply bg-white border border-gray-200 rounded-xl p-6;
+    @apply bg-bg-card border border-border-primary rounded-lg p-5;
+  }
+
+  /* GitLab 设置卡片：header / body / footer 三段式 */
+  .panel {
+    @apply bg-bg-card border border-border-primary rounded-lg;
+  }
+
+  .panel-header {
+    @apply px-5 py-4 border-b border-border-primary;
+  }
+
+  .panel-title {
+    @apply text-base font-semibold text-text-primary;
+  }
+
+  .panel-body {
+    @apply px-5 py-4;
+  }
+
+  .panel-footer {
+    @apply px-5 py-3 border-t border-border-primary flex flex-wrap items-center justify-end gap-2;
+  }
+
+  /* 表单：label/说明在左、控件在右的两栏行（移动端退化为单栏） */
+  .form-row {
+    @apply py-4 border-b border-border-primary last:border-b-0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.25rem;
+  }
+
+  @media (min-width: 768px) {
+    .form-row {
+      grid-template-columns: 240px minmax(0, 1fr);
+      gap: 1.5rem;
+    }
+  }
+
+  .form-label {
+    @apply block text-sm font-semibold text-text-primary;
+  }
+
+  .form-hint {
+    @apply mt-1 text-xs leading-relaxed text-text-secondary;
+  }
+
+  .form-input {
+    @apply w-full h-9 px-3 rounded-md border border-border-primary bg-bg-card text-sm text-text-primary placeholder:text-text-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/15;
+  }
+
+  textarea.form-input {
+    @apply h-auto py-2;
+  }
+
+  /* 状态提示框（成功/警告/信息） */
+  .notice {
+    @apply p-3 rounded-md border text-sm;
+  }
+
+  .notice-success {
+    @apply bg-green-50 border-green-200 text-green-900;
+  }
+
+  .notice-warning {
+    @apply bg-amber-50 border-amber-200 text-amber-900;
+  }
+
+  .notice-info {
+    @apply bg-sky-50 border-sky-200 text-sky-900;
+  }
+
+  /* 浅色侧边栏 */
+  .sidebar-link {
+    @apply flex items-center gap-3 h-9 px-3 rounded-md text-sm text-text-secondary hover:bg-bg-secondary hover:text-text-primary transition-colors;
+  }
+
+  .sidebar-link.active {
+    @apply bg-brand-soft text-brand font-semibold;
+  }
+
+  .sidebar-section-title {
+    @apply px-3 pt-5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-text-muted;
+  }
+
+  /* 设置页左侧子导航 */
+  .settings-nav-link {
+    @apply flex w-full items-center gap-2 h-8 px-3 rounded-md text-sm text-left text-text-secondary hover:bg-bg-secondary hover:text-text-primary transition-colors;
+  }
+
+  .settings-nav-link.active {
+    @apply bg-brand-soft text-brand font-semibold;
+  }
+
+  .status-dot {
+    @apply inline-block w-2 h-2 rounded-full shrink-0;
+  }
+
+  .status-dot.ok {
+    @apply bg-success;
+  }
+
+  .status-dot.pending {
+    @apply bg-warning;
+  }
+
+  .status-dot.none {
+    @apply bg-[var(--border-strong)];
+  }
+
+  /* 激活行浅蓝底上加白色描环，保证小色点的对比度 */
+  .settings-nav-link.active .status-dot {
+    box-shadow: 0 0 0 2px rgb(255 255 255 / 85%);
   }
 }

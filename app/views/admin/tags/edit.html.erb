@@ -5,7 +5,7 @@
     <% end %>
   </div>
 
-  <div class="bg-bg-card border border-border-primary rounded-2xl p-6 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+  <div class="bg-bg-card border border-border-primary rounded-lg p-6">
     <h2 class="text-2xl font-bold text-text-primary mb-6">编辑标签</h2>
 
     <%= form_with(model: [:admin, @tag], class: "space-y-6") do |f| %>
@@ -37,8 +37,8 @@
       </div>
 
       <div class="flex justify-end gap-3">
-        <%= link_to "取消", admin_tags_path, class: "h-10 px-5 rounded-xl border border-border-primary bg-bg-card hover:border-brand hover:text-brand font-semibold text-sm transition inline-flex items-center justify-center" %>
-        <%= f.submit "保存", class: "h-10 px-5 rounded-xl bg-brand text-white hover:bg-brand-dark font-semibold text-sm transition cursor-pointer shadow-[0_7px_16px_rgba(59,130,246,.14)]" %>
+        <%= link_to "取消", admin_tags_path, class: "btn btn-default" %>
+        <%= f.submit "保存", class: "btn btn-primary cursor-pointer" %>
       </div>
     <% end %>
   </div>

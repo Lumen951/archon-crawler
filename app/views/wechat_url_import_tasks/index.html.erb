@@ -1,25 +1,25 @@
 <div class="space-y-6">
   <div class="flex items-center justify-between">
     <div>
-      <h1 class="text-3xl font-bold text-gray-900">微信文章链接导入任务</h1>
-      <p class="text-gray-600 mt-1">查看后台导入任务及处理结果</p>
+      <h1 class="text-2xl font-bold text-text-primary">微信文章链接导入任务</h1>
+      <p class="text-text-secondary mt-1">查看后台导入任务及处理结果</p>
     </div>
     <%= link_to "导入公众号", import_wechat_page_accounts_path, class: "btn btn-primary" %>
   </div>
 
   <div class="card">
     <% if @tasks.any? %>
-      <div class="divide-y divide-gray-200">
+      <div class="divide-y divide-border-primary">
         <% @tasks.each do |task| %>
-          <%= link_to wechat_url_import_task_path(task), class: "block py-4 first:pt-0 last:pb-0 hover:bg-gray-50" do %>
+          <%= link_to wechat_url_import_task_path(task), class: "block py-4 first:pt-0 last:pb-0 hover:bg-bg-secondary" do %>
             <div class="flex items-center justify-between gap-4">
               <div>
-                <div class="font-medium text-gray-900"><%= task.total_count %> 个链接</div>
-                <div class="text-sm text-gray-500"><%= l(task.created_at, format: :short) %></div>
+                <div class="font-medium text-text-primary"><%= task.total_count %> 个链接</div>
+                <div class="text-sm text-text-secondary"><%= l(task.created_at, format: :short) %></div>
               </div>
               <%= render "shared/status_badge", status: task.status %>
             </div>
-            <div class="mt-2 text-sm text-gray-600">
+            <div class="mt-2 text-sm text-text-secondary">
               已处理 <%= task.processed_count %> 个，成功 <%= task.created_count + task.found_count %> 个，失败 <%= task.failed_count %> 个
             </div>
           <% end %>
@@ -27,7 +27,7 @@
       </div>
       <div class="mt-6"><%= paginate @tasks %></div>
     <% else %>
-      <p class="text-gray-600">暂无导入任务。</p>
+      <p class="text-text-secondary">暂无导入任务。</p>
     <% end %>
   </div>
 </div>

@@ -1,8 +1,8 @@
 <div class="space-y-6">
   <div class="flex items-center justify-between gap-4 flex-wrap">
     <div>
-      <h1 class="text-3xl font-bold text-gray-900">Twitter 搜索结果</h1>
-      <p class="text-gray-600 mt-1">共找到 <span class="font-semibold text-gray-900"><%= @search_results.size %></span> 个帐号，请勾选要导入的</p>
+      <h1 class="text-2xl font-bold text-text-primary">Twitter 搜索结果</h1>
+      <p class="text-text-secondary mt-1">共找到 <span class="font-semibold text-text-primary"><%= @search_results.size %></span> 个帐号，请勾选要导入的</p>
     </div>
     <%= link_to "← 返回导入页", import_twitter_page_accounts_path, class: "btn btn-secondary" %>
   </div>
@@ -10,25 +10,25 @@
   <div class="card">
     <%= form_with url: import_twitter_accounts_path, method: :post, local: true, id: "twitter-preview-form" do %>
       <div class="flex items-center justify-between gap-3 mb-4">
-        <div class="text-sm text-gray-600">选择要导入的 Twitter 帐号</div>
-        <label class="inline-flex items-center gap-2 text-sm text-gray-700 select-none">
-          <input type="checkbox" id="select-all-twitter" class="rounded border-gray-300 text-primary focus:ring-primary">
+        <div class="text-sm text-text-secondary">选择要导入的 Twitter 帐号</div>
+        <label class="inline-flex items-center gap-2 text-sm text-text-primary select-none">
+          <input type="checkbox" id="select-all-twitter" class="rounded border-border-primary text-primary focus:ring-primary">
           全选
         </label>
       </div>
 
-      <div class="overflow-x-auto border border-gray-200 rounded-xl">
-        <table class="min-w-full divide-y divide-gray-200">
-          <thead class="bg-gray-50">
+      <div class="overflow-x-auto border border-border-primary rounded-lg">
+        <table class="min-w-full divide-y divide-border-primary">
+          <thead class="bg-bg-secondary">
             <tr>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">选择</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">帐号</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">User ID</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">粉丝数</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">推文数</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">选择</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">帐号</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">User ID</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">粉丝数</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">推文数</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-gray-200 bg-white">
+          <tbody class="divide-y divide-border-primary bg-bg-card">
             <% @search_results.each_with_index do |user, idx| %>
               <% rest_id = user["rest_id"] || user[:rest_id] %>
               <% screen_name = user["screen_name"] || user[:screen_name] %>
@@ -36,13 +36,13 @@
               <% image = user["profile_image_url_https"] || user[:image] %>
               <% followers = user["followers_count"] || user[:followers_count] || 0 %>
               <% tweets_count = user["statuses_count"] || user[:statuses_count] || 0 %>
-              <tr class="hover:bg-gray-50 transition">
+              <tr class="hover:bg-bg-secondary transition">
                 <td class="px-4 py-3 align-top">
                   <input type="checkbox"
                          name="selected_user_ids[]"
                          value="<%= rest_id %>"
                          id="selected-twitter-<%= idx %>"
-                         class="twitter-checkbox rounded border-gray-300 text-primary focus:ring-primary"
+                         class="twitter-checkbox rounded border-border-primary text-primary focus:ring-primary"
                          checked>
                 </td>
                 <td class="px-4 py-3">
@@ -55,14 +55,14 @@
                       </div>
                     <% end %>
                     <div>
-                      <span class="font-medium text-gray-900"><%= name %></span>
-                      <span class="text-sm text-gray-500 ml-1">@<%= screen_name %></span>
+                      <span class="font-medium text-text-primary"><%= name %></span>
+                      <span class="text-sm text-text-secondary ml-1">@<%= screen_name %></span>
                     </div>
                   </label>
                 </td>
-                <td class="px-4 py-3 text-sm text-gray-600 font-mono"><%= rest_id %></td>
-                <td class="px-4 py-3 text-sm text-gray-700"><%= number_with_delimiter(followers) %></td>
-                <td class="px-4 py-3 text-sm text-gray-700"><%= number_with_delimiter(tweets_count) %></td>
+                <td class="px-4 py-3 text-sm text-text-secondary font-mono"><%= rest_id %></td>
+                <td class="px-4 py-3 text-sm text-text-primary"><%= number_with_delimiter(followers) %></td>
+                <td class="px-4 py-3 text-sm text-text-primary"><%= number_with_delimiter(tweets_count) %></td>
               </tr>
 
               <%= hidden_field_tag "accounts_data[#{rest_id}][screen_name]", screen_name %>

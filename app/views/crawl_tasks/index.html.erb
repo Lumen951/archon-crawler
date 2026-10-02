@@ -5,12 +5,12 @@
 <div class="space-y-8">
   <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
     <div>
-      <h1 class="text-3xl font-bold text-text-primary">抓取任务</h1>
-      <p class="text-text-secondary mt-2">监控和管理文章抓取任务</p>
+      <h1 class="text-2xl font-bold text-text-primary">抓取任务</h1>
+      <p class="mt-1 text-sm text-text-secondary">监控和管理文章抓取任务</p>
       <p class="text-sm text-text-muted mt-2">系统会按活跃度自动调度抓取，也可以点击"抓取到期帐号"立即开始。</p>
     </div>
     <%= button_to crawl_due_crawl_tasks_path, method: :post,
-        class: "h-10 px-5 rounded-xl bg-brand text-white hover:bg-brand-dark font-semibold text-sm transition inline-flex items-center justify-center gap-2 shadow-[0_7px_16px_rgba(59,130,246,.14)]",
+        class: "btn btn-primary",
         data: { confirm: "为所有到期的帐号启动抓取任务？" } do %>
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>

@@ -1,16 +1,16 @@
-<div class="flex items-center justify-between py-2 px-3 rounded-lg <%= case ta.status when 'completed' then 'bg-green-50' when 'running' then 'bg-yellow-50' when 'failed' then 'bg-red-50' else 'bg-gray-50' end %>">
+<div class="flex items-center justify-between py-2 px-3 rounded-lg <%= case ta.status when 'completed' then 'bg-green-50' when 'running' then 'bg-yellow-50' when 'failed' then 'bg-red-50' else 'bg-bg-secondary' end %>">
   <div class="flex items-center space-x-3">
     <span class="text-lg">
       <%= case ta.status when 'completed' then '✓' when 'running' then '●' when 'failed' then '✗' else '○' end %>
     </span>
     <div>
-      <p class="font-medium text-gray-900"><%= link_to ta.account.nickname, account_path(ta.account) %></p>
+      <p class="font-medium text-text-primary"><%= link_to ta.account.nickname, account_path(ta.account) %></p>
       <% if ta.error_message.present? %>
         <p class="text-xs text-red-600 mt-0.5"><%= ta.error_message.truncate(100) %></p>
       <% end %>
     </div>
   </div>
-  <div class="text-xs text-gray-500">
+  <div class="text-xs text-text-secondary">
     <% if ta.completed_at %>
       <%= ta.completed_at.strftime('%H:%M:%S') %>
     <% elsif ta.started_at %>

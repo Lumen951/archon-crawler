@@ -3,25 +3,25 @@
     <% if account.round_head_img.present? %>
       <img src="<%= account.round_head_img %>" alt="<%= account.nickname %>" class="w-16 h-16 rounded-full">
     <% else %>
-      <div class="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center">
-        <span class="text-gray-500 text-xl font-semibold"><%= account.nickname[0] %></span>
+      <div class="w-16 h-16 rounded-full bg-bg-secondary flex items-center justify-center">
+        <span class="text-text-secondary text-xl font-semibold"><%= account.nickname[0] %></span>
       </div>
     <% end %>
 
     <div class="flex-1 min-w-0">
       <div class="flex items-center justify-between mb-2">
-        <h3 class="text-lg font-semibold text-gray-900 truncate">
+        <h3 class="text-lg font-semibold text-text-primary truncate">
           <%= link_to account.nickname, admin_account_path(account), class: "hover:text-primary" %>
         </h3>
         <%= render 'shared/status_badge', status: account.status %>
       </div>
 
-      <div class="text-sm text-gray-600 space-y-1">
+      <div class="text-sm text-text-secondary space-y-1">
         <p><span class="font-medium">文章数：</span> <%= account.total_articles %></p>
         <p><span class="font-medium">最后抓取：</span>
           <%= account.last_crawled_at ? time_ago_in_words(account.last_crawled_at) + '前' : '从未抓取' %>
         </p>
-        <p class="text-xs text-gray-400 truncate"><span class="font-medium">Fakeid:</span> <%= account.fakeid %></p>
+        <p class="text-xs text-text-muted truncate"><span class="font-medium">Fakeid:</span> <%= account.fakeid %></p>
       </div>
 
       <div class="mt-4 flex space-x-2">

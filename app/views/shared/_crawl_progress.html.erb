@@ -1,19 +1,23 @@
-<div class="bg-bg-card border border-border-primary rounded-2xl p-5 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+<div class="bg-bg-card border border-border-primary rounded-lg p-5">
   <h3 class="text-sm font-semibold text-text-primary mb-4">各活跃度组抓取进度</h3>
   <% labels = {
-      active: "🟢 活跃 (7天内)",
-      slow: "🟡 减速 (8-30天)",
-      dormant: "🟠 停更 (31-90天)",
-      dead: "🔴 失活 (90天+)",
-      never: "⚪ 从未发布",
-      uncrawled: "🌫️ 从未抓取",
+      active: ["活跃 (7天内)", "bg-green-500"],
+      slow: ["减速 (8-30天)", "bg-yellow-500"],
+      dormant: ["停更 (31-90天)", "bg-orange-500"],
+      dead: ["失活 (90天+)", "bg-red-500"],
+      never: ["从未发布", "bg-gray-400"],
+      uncrawled: ["从未抓取", "bg-gray-300"],
     } %>
   <div class="space-y-4">
     <% @crawl_progress.each do |row| %>
+      <% label, dot_color = labels[row[:key]] %>
       <div>
         <div class="flex items-center justify-between gap-3 mb-1.5">
-          <div class="flex items-baseline gap-2 min-w-0">
-            <span class="text-sm text-text-secondary flex-shrink-0"><%= labels[row[:key]] %></span>
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="flex items-center gap-1.5 text-sm text-text-secondary flex-shrink-0">
+              <span class="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0 <%= dot_color %>"></span>
+              <%= label %>
+            </span>
             <span class="text-xs text-brand font-semibold flex-shrink-0">待抓取 <%= row[:due] %> / <%= row[:total] %></span>
           </div>
           <span class="text-xs font-semibold text-text-primary flex-shrink-0"><%= row[:pct] %>%</span>

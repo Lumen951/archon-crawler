@@ -1,8 +1,8 @@
 <div class="space-y-6">
   <div class="flex items-center justify-between">
     <div>
-      <h1 class="text-3xl font-bold text-gray-900">导入活动研究</h1>
-      <p class="text-gray-600 mt-1">创建一份活动调研配置，之后在研究控制台随时启动调研</p>
+      <h1 class="text-2xl font-bold text-text-primary">导入活动研究</h1>
+      <p class="text-text-secondary mt-1">创建一份活动调研配置，之后在研究控制台随时启动调研</p>
     </div>
     <%= link_to "← 返回导入页", import_accounts_path, class: "btn btn-secondary" %>
   </div>
@@ -11,7 +11,7 @@
     <%= render 'event_form', form_url: import_event_accounts_path, form_method: :post, submit_label: "创建活动配置" %>
   </div>
 
-  <div class="card bg-blue-50 border-blue-200">
+  <div class="card bg-brand-soft border-blue-200">
     <h3 class="font-semibold text-blue-900 mb-3">💡 说明</h3>
     <ul class="space-y-2 text-sm text-blue-800">
       <li>• 活动研究账号不抓文章、不进抓取队列，只承载调研配置</li>

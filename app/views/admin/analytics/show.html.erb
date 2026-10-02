@@ -1,26 +1,29 @@
 <div class="space-y-6">
   <div>
-    <h1 class="text-3xl font-bold text-text-primary">帐号活跃度分析</h1>
-    <p class="text-text-secondary mt-2">发布活跃度概览 & 不活跃帐号识别</p>
+    <h1 class="text-2xl font-bold text-text-primary">帐号活跃度分析</h1>
+    <p class="mt-1 text-sm text-text-secondary">发布活跃度概览 & 不活跃帐号识别</p>
   </div>
 
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
     <!-- Activity Distribution -->
-    <div class="bg-bg-card border border-border-primary rounded-2xl p-5 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+    <div class="bg-bg-card border border-border-primary rounded-lg p-5">
       <h3 class="text-sm font-semibold text-text-primary mb-4">发布活跃度分布</h3>
       <% max_count = [@activity_distribution.values.max, 1].max %>
       <% bars = [
-        ["🟢 活跃 (7天内)", @activity_distribution[:active], "bg-green-500"],
-        ["🟡 减速 (8-30天)", @activity_distribution[:slow], "bg-yellow-500"],
-        ["🟠 停更 (31-90天)", @activity_distribution[:dormant], "bg-orange-500"],
-        ["🔴 失活 (90天+)", @activity_distribution[:dead], "bg-red-500"],
-        ["⚪ 从未发布", @activity_distribution[:never], "bg-gray-400"],
-        ["🌫️ 从未抓取", @activity_distribution[:uncrawled], "bg-gray-300"],
+        ["活跃 (7天内)", @activity_distribution[:active], "bg-green-500"],
+        ["减速 (8-30天)", @activity_distribution[:slow], "bg-yellow-500"],
+        ["停更 (31-90天)", @activity_distribution[:dormant], "bg-orange-500"],
+        ["失活 (90天+)", @activity_distribution[:dead], "bg-red-500"],
+        ["从未发布", @activity_distribution[:never], "bg-gray-400"],
+        ["从未抓取", @activity_distribution[:uncrawled], "bg-gray-300"],
       ] %>
       <div class="space-y-3">
         <% bars.each do |label, count, color| %>
           <div class="flex items-center gap-3">
-            <span class="text-sm text-text-secondary w-40 flex-shrink-0"><%= label %></span>
+            <span class="flex items-center gap-1.5 text-sm text-text-secondary w-40 flex-shrink-0">
+              <span class="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0 <%= color %>"></span>
+              <%= label %>
+            </span>
             <div class="flex-1 bg-bg-secondary rounded-full h-6 overflow-hidden">
               <div class="h-full <%= color %> rounded-full transition-all duration-500 flex items-center justify-end pr-2" style="width: <%= (count.to_f / max_count * 100).round %>%; min-width: <%= count > 0 ? '2rem' : '0' %>">
                 <% if count > 0 %>
@@ -34,47 +37,47 @@
     </div>
 
     <!-- Platform Breakdown -->
-    <div class="bg-bg-card border border-border-primary rounded-2xl p-5 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+    <div class="bg-bg-card border border-border-primary rounded-lg p-5">
       <h3 class="text-sm font-semibold text-text-primary mb-4">按平台统计</h3>
       <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-border-primary">
+        <table class="min-w-[680px] divide-y divide-border-primary">
           <thead class="bg-bg-secondary">
             <tr>
-              <th class="px-4 py-2 text-left text-xs font-semibold text-text-secondary uppercase">平台</th>
-              <th class="px-4 py-2 text-right text-xs font-semibold text-text-secondary uppercase">总数</th>
-              <th class="px-4 py-2 text-right text-xs font-semibold text-text-secondary uppercase">活跃 (7天内)</th>
-              <th class="px-4 py-2 text-right text-xs font-semibold text-text-secondary uppercase">减速 (8-30天)</th>
-              <th class="px-4 py-2 text-right text-xs font-semibold text-text-secondary uppercase">停更 (31-90天)</th>
-              <th class="px-4 py-2 text-right text-xs font-semibold text-text-secondary uppercase">失活 (90天+)</th>
-              <th class="px-4 py-2 text-right text-xs font-semibold text-text-secondary uppercase">从未发布</th>
-              <th class="px-4 py-2 text-right text-xs font-semibold text-text-secondary uppercase">从未抓取</th>
-              <th class="px-4 py-2 text-right text-xs font-semibold text-text-secondary uppercase">均分</th>
+              <th class="px-4 py-2 text-left text-xs font-semibold text-text-secondary uppercase whitespace-nowrap">平台</th>
+              <th class="px-4 py-2 text-right text-xs font-semibold text-text-secondary uppercase whitespace-nowrap">总数</th>
+              <th class="px-4 py-2 text-right text-xs font-semibold text-text-secondary uppercase whitespace-nowrap">活跃 (7天内)</th>
+              <th class="px-4 py-2 text-right text-xs font-semibold text-text-secondary uppercase whitespace-nowrap">减速 (8-30天)</th>
+              <th class="px-4 py-2 text-right text-xs font-semibold text-text-secondary uppercase whitespace-nowrap">停更 (31-90天)</th>
+              <th class="px-4 py-2 text-right text-xs font-semibold text-text-secondary uppercase whitespace-nowrap">失活 (90天+)</th>
+              <th class="px-4 py-2 text-right text-xs font-semibold text-text-secondary uppercase whitespace-nowrap">从未发布</th>
+              <th class="px-4 py-2 text-right text-xs font-semibold text-text-secondary uppercase whitespace-nowrap">从未抓取</th>
+              <th class="px-4 py-2 text-right text-xs font-semibold text-text-secondary uppercase whitespace-nowrap">均分</th>
             </tr>
           </thead>
           <tfoot class="bg-bg-secondary">
             <tr>
-              <td class="px-4 py-2 text-left text-xs font-semibold text-text-secondary uppercase">总计</td>
-              <td class="px-4 py-2 text-right text-xs font-semibold text-text-secondary uppercase"><%= @summary[:total] %></td>
-              <td class="px-4 py-2 text-right text-xs font-semibold text-text-secondary uppercase"><%= @summary[:active] %></td>
-              <td class="px-4 py-2 text-right text-xs font-semibold text-text-secondary uppercase"><%= @summary[:slow] %></td>
-              <td class="px-4 py-2 text-right text-xs font-semibold text-text-secondary uppercase"><%= @summary[:dormant] %></td>
-              <td class="px-4 py-2 text-right text-xs font-semibold text-text-secondary uppercase"><%= @summary[:dead] %></td>
-              <td class="px-4 py-2 text-right text-xs font-semibold text-text-secondary uppercase"><%= @summary[:never] %></td>
-              <td class="px-4 py-2 text-right text-xs font-semibold text-text-secondary uppercase"><%= @summary[:uncrawled] %></td>
-              <td class="px-4 py-2 text-right text-xs font-semibold text-text-secondary uppercase"><%= @summary[:avg_score] %></td>
+              <td class="px-4 py-2 text-left text-xs font-semibold text-text-secondary uppercase whitespace-nowrap">总计</td>
+              <td class="px-4 py-2 text-right text-xs font-semibold text-text-secondary uppercase whitespace-nowrap"><%= @summary[:total] %></td>
+              <td class="px-4 py-2 text-right text-xs font-semibold text-text-secondary uppercase whitespace-nowrap"><%= @summary[:active] %></td>
+              <td class="px-4 py-2 text-right text-xs font-semibold text-text-secondary uppercase whitespace-nowrap"><%= @summary[:slow] %></td>
+              <td class="px-4 py-2 text-right text-xs font-semibold text-text-secondary uppercase whitespace-nowrap"><%= @summary[:dormant] %></td>
+              <td class="px-4 py-2 text-right text-xs font-semibold text-text-secondary uppercase whitespace-nowrap"><%= @summary[:dead] %></td>
+              <td class="px-4 py-2 text-right text-xs font-semibold text-text-secondary uppercase whitespace-nowrap"><%= @summary[:never] %></td>
+              <td class="px-4 py-2 text-right text-xs font-semibold text-text-secondary uppercase whitespace-nowrap"><%= @summary[:uncrawled] %></td>
+              <td class="px-4 py-2 text-right text-xs font-semibold text-text-secondary uppercase whitespace-nowrap"><%= @summary[:avg_score] %></td>
             </tr>
           </tfoot>
           <tbody class="divide-y divide-border-primary">
             <% @platform_stats.each do |stat| %>
               <tr class="hover:bg-bg-secondary transition">
-                <td class="px-4 py-2 text-sm font-medium text-text-primary"><%= stat[:platform] %></td>
-                <td class="px-4 py-2 text-sm text-right text-text-primary"><%= stat[:total] %></td>
+                <td class="px-4 py-2 text-sm font-medium text-text-primary whitespace-nowrap"><%= stat[:platform] %></td>
+                <td class="px-4 py-2 text-sm text-right text-text-primary whitespace-nowrap"><%= stat[:total] %></td>
                 <td class="px-4 py-2 text-sm text-right"><span class="<%= stat[:active] > 0 ? 'text-green-600 font-semibold' : 'text-text-muted' %>"><%= stat[:active] %></span></td>
                 <td class="px-4 py-2 text-sm text-right"><span class="<%= stat[:slow] > 0 ? 'text-yellow-600 font-semibold' : 'text-text-muted' %>"><%= stat[:slow] %></span></td>
                 <td class="px-4 py-2 text-sm text-right"><span class="<%= stat[:dormant] > 0 ? 'text-orange-600 font-semibold' : 'text-text-muted' %>"><%= stat[:dormant] %></span></td>
                 <td class="px-4 py-2 text-sm text-right"><span class="<%= stat[:dead] > 0 ? 'text-red-600 font-semibold' : 'text-text-muted' %>"><%= stat[:dead] %></span></td>
-                <td class="px-4 py-2 text-sm text-right"><span class="<%= stat[:never] > 0 ? 'text-gray-500 font-semibold' : 'text-text-muted' %>"><%= stat[:never] %></span></td>
-                <td class="px-4 py-2 text-sm text-right"><span class="<%= stat[:uncrawled] > 0 ? 'text-gray-400 font-semibold' : 'text-text-muted' %>"><%= stat[:uncrawled] %></span></td>
+                <td class="px-4 py-2 text-sm text-right"><span class="<%= stat[:never] > 0 ? 'text-text-secondary font-semibold' : 'text-text-muted' %>"><%= stat[:never] %></span></td>
+                <td class="px-4 py-2 text-sm text-right"><span class="<%= stat[:uncrawled] > 0 ? 'text-text-muted font-semibold' : 'text-text-muted' %>"><%= stat[:uncrawled] %></span></td>
                 <td class="px-4 py-2 text-sm text-right"><span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-semibold
                   <%= stat[:avg_score] >= 30 ? 'bg-green-100 text-green-700' :
                       stat[:avg_score] >= 10 ? 'bg-yellow-100 text-yellow-700' :
@@ -95,7 +98,7 @@
 
   <!-- Top Publishers -->
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-    <div class="bg-bg-card border border-border-primary rounded-2xl p-5 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+    <div class="bg-bg-card border border-border-primary rounded-lg p-5">
       <h3 class="text-sm font-semibold text-text-primary mb-4">过去7天 — 最活跃帐号 Top 20</h3>
       <% if @top_publishers_7d.any? %>
         <div class="overflow-x-auto max-h-[400px] overflow-y-auto">
@@ -133,7 +136,7 @@
       <% end %>
     </div>
 
-    <div class="bg-bg-card border border-border-primary rounded-2xl p-5 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+    <div class="bg-bg-card border border-border-primary rounded-lg p-5">
       <h3 class="text-sm font-semibold text-text-primary mb-4">过去30天 — 最活跃帐号 Top 20</h3>
       <% if @top_publishers_30d.any? %>
         <div class="overflow-x-auto max-h-[400px] overflow-y-auto">
@@ -173,7 +176,7 @@
   </div>
 
   <!-- Dormant Attention List -->
-  <div class="bg-bg-card border border-orange-200 rounded-2xl p-5 shadow-[0_1px_0_rgba(255,255,255,.9),0_18px_55px_rgba(15,23,42,.055)]">
+  <div class="bg-bg-card border border-orange-200 rounded-lg p-5">
     <div class="flex items-center justify-between mb-4">
       <h3 class="text-sm font-semibold text-text-primary flex items-center gap-2">
         <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-orange-100 text-orange-600 text-xs font-bold">!</span>
@@ -183,7 +186,7 @@
         <span class="text-sm text-text-secondary"><%= @dormant_attention.size %> 个帐号</span>
         <%= form_tag bulk_disable_dormant_admin_analytics_path, method: :post, class: "inline" do %>
           <%= hidden_field_tag :authenticity_token, form_authenticity_token %>
-          <button type="submit" class="h-9 px-4 rounded-lg bg-orange-500 text-white hover:bg-orange-600 text-sm font-semibold transition">
+          <button type="submit" class="btn btn-warning">
             停用全部 <%= @dormant_attention.size %> 个
           </button>
         <% end %>
@@ -227,7 +230,7 @@
         </table>
       </div>
     <% else %>
-      <p class="text-text-muted text-sm text-center py-8">🎉 没有需要关注的停更帐号</p>
+      <p class="text-text-muted text-sm text-center py-8">没有需要关注的停更帐号</p>
     <% end %>
   </div>
 </div>

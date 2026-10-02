@@ -7,7 +7,8 @@ import { test, login, shot } from "../support/helpers";
 // 种子注入了有效会话，因此先在面板里退出登录，才能走到扫码入口。
 test("微信读书（直连）扫码登录全流程", async ({ page, shot }) => {
   await login(page);
-  await page.goto("/admin/settings");
+  // 设置页为面板切换式布局，#wechat 直达微信读书面板
+  await page.goto("/admin/settings#wechat");
 
   const panel = page.locator("#weread_native_panel");
   await expect(panel).toBeVisible();
@@ -34,4 +35,27 @@ test("微信读书（直连）扫码登录全流程", async ({ page, shot }) => 
   // 重新加载后面板回显最新会话状态
   await page.reload();
   await expect(page.locator("#weread_native_panel").getByText("会话状态：✓ 已登录")).toBeVisible();
+});
+
+// 小红书采集通道切换（付费 API / 浏览器直连）。设置页小红书卡片里的单选表单，
+// 提交后 flash + 回显选中态。结束时切回默认 API，避免影响其他用例。
+test("小红书采集通道切换", async ({ page, shot }) => {
+  await login(page);
+  // 设置页为面板切换式布局，#rednote 直达小红书面板
+  await page.goto("/admin/settings#rednote");
+
+  const card = page.locator("#rednote");
+  await expect(card.getByRole("heading", { name: "采集通道" })).toBeVisible();
+  await expect(card.locator('input[name="rednote_crawl_provider"][value="api"]')).toBeChecked();
+
+  await card.locator('input[name="rednote_crawl_provider"][value="browser"]').check();
+  await card.getByRole("button", { name: "保存采集通道" }).click();
+  await expect(page.getByText("已切换为浏览器直连")).toBeVisible();
+  await expect(card.locator('input[name="rednote_crawl_provider"][value="browser"]')).toBeChecked();
+  await shot("53-采集通道已切换为浏览器直连");
+
+  await card.locator('input[name="rednote_crawl_provider"][value="api"]').check();
+  await card.getByRole("button", { name: "保存采集通道" }).click();
+  await expect(page.getByText("已切换为付费 API")).toBeVisible();
+  await expect(card.locator('input[name="rednote_crawl_provider"][value="api"]')).toBeChecked();
 });

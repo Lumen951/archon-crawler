@@ -250,6 +250,8 @@ export default class extends Controller {
   }
 
   onScreenWheel(e) {
+    // Alt + 滚轮：滚动本地截图容器（查看长截图的其余部分），不转发远程
+    if (e.altKey) return
     e.preventDefault()
     const { x, y } = this.toScreenCoords(e)
     this.sendEvent({ type: "scroll", x, y, dx: e.deltaX, dy: e.deltaY })
