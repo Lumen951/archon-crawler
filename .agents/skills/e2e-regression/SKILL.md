@@ -48,7 +48,7 @@ bin/e2e --ui                             # Playwright UI 调试模式
 
 1. 先看 `error-context.md` 的页面快照 —— 多数失败是选择器没对上或页面没到
    预期状态，不是产品 bug。
-2. `log/e2e-server.log` 里搜 `E2EMock` 或 `NetConnectNotAllowed` —— 出现后者
+2. `log/e2e-server.log` 里搜 `E2eMock` 或 `NetConnectNotAllowed` —— 出现后者
    说明代码新引入了外部 HTTP 依赖，fixture 没覆盖（这是测试在帮忙，不要
    绕过它）。
 3. 任务推进慢不是 bug：抓取/正文下载靠 Rails 后台任务（dev 是进程内

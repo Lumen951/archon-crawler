@@ -1,7 +1,7 @@
 # E2E 浏览器回归测试的离线 mock 层。
 #
 # bin/e2e 以 E2E_MOCKS=1 启动 development 服务器时由
-# config/initializers/e2e_mock.rb 调 E2EMock.enable! 激活：
+# config/initializers/e2e_mock.rb 调 E2eMock.enable! 激活：
 #
 #   1. WebMock 拦截所有外部 HTTP（按 host 分发给 Handlers），回放
 #      e2e/fixtures/ 下的本地报文——mp.weixin.qq.com 的扫码登录、文章列表、
@@ -12,7 +12,7 @@
 #      保证测试永不触网，也暴露出新引入的外部依赖。
 #
 # 只在 development 环境可启用；生产与测试套件完全不受影响。
-module E2EMock
+module E2eMock
   FIXTURE_ROOT = Rails.root.join("e2e/fixtures").freeze
   SAMPLE_ROOT  = Rails.root.join("e2e/fixtures/samples").freeze
 
@@ -34,7 +34,7 @@ module E2EMock
     Registry.register!
     RubyStubs.apply!
 
-    Rails.logger.info("[E2EMock] 已启用：外部 HTTP 由 #{FIXTURE_ROOT} 回放")
+    Rails.logger.info("[E2eMock] 已启用：外部 HTTP 由 #{FIXTURE_ROOT} 回放")
   end
 
   # 读取 fixture；优先 samples/（生产样本，gitignore，不提交），

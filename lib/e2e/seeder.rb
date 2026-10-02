@@ -1,6 +1,6 @@
 require "base64"
 
-module E2E
+module E2e
   # bin/e2e 每次运行前调用：把 E2E 专用数据库（E2E_DB_NAME，默认
   # mp_crawler_e2e）重置为确定性的初始状态。幂等，可重复执行。
   #
@@ -58,7 +58,7 @@ module E2E
       Option.set("max_crawl_pages", 1)
       # 活动调研（event research）的外部密钥全部是占位值：对应的
       # google.serper.dev / openai-proxy / open.api.tianyancha.com 都由
-      # E2EMock 回放（见 lib/e2e_mock/handlers.rb）。
+      # E2eMock 回放（见 lib/e2e_mock/handlers.rb）。
       Option.set("openai_api_key", "e2e-mock-llm-key")
       Option.set("serper_api_key", "e2e-mock-serper-key")
       Option.set("tianyancha_api_key", "e2e-mock-tianyancha-key")

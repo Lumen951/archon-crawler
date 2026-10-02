@@ -1,4 +1,4 @@
-module E2EMock
+module E2eMock
   # 把 WebMock 拦到的请求按 host 分发给 Handlers，并把返回值适配成
   # WebMock 的 to_return 响应 Hash。未知 host 不注册（WebMock 直接报
   # NetConnectNotAllowedError），让新引入的外部依赖在 E2E 里立刻暴露。
@@ -29,7 +29,7 @@ module E2EMock
       def respond(handler, request)
         response = handler.handle(request) ||
                    raise(UnmockedRequest,
-                         "[E2EMock] #{handler} 没有为 #{request.method.upcase} #{request.uri} 提供 fixture")
+                         "[E2eMock] #{handler} 没有为 #{request.method.upcase} #{request.uri} 提供 fixture")
 
         {
           status: response.fetch(:status, 200),

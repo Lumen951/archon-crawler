@@ -4,7 +4,7 @@ namespace :e2e do
   desc "Seed the E2E database with deterministic fixture data (requires E2E_DB_NAME, run by bin/e2e)"
   task seed: :environment do
     require "e2e/seeder"
-    E2E::Seeder.run!
+    E2e::Seeder.run!
   end
 
   desc "Truncate all tables in the E2E database for a fresh regression run (requires E2E_DB_NAME)"

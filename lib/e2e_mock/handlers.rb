@@ -1,6 +1,6 @@
 require "rqrcode"
 
-module E2EMock
+module E2eMock
   module Handlers
     # 通用兜底：按 fixture 目录约定找文件，找不到就返回 nil（Registry 会
     # 回 599 并在报错信息里说明缺哪个 fixture）。文件名规则：
@@ -13,9 +13,9 @@ module E2EMock
         path = "/index" if path.empty?
         %w[json html].each do |ext|
           name = File.join(fixture_prefix, "#{path}.#{ext}")
-          next unless E2EMock.fixture_exist?(name)
+          next unless E2eMock.fixture_exist?(name)
 
-          body = E2EMock.fixture(name)
+          body = E2eMock.fixture(name)
           return { status: 200, body: body,
                    headers: { "Content-Type" => ext == "json" ? "application/json; charset=utf-8" : "text/html; charset=utf-8" } }
         end
@@ -63,7 +63,7 @@ module E2EMock
 
         def login_page
           @poll_count = 0
-          { status: 200, body: E2EMock.fixture("wechat_mp/login_page.html"),
+          { status: 200, body: E2eMock.fixture("wechat_mp/login_page.html"),
             headers: { "Content-Type" => "text/html; charset=utf-8" } }
         end
 
@@ -102,7 +102,7 @@ module E2EMock
 
         # validate_session 与 complete_login 的账号信息都会访问 home 页
         def home_page
-          { status: 200, body: E2EMock.fixture("wechat_mp/home_page.html"),
+          { status: 200, body: E2eMock.fixture("wechat_mp/home_page.html"),
             headers: { "Content-Type" => "text/html; charset=utf-8" } }
         end
 
@@ -110,8 +110,8 @@ module E2EMock
           fakeid = query["fakeid"].to_s
           offset = query["begin"].to_i
           name = "wechat_mp/free_publish/#{fakeid}.json"
-          body = if E2EMock.fixture_exist?(name)
-                   E2EMock.fixture(name)
+          body = if E2eMock.fixture_exist?(name)
+                   E2eMock.fixture(name)
                  else
                    # 该账号没有 fixture：返回空列表（客户端会以 ApiError 结束，
                    # 任务状态如实记录，与真实上游「无数据」行为一致）
@@ -124,12 +124,12 @@ module E2EMock
         #（或 samples 覆盖），找不到时回退到通用 fixture。
         def article_page(slug)
           name = "wechat_mp/articles/#{File.basename(slug.to_s)}.html"
-          body = E2EMock.fixture_exist?(name) ? E2EMock.fixture(name) : E2EMock.fixture("wechat_mp/articles/MOCKARTICLE1.html")
+          body = E2eMock.fixture_exist?(name) ? E2eMock.fixture(name) : E2eMock.fixture("wechat_mp/articles/MOCKARTICLE1.html")
           { status: 200, body: body, headers: { "Content-Type" => "text/html; charset=utf-8" } }
         end
 
         def fixture_json(name)
-          { status: 200, body: E2EMock.fixture(name),
+          { status: 200, body: E2eMock.fixture(name),
             headers: { "Content-Type" => "application/json; charset=utf-8" } }
         end
       end
@@ -221,8 +221,8 @@ module E2EMock
         def cover(query)
           book_id = query["bookId"].to_s
           name = "weread_native/cover/#{File.basename(book_id)}.json"
-          body = if E2EMock.fixture_exist?(name)
-                   E2EMock.fixture(name)
+          body = if E2eMock.fixture_exist?(name)
+                   E2eMock.fixture(name)
                  else
                    # 没有 fixture 的帐号：无最新文章（与上游「未订阅/无内容」行为一致）
                    { errCode: 0, reviewId: "" }
@@ -235,7 +235,7 @@ module E2EMock
         def content_page(query)
           review_id = query["reviewId"].to_s
           name = "weread_native/content/#{File.basename(review_id)}.html"
-          body = E2EMock.fixture_exist?(name) ? E2EMock.fixture(name) : E2EMock.fixture("weread_native/content/e2ereview0001.html")
+          body = E2eMock.fixture_exist?(name) ? E2eMock.fixture(name) : E2eMock.fixture("weread_native/content/e2ereview0001.html")
           { status: 200, body: body, headers: { "Content-Type" => "text/html; charset=utf-8" } }
         end
 
@@ -269,7 +269,7 @@ module E2EMock
           query = payload["q"].to_s
           fixture = query.include?("张三") ? "event_research/serper_person.json" : "event_research/serper_event.json"
 
-          { status: 200, body: E2EMock.fixture(fixture),
+          { status: 200, body: E2eMock.fixture(fixture),
             headers: { "Content-Type" => "application/json; charset=utf-8" } }
         rescue JSON::ParserError
           { status: 400, body: { error: "bad serper request" }.to_json,
@@ -284,7 +284,7 @@ module E2EMock
     # 主要人员里有张三，供「人名 × 主要人员」交叉比对出任职记录。
     module Tianyancha
       def self.handle(_request)
-        { status: 200, body: E2EMock.fixture("event_research/tianyancha_company.json"),
+        { status: 200, body: E2eMock.fixture("event_research/tianyancha_company.json"),
           headers: { "Content-Type" => "application/json; charset=utf-8" } }
       end
     end
@@ -295,7 +295,7 @@ module E2EMock
     # 抽取结果 JSON（人物抽取按 awards[0].people[0] 取人，两个阶段都兼容）。
     module LlmProxy
       def self.handle(_request)
-        { status: 200, body: E2EMock.fixture("event_research/llm_response.json"),
+        { status: 200, body: E2eMock.fixture("event_research/llm_response.json"),
           headers: { "Content-Type" => "application/json; charset=utf-8" } }
       end
     end
