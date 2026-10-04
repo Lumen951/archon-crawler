@@ -6,12 +6,12 @@
     </div>
     <div class="flex items-center gap-2">
       <% if @account %>
-        <%= link_to "← 全部网站", monitor_changes_path, class: "h-10 px-4 rounded-lg border border-border-primary font-semibold inline-flex items-center" %>
+        <%= link_to "← 全部网站", monitor_changes_path, class: "btn btn-default" %>
       <% end %>
       <% if params[:important].present? %>
-        <%= link_to "显示全部", monitor_changes_path, class: "h-10 px-4 rounded-lg border border-border-primary font-semibold inline-flex items-center" %>
+        <%= link_to "显示全部", monitor_changes_path, class: "btn btn-default" %>
       <% else %>
-        <%= link_to "只看重要", monitor_changes_path(important: 1), class: "h-10 px-4 rounded-lg border border-border-primary font-semibold inline-flex items-center" %>
+        <%= link_to "只看重要", monitor_changes_path(important: 1), class: "btn btn-default" %>
       <% end %>
     </div>
   </div>
