@@ -307,9 +307,10 @@ class WereadNativeApiClient
     return nil if url.blank?
 
     query = URI.parse(url.to_s).query rescue nil
-    return CGI.parse(query.to_s)["reviewId"].first if query.present?
+    # Ruby 4 移除了 CGI.parse，统一用 URI.decode_www_form
+    return URI.decode_www_form(query.to_s).to_h["reviewId"] if query.present?
     nil
-  rescue URI::InvalidURIError
+  rescue URI::InvalidURIError, ArgumentError
     nil
   end
 

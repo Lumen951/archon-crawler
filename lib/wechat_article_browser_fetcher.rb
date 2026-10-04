@@ -72,7 +72,8 @@ class WechatArticleBrowserFetcher
       return url unless url.include?("appmsgcaptcha")
 
       query = URI.parse(url).query.to_s
-      CGI.parse(query).dig("target_url", 0).presence || url
+      # Ruby 4 移除了 CGI.parse，统一用 URI.decode_www_form（与 profile_ext_api_client 一致）
+      URI.decode_www_form(query).to_h["target_url"].presence || url
     rescue StandardError
       url
     end
