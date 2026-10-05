@@ -20,6 +20,7 @@
 # Indexes
 #
 #  index_articles_on_account_id_and_published_at  (account_id,published_at DESC)
+#  index_articles_on_content_markdown_trgm        (content_markdown) USING gin
 #  index_articles_on_crawl_task_id                (crawl_task_id)
 #  index_articles_on_digest_trgm                  (digest) USING gin
 #  index_articles_on_published_at                 (published_at)
@@ -47,17 +48,19 @@ class Article < ApplicationRecord
   scope :last_month, -> { where("published_at >= ?", 1.month.ago) }
   scope :wechat_missing_content, -> { joins(:account).where(accounts: { type: "WechatAccount" }, content_html: nil) }
 
-  # Fuzzy keyword search over title and digest. Space-separated terms are AND-ed;
-  # every term must appear as a substring in at least one of the two columns.
-  # Backed by the pg_trgm GIN indexes on both columns — the body is deliberately
-  # not searched (see the migration) so that this OR stays fully indexable.
+  # Fuzzy keyword search over title, digest and content_markdown.
+  # Space-separated terms are AND-ed; every term must appear as a substring in
+  # at least one of the three columns. Backed by the pg_trgm GIN indexes on all
+  # three columns; content_html is never searched (content_markdown is the
+  # canonical body text). Terms shorter than three characters cannot form a
+  # trigram, so those queries fall back to a scan (see the migrations).
   def self.search_keyword(keyword)
     terms = keyword.to_s.split.reject(&:blank?)
     return all if terms.empty?
 
     terms.reduce(all) do |scope, term|
       pattern = "%#{sanitize_sql_like(term)}%"
-      scope.where("title ILIKE :p OR digest ILIKE :p", p: pattern)
+      scope.where("title ILIKE :p OR digest ILIKE :p OR content_markdown ILIKE :p", p: pattern)
     end
   end
 

@@ -6,12 +6,15 @@ class AddKeywordSearchToArticles < ActiveRecord::Migration[8.1]
               name: "index_articles_on_title_trgm"
     add_index :articles, :digest, using: :gin, opclass: :gin_trgm_ops,
               name: "index_articles_on_digest_trgm"
-    # No index on the body (content_markdown / content_html): at ~200k articles
-    # those columns hold gigabytes of text, so a trgm GIN index over them would
-    # be as large as the data itself, take hours to build and slow every insert.
-    # search_keyword only matches title and digest, which keeps the OR below
-    # fully indexable — a non-indexed branch would force a seq scan and make
-    # both indexes above dead weight.
+    # No index on the body (content_markdown / content_html) in THIS migration:
+    # at ~200k articles those columns hold gigabytes of text, so a trgm GIN
+    # index over them would be as large as the data itself and take hours to
+    # build. An earlier attempt indexed both body columns with a plain CREATE
+    # INDEX on RDS; the build blocked article writes, saturated the instance
+    # and was abandoned. search_keyword now also matches content_markdown,
+    # backed by a CONCURRENTLY-built, retry-safe index added later in
+    # 20261005000001. content_html remains deliberately unindexed and
+    # unsearched.
   end
 
   def down

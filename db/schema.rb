@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_01_000001) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_05_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -72,6 +72,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_01_000001) do
     t.datetime "updated_at", null: false
     t.string "url", null: false
     t.index ["account_id", "published_at"], name: "index_articles_on_account_id_and_published_at", order: { published_at: :desc }
+    t.index ["content_markdown"], name: "index_articles_on_content_markdown_trgm", opclass: :gin_trgm_ops, using: :gin
     t.index ["crawl_task_id"], name: "index_articles_on_crawl_task_id"
     t.index ["digest"], name: "index_articles_on_digest_trgm", opclass: :gin_trgm_ops, using: :gin
     t.index ["published_at"], name: "index_articles_on_published_at"

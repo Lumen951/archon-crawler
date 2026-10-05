@@ -431,8 +431,15 @@ class ApiTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert JSON.parse(response.body)["articles"].any? { |a| a["title"] == @article1.title }
 
-    # ...but the body is not (no trgm index on it at this scale)
+    # ...and the body is searched too (content_markdown)
     params = { account_id: @wechat_account.id, keyword: "这是测试内容" }
+    get "/api/v1/articles", params: params, headers: auth_headers
+    assert_response :success
+    assert JSON.parse(response.body)["articles"].any? { |a| a["title"] == @article1.title }
+
+    # ...but content_html is not (content_markdown is the searchable body text)
+    @article1.update!(content_html: "<p>HTML 独有的测试标记</p>")
+    params = { account_id: @wechat_account.id, keyword: "HTML 独有的测试标记" }
     get "/api/v1/articles", params: params, headers: auth_headers
     assert_response :success
     assert_empty JSON.parse(response.body)["articles"]

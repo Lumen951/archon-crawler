@@ -22,6 +22,7 @@ require "test_helper"
 # Indexes
 #
 #  index_articles_on_account_id_and_published_at  (account_id,published_at DESC)
+#  index_articles_on_content_markdown_trgm        (content_markdown) USING gin
 #  index_articles_on_crawl_task_id                (crawl_task_id)
 #  index_articles_on_digest_trgm                  (digest) USING gin
 #  index_articles_on_published_at                 (published_at)
@@ -74,19 +75,38 @@ class ArticleTest < ActiveSupport::TestCase
     assert_not_includes results, @no_match
   end
 
-  # The body is intentionally not searchable: at ~200k articles a trgm index on
-  # content_markdown/content_html would dwarf the table, and searching it
-  # unindexed is a full scan.
-  test "search_keyword ignores the body" do
+  # The body search targets content_markdown only: content_html is the raw
+  # presentation source, markdown is the canonical searchable text.
+  test "search_keyword matches content_markdown but not content_html" do
     results = Article.search_keyword("爬虫")
 
-    assert_not_includes results, @body_markdown_only
+    assert_includes results, @body_markdown_only
     assert_not_includes results, @body_html_only
+  end
+
+  test "search_keyword matches English in the body case-insensitively" do
+    english_body = @account.articles.create!(
+      title: "无关标题丁",
+      url: "https://example.com/search-english-#{SecureRandom.hex(8)}",
+      content_markdown: "This guide covers Ruby on Rails deployment.",
+      published_at: 7.days.ago
+    )
+
+    assert_includes Article.search_keyword("RAILS deployment"), english_body
   end
 
   test "search_keyword ANDs space-separated terms" do
     assert_includes Article.search_keyword("爬虫 实战"), @in_title
     assert_includes Article.search_keyword("爬虫 框架"), @in_digest
+    assert_includes Article.search_keyword("爬虫 工具"), @body_markdown_only
+
+    cross_column = @account.articles.create!(
+      title: "爬虫调度器",
+      url: "https://example.com/search-cross-#{SecureRandom.hex(8)}",
+      content_markdown: "核心是分布式队列",
+      published_at: 8.days.ago
+    )
+    assert_includes Article.search_keyword("调度器 队列"), cross_column
 
     assert_empty Article.search_keyword("爬虫 不存在的词")
   end
