@@ -1,4 +1,6 @@
 class ArticlesController < ApplicationController
+  layout "oauth", only: :show
+
   PLATFORM_ACCOUNT_TYPES = {
     "wechat" => "WechatAccount",
     "rednote" => "RednoteAccount",

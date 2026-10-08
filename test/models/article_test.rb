@@ -67,6 +67,15 @@ class ArticleTest < ActiveSupport::TestCase
     )
   end
 
+  test "recent orders articles without a publication time last" do
+    undated = @account.articles.create!(
+      title: "Undated article",
+      url: "https://example.com/undated-#{SecureRandom.hex(8)}"
+    )
+
+    assert_equal undated, Article.recent.to_a.last
+  end
+
   test "search_keyword matches title and digest" do
     results = Article.search_keyword("爬虫")
 

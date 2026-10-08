@@ -1,23 +1,18 @@
-<div class="mx-auto">
+<div class="w-full max-w-4xl mx-auto">
   <!-- Header -->
   <div class="mb-6">
-    <div class="mb-4">
-      <%= link_to account_path(@article.account), class: "inline-flex items-center gap-3 text-text-secondary hover:text-brand transition group" do %>
-        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-        </svg>
-        <% if @article.account.round_head_img.present? %>
-          <img src="<%= @article.account.round_head_img %>" alt="<%= @article.account.nickname %>" class="h-8 w-8 rounded-full flex-shrink-0">
-        <% else %>
-          <div class="h-8 w-8 rounded-full bg-bg-secondary flex items-center justify-center text-text-secondary text-sm flex-shrink-0">
-            <%= @article.account.rednote? ? '📕' : '💬' %>
-          </div>
-        <% end %>
-        <span class="font-medium text-text-primary group-hover:text-brand transition"><%= @article.account.nickname %></span>
-        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium <%= @article.account.platform_badge_class %>">
-          <%= @article.account.platform_name %>
-        </span>
+    <div class="mb-4 inline-flex items-center gap-3 text-text-secondary">
+      <% if @article.account.round_head_img.present? %>
+        <img src="<%= @article.account.round_head_img %>" alt="<%= @article.account.nickname %>" class="h-8 w-8 rounded-full flex-shrink-0">
+      <% else %>
+        <div class="h-8 w-8 rounded-full bg-bg-secondary flex items-center justify-center text-text-secondary text-sm flex-shrink-0">
+          <%= @article.account.rednote? ? '📕' : '💬' %>
+        </div>
       <% end %>
+      <span class="font-medium text-text-primary"><%= @article.account.nickname %></span>
+      <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium <%= @article.account.platform_badge_class %>">
+        <%= @article.account.platform_name %>
+      </span>
     </div>
 
     <h1 class="text-2xl sm:text-2xl font-bold text-text-primary mb-4"><%= @article.title %></h1>

@@ -41,7 +41,7 @@ class Article < ApplicationRecord
   after_create :refresh_account_counters
   after_destroy :refresh_account_counters
 
-  scope :recent, -> { order(published_at: :desc) }
+  scope :recent, -> { order(Arel.sql("published_at DESC NULLS LAST")) }
   scope :today, -> { where("published_at >= ?", Time.current.beginning_of_day) }
   scope :yesterday, -> { where(published_at: Time.current.beginning_of_day - 1.day...Time.current.beginning_of_day) }
   scope :last_7_days, -> { where("published_at >= ?", 7.days.ago) }

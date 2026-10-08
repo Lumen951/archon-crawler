@@ -137,6 +137,36 @@ class AccountsControllerTest < ActionDispatch::IntegrationTest
     assert_match "请输入至少一个微信公众号文章链接", response.body
   end
 
+  test "shows a compact account index" do
+    account = WechatAccount.create!(
+      fakeid: "compact_index_account",
+      nickname: "紧凑列表帐号",
+      status: :active,
+      activity_score: 52,
+      articles_last_7_days: 3,
+      articles_last_30_days: 12,
+      total_articles: 58,
+      last_published_at: 2.days.ago,
+      last_crawled_at: 1.day.ago,
+      next_crawl_at: 1.day.from_now
+    )
+    first_tag = Tag.create!(name: "重点关注")
+    long_tag = Tag.create!(name: "这是一个很长的标签名称，用于验证桌面列表中的截断和悬停展示")
+    account.tags << [first_tag, long_tag]
+
+    get accounts_path
+
+    assert_response :success
+    assert_select "a[href=?]", account_path(account), text: account.nickname
+    assert_select ".status-badge", text: "启用"
+    assert_select "td[title=?]", "活跃度评分：52。过去 7 天 3 篇，过去 30 天 12 篇，共 58 篇", text: "52"
+    assert_select "td", text: /上次：1天前/
+    assert_select "span[title=?]", first_tag.name, text: first_tag.name
+    assert_select "span[title=?]", "#{first_tag.name}, #{long_tag.name}", text: "+1"
+    assert_select "form[action=?]", crawl_account_path(account)
+    assert_select "form[action=?]", toggle_status_account_path(account)
+  end
+
   test "shows account identity details" do
     account = accounts(:one)
 
