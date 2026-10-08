@@ -8,11 +8,11 @@ require "ferrum"
 # （wappoc_appmsgcaptcha），纯 HTTP 下载（WechatCrawler.fetch_article_page）
 # 无法通过。微信的环境验证以 Cookie 形式留在浏览器里，因此这里的思路是：
 #
-#   1. 复用远程登录的浏览器环境——用户在设置页「远程浏览器登录」里完成的
-#      人工验证/登录优先直接继承：登录浏览器仍在运行（含 Rails.cache 过期
-#      但进程存活的孤儿）时附着开新标签页；
+#   1. 复用远程登录的浏览器环境——用户在设置页「远程浏览器登录」（现在是
+#      微信读书直连 weread_native）里完成的人工验证/登录优先直接继承：登录
+#      浏览器仍在运行（含 Rails.cache 过期但进程存活的孤儿）时附着开新标签页；
 #   2. 否则用常驻共享浏览器（SharedBrowser）抓取：独立 user-data-dir，从
-#      Session#frame 持续导出的 Cookie 快照回灌（会话级 Cookie 如环境验证、
+#      weread_native profile 的 Cookie 快照回灌（会话级 Cookie 如环境验证、
 #      slave_sid 不会被 Chrome 写进 profile，不回灌就继承不到人工验证成果），
 #      每次抓取前重灌，无需每次重新验证。
 #
@@ -24,7 +24,10 @@ class WechatArticleBrowserFetcher
   # go_to 返回后等待 JS 渲染的时间。#js_content 是服务端渲染的，这里只是
   # 留给页内脚本的缓冲。
   LOAD_SETTLE_SECONDS = 1.5
-  PROFILE_PROVIDER = "wechat_mp"
+  # 人工验证/登录发生在哪个 profile：远程浏览器里唯一还在用的微信侧平台是
+  # 微信读书直连，用户在它里面打开文章链接完成环境验证，验证 Cookie 因此
+  # 留在 weread_native profile 里。
+  PROFILE_PROVIDER = "weread_native"
 
   class Error < StandardError; end
 
@@ -128,8 +131,10 @@ class WechatArticleBrowserFetcher
 
     def captcha_error(target)
       CaptchaRequiredError.new(
-        "当前环境异常，需要验证：浏览器内仍被微信拦截。请在设置页「远程浏览器登录」打开微信公众号登录浏览器，" \
-        "把下面的链接粘贴到地址栏打开，在页面里完成环境验证（验证状态会保留在本机浏览器环境中），之后重试下载即可。链接：#{target}"
+        "当前环境异常，需要验证：浏览器内仍被微信拦截。请在设置页「远程浏览器登录」打开" \
+        "微信读书（直连）的登录浏览器，把下面的链接粘贴到地址栏打开，在页面里完成环境验证" \
+        "（验证 Cookie 会留在 weread_native profile 里，下载浏览器每次抓取前都会回灌），" \
+        "之后重试下载即可。链接：#{target}"
       )
     end
   end

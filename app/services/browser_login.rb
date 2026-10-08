@@ -24,8 +24,9 @@ module BrowserLogin
   end
 
   # 各平台持久化浏览器环境（user-data-dir）的根目录。登录浏览器把验证/登录
-  # Cookie 持续快照到自己的 profile 目录；正文抓取的常驻共享浏览器使用独立
-  # 的 wechat_mp_downloader 目录（见 SharedBrowser），据此回灌快照。
+  # Cookie 持续快照到自己的 profile 目录；正文抓取的常驻共享浏览器使用独立的
+  # wechat_mp_downloader 目录（见 SharedBrowser），据此回灌 weread_native
+  # profile 的快照（远程浏览器里唯一还在做微信侧人工验证的平台）。
   def profile_root
     Rails.root.join("storage", "browser_profiles")
   end

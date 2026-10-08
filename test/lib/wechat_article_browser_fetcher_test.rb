@@ -107,6 +107,27 @@ class WechatArticleBrowserFetcherTest < ActiveSupport::TestCase
     end
   end
 
+  # 回归守卫：远程浏览器里唯一还在承载微信侧人工验证的平台是微信读书直连
+  # （weread_native）。Cookie 桥的两端都必须指向它——指错了就永远继承不到人工
+  # 验证成果（生产踩过：指向已从设置页下线的 wechat_mp，快照停留 9 天前的版本，
+  # 于是正文下载一直卡在「当前环境异常」）。
+  test "the cookie bridge targets the profile that carries the manual verification" do
+    assert_equal "weread_native", WechatArticleBrowserFetcher::PROFILE_PROVIDER
+    assert_equal "weread_native", WechatArticleBrowserFetcher::SharedBrowser::SNAPSHOT_PROVIDER
+    assert_includes BrowserLogin::PROVIDERS.keys, WechatArticleBrowserFetcher::PROFILE_PROVIDER,
+                    "附着登录浏览器用的 platform key 必须是远程浏览器登录里的真实平台"
+  end
+
+  # 快照按 provider 的 cookie_domain_pattern 过滤，该 pattern 必须覆盖
+  # mp.weixin.qq.com，否则人工通过的环境验证 Cookie 根本进不了快照。
+  test "weread_native snapshot covers the mp.weixin.qq.com verification cookies" do
+    pattern = BrowserLogin.find("weread_native").cookie_domain_pattern
+
+    assert_match pattern, "mp.weixin.qq.com"
+    assert_match pattern, ".weixin.qq.com"
+    assert_match pattern, "weread.qq.com"
+  end
+
   test "fetch keeps the deleted-content semantics of the http path" do
     page = FakePage.new(url: @article_url, body: "<html>该内容已被发布者删除</html>")
 
@@ -122,7 +143,7 @@ class WechatArticleBrowserFetcherTest < ActiveSupport::TestCase
       page = FakePage.new(url: @article_url, body: "<div id=\"js_content\">正文</div>")
       browser = FakeBrowser.new(page)
       profile_dir = File.join(tmp_root, "wechat_mp_downloader")
-      snapshot_dir = File.join(tmp_root, "wechat_mp")
+      snapshot_dir = File.join(tmp_root, "weread_native")
       FileUtils.mkdir_p(snapshot_dir)
       write_snapshot(snapshot_dir, "s1")
 

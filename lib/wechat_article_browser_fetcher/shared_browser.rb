@@ -15,7 +15,7 @@
 #   - owner 进程死亡后 flock 随之释放，Chrome 成为孤儿存活，下一个抓取进程
 #     凭 pid 文件收养，避免再拉一个被 SingletonLock 顶掉的同 profile Chrome。
 #
-# 与登录浏览器（BrowserLogin::Session，wechat_mp profile）互不干扰：抓取
+# 与登录浏览器（BrowserLogin::Session，weread_native profile）互不干扰：抓取
 # 浏览器用独立 user-data-dir（终身持锁不能占用登录目录，否则挡住人工验证），
 # Cookie 仍从登录 profile 的快照文件回灌（Session#frame 持续导出，含会话级
 # 环境验证 Cookie），且每次抓取前重灌，长寿命浏览器因此能继承最新验证成果。
@@ -26,10 +26,14 @@ class WechatArticleBrowserFetcher
   class SharedBrowser
     # 空闲多久后回收。下次抓取时惰性检查，回收前 Chrome 常驻内存。
     IDLE_TTL = 15.minutes
-    # 抓取浏览器自己的 user-data-dir 与锁命名空间。
+    # 抓取浏览器自己的 user-data-dir 与锁命名空间。不能直接用登录 profile 目录：
+    # 登录浏览器会终身持有该目录的 ProfileLock，抓取浏览器若占住它，用户就打不开
+    # 远程登录浏览器去完成验证/重新扫码了。
     PROFILE_PROVIDER = "wechat_mp_downloader"
-    # Cookie 快照仍读登录浏览器的 profile 目录。
-    SNAPSHOT_PROVIDER = "wechat_mp"
+    # Cookie 快照读登录浏览器的 profile 目录。远程浏览器里唯一还在承载微信侧
+    # 人工验证的是微信读书直连（weread_native），其 cookie_domain_pattern 覆盖
+    # qq.com，mp.weixin.qq.com 的环境验证 Cookie 因此也在快照里。
+    SNAPSHOT_PROVIDER = "weread_native"
     PID_FILE = ".shared_browser.json"
 
     class << self
@@ -257,7 +261,8 @@ class WechatArticleBrowserFetcher
     end
 
     # 会话级 Cookie（环境验证、登录态）Chrome 不会写进 profile，必须从登录
-    # 浏览器目录的快照回灌；每次抓取都重灌，单条失败不影响其余。
+    # 浏览器目录的快照回灌（weread_native profile：人工环境验证留在那里）；
+    # 每次抓取都重灌，单条失败不影响其余。
     def restore_cookies!(page, crawl_task)
       snapshot_dir = BrowserLogin.profile_dir_for(SNAPSHOT_PROVIDER)
       entries = BrowserLogin::CookieExport.load(snapshot_dir)
