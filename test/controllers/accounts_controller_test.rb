@@ -137,6 +137,17 @@ class AccountsControllerTest < ActionDispatch::IntegrationTest
     assert_match "请输入至少一个微信公众号文章链接", response.body
   end
 
+  test "shows account identity details" do
+    account = accounts(:one)
+
+    get account_path(account)
+
+    assert_response :success
+    assert_select "[data-controller='inline-edit'] h1[data-inline-edit-target='display']", text: account.nickname
+    assert_select "span", text: account.platform_name
+    assert_select "div.w-20.h-20", text: "💬"
+  end
+
   test "deletes account from show action" do
     account = WechatAccount.create!(fakeid: "to_delete_fakeid", nickname: "待删除帐号", status: :active)
 

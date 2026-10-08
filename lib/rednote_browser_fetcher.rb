@@ -51,16 +51,32 @@ class RednoteBrowserFetcher
   # 单篇笔记不可见（已删除 / 仅自己可见 / xsec_token 失效）。按单篇失败处理。
   class NoteUnavailableError < Error; end
 
-  # 主页笔记提取：优先 __INITIAL_STATE__.user（数组或 { notes, hasMore } 两种
-  # 形态，且可能被 Vue 包装在 .value 里），空时退回 DOM 卡片链接
-  # （/explore/{id}?xsec_token=…）。字段名同时兼容 camelCase 与 snake_case。
+  # 主页笔记提取：同时读取 __INITIAL_STATE__.user 与 DOM 卡片链接。状态数据提供
+  # 标题/封面等稳定字段，DOM 链接补齐详情跳转必需的 xsec_token/xsec_source。
   PROFILE_EXTRACT_JS = <<~'JS'.freeze
     (() => {
       const result = { nickname: "", hasMore: null, notes: [] };
-      const push = (id, xsec, title, cover) => {
+      const byId = new Map();
+      const push = (id, xsec, title, cover, source) => {
         if (!id) return;
-        result.notes.push({ id: String(id), xsec_token: xsec ? String(xsec) : "",
-                            title: (title || "").trim(), cover: cover || "" });
+        const key = String(id);
+        const candidate = {
+          id: key,
+          xsec_token: xsec ? String(xsec) : "",
+          xsec_source: source ? String(source) : "",
+          title: (title || "").trim(),
+          cover: cover || ""
+        };
+        const existing = byId.get(key);
+        if (existing) {
+          if (!existing.xsec_token && candidate.xsec_token) existing.xsec_token = candidate.xsec_token;
+          if (!existing.xsec_source && candidate.xsec_source) existing.xsec_source = candidate.xsec_source;
+          if (!existing.title && candidate.title) existing.title = candidate.title;
+          if (!existing.cover && candidate.cover) existing.cover = candidate.cover;
+          return;
+        }
+        byId.set(key, candidate);
+        result.notes.push(candidate);
       };
       const coverOf = (c) => {
         if (!c) return "";
@@ -71,12 +87,17 @@ class RednoteBrowserFetcher
       };
       const collect = (list) => {
         (list || []).forEach((item) => {
+          if (Array.isArray(item)) {
+            collect(item);
+            return;
+          }
           if (!item || typeof item !== "object") return;
           const card = item.noteCard || item.note_card || item;
           const id = item.id || item.noteId || item.note_id || card.id || card.noteId || card.note_id;
           const xsec = item.xsecToken || item.xsec_token || card.xsecToken || card.xsec_token || "";
+          const source = item.xsecSource || item.xsec_source || card.xsecSource || card.xsec_source || "";
           const title = card.displayTitle || card.display_title || card.title || "";
-          push(id, xsec, title, coverOf(card.cover));
+          push(id, xsec, title, coverOf(card.cover), source);
         });
       };
       const unwrap = (v) => (v && typeof v === "object" && v.value !== undefined ? v.value : v);
@@ -94,20 +115,23 @@ class RednoteBrowserFetcher
           if (Array.isArray(bucket)) collect(bucket);
         }
       } catch (e) {}
-      if (!result.notes.length) {
-        document.querySelectorAll('a[href*="/explore/"], a[href*="/search_result/"]').forEach((a) => {
-          const href = a.getAttribute("href") || "";
-          const m = href.match(/\/(?:explore|search_result)\/([0-9a-zA-Z]+)/);
-          if (!m) return;
-          let xsec = "";
-          try { xsec = new URLSearchParams(href.split("?")[1] || "").get("xsec_token") || ""; } catch (e) {}
-          const card = a.closest("section") || a.parentElement || a;
-          const titleEl = card.querySelector(".title, a.title, .note-text");
-          const img = card.querySelector("img");
-          push(m[1], xsec, titleEl ? titleEl.innerText : "",
-               img ? (img.src || img.getAttribute("data-src") || "") : "");
-        });
-      }
+      document.querySelectorAll('a[href*="/explore/"], a[href*="/search_result/"]').forEach((a) => {
+        const href = a.getAttribute("href") || "";
+        const m = href.match(/\/(?:explore|search_result)\/([0-9a-zA-Z]+)/);
+        if (!m) return;
+        let xsec = "";
+        let source = "";
+        try {
+          const query = new URLSearchParams(href.split("?")[1] || "");
+          xsec = query.get("xsec_token") || "";
+          source = query.get("xsec_source") || "";
+        } catch (e) {}
+        const card = a.closest("section") || a.parentElement || a;
+        const titleEl = card.querySelector(".title, a.title, .note-text");
+        const img = card.querySelector("img");
+        push(m[1], xsec, titleEl ? titleEl.innerText : "",
+             img ? (img.src || img.getAttribute("data-src") || "") : "", source);
+      });
       return result;
     })()
   JS
@@ -196,25 +220,33 @@ class RednoteBrowserFetcher
 
     # ── 归一化（纯函数，供测试） ──────────────────────────
 
-    # 主页提取结果 → { nickname:, notes: [{note_id, xsec_token, title, cover_url}], has_more: }
-    # 按 note_id 去重（状态数据在前、DOM 兜底在后，先到先得）。
+    # 主页提取结果 → { nickname:, notes: [{note_id, xsec_token, xsec_source, title, cover_url}], has_more: }
+    # 按 note_id 去重，后续记录只补齐前一条缺失的字段。
     def normalize_profile_payload(payload)
       return { nickname: "", notes: [], has_more: nil } unless payload.is_a?(Hash)
 
-      seen = {}
-      notes = Array(payload["notes"]).filter_map do |raw|
+      by_id = {}
+      Array(payload["notes"]).each do |raw|
         next unless raw.is_a?(Hash)
+
         note_id = raw["id"].to_s.strip
-        next if note_id.blank? || seen.key?(note_id)
-        seen[note_id] = true
-        {
+        next if note_id.blank?
+
+        candidate = {
           note_id: note_id,
-          xsec_token: raw["xsec_token"].to_s,
+          xsec_token: raw["xsec_token"].to_s.strip,
+          xsec_source: raw["xsec_source"].to_s.strip,
           title: raw["title"].to_s,
           cover_url: raw["cover"].to_s
         }
+        existing = by_id[note_id]
+        if existing
+          merge_listing_item!(existing, candidate)
+        else
+          by_id[note_id] = candidate
+        end
       end
-      { nickname: payload["nickname"].to_s.strip, notes: notes,
+      { nickname: payload["nickname"].to_s.strip, notes: by_id.values,
         has_more: payload["hasMore"] == false ? false : nil }
     end
 
@@ -259,10 +291,18 @@ class RednoteBrowserFetcher
     end
 
     # 详情页导航 URL：带 xsec_source 与 xsec_token（列表页携带的跳转凭证）。
-    def note_detail_url(note_id, xsec_token = nil)
-      url = "#{RednoteCrawler::NOTE_URL_BASE}/#{note_id}?xsec_source=pc_user"
+    def note_detail_url(note_id, xsec_token = nil, xsec_source: nil)
+      source = xsec_source.to_s.strip.presence || "pc_user"
+      url = "#{RednoteCrawler::NOTE_URL_BASE}/#{note_id}?xsec_source=#{CGI.escape(source)}"
       url += "&xsec_token=#{CGI.escape(xsec_token)}" if xsec_token.present?
       url
+    end
+
+    def merge_listing_item!(existing, candidate)
+      %i[xsec_token xsec_source title cover_url].each do |field|
+        existing[field] = candidate[field] if existing[field].to_s.strip.blank? && candidate[field].to_s.strip.present?
+      end
+      existing
     end
 
     private
@@ -429,7 +469,10 @@ class RednoteBrowserFetcher
       listing = extract_profile_listing!(initial: true)
       seen = {}
       nickname = listing[:nickname]
-      listing[:notes].each { |item| seen[item[:note_id]] = item }
+      listing[:notes].each do |item|
+        existing = seen[item[:note_id]]
+        existing ? RednoteBrowserFetcher.merge_listing_item!(existing, item) : seen[item[:note_id]] = item
+      end
 
       rounds = 0
       idle_rounds = 0
@@ -443,7 +486,10 @@ class RednoteBrowserFetcher
         listing = extract_profile_listing!
         before = seen.size
         nickname = listing[:nickname] if listing[:nickname].present?
-        listing[:notes].each { |item| seen[item[:note_id]] ||= item }
+        listing[:notes].each do |item|
+          existing = seen[item[:note_id]]
+          existing ? RednoteBrowserFetcher.merge_listing_item!(existing, item) : seen[item[:note_id]] = item
+        end
         has_more = false if listing[:has_more] == false
 
         if seen.size == before
@@ -462,9 +508,14 @@ class RednoteBrowserFetcher
     # 打开单篇笔记详情页，返回页面原始提取 payload（note/dom/blocked 结构），由
     # 调用方 normalize_note_detail 归一。轮询超时仍无数据返回 nil；明确不可见
     # （已删除/仅自己可见）抛 NoteUnavailableError；风控抛 RiskControlError。
-    def fetch_note_detail(note_id, xsec_token: nil)
+    def fetch_note_detail(note_id, xsec_token: nil, xsec_source: nil)
+      if xsec_token.to_s.strip.blank?
+        raise NoteUnavailableError,
+              "笔记 #{note_id} 缺少详情页跳转凭证 xsec_token，未打开详情页；请检查主页列表提取或重新登录后重试"
+      end
+
       RednoteBrowserFetcher.rate_limiter.wait
-      target = RednoteBrowserFetcher.note_detail_url(note_id, xsec_token)
+      target = RednoteBrowserFetcher.note_detail_url(note_id, xsec_token, xsec_source: xsec_source)
       RednoteBrowserFetcher.log(@crawl_task, :debug, "打开笔记详情页: #{target[0, 90]}")
       @page.go_to(target)
 

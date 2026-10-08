@@ -2,7 +2,7 @@ require "test_helper"
 
 class RednoteBrowserCrawlerTest < ActiveSupport::TestCase
   # 鸭子类型替身：RednoteBrowserCrawler 只用 fetch_profile_notes /
-  # fetch_note_detail（xsec_token:）。
+  # fetch_note_detail（xsec_token:、xsec_source:）。
   class FakeSession
     attr_reader :requested_details
 
@@ -20,8 +20,8 @@ class RednoteBrowserCrawlerTest < ActiveSupport::TestCase
 
     def max_scrolls_used = @max_scrolls
 
-    def fetch_note_detail(note_id, xsec_token: nil)
-      @requested_details << [ note_id, xsec_token ]
+    def fetch_note_detail(note_id, xsec_token: nil, xsec_source: nil)
+      @requested_details << [ note_id, xsec_token, xsec_source ]
       raise @errors[note_id] if @errors[note_id]
 
       @payloads[note_id]
@@ -70,10 +70,10 @@ class RednoteBrowserCrawlerTest < ActiveSupport::TestCase
     assert_equal 17, RednoteBrowserCrawler.scroll_cap(-1)
   end
 
-  test "浏览器通道保存笔记：字段映射、xsec_token 透传、raw_data 保留来源" do
+  test "浏览器通道保存笔记：字段映射、跳转凭证透传、raw_data 保留来源" do
     session = FakeSession.new(
       listing: { nickname: "测试号", truncated: false,
-                 notes: [ { note_id: "note1", xsec_token: "tok-1", title: "列表标题", cover_url: "" } ] },
+                 notes: [ { note_id: "note1", xsec_token: "tok-1", xsec_source: "profile_feed", title: "列表标题", cover_url: "" } ] },
       payloads: { "note1" => browser_payload("note1") }
     )
 
@@ -82,7 +82,7 @@ class RednoteBrowserCrawlerTest < ActiveSupport::TestCase
     end
 
     assert_equal({ new_count: 1, skip_count: 0, error_count: 0 }, result)
-    assert_equal [ [ "note1", "tok-1" ] ], session.requested_details, "详情页必须携带列表页的 xsec_token"
+    assert_equal [ [ "note1", "tok-1", "profile_feed" ] ], session.requested_details, "详情页必须携带列表页的跳转凭证"
     assert_equal 2, session.max_scrolls_used, "max_pages=1 换算成 2 轮滚动"
 
     article = Article.find_by(url: "https://www.xiaohongshu.com/explore/note1")

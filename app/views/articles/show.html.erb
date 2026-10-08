@@ -1,12 +1,22 @@
-<div class="max-w-4xl mx-auto">
+<div class="mx-auto">
   <!-- Header -->
   <div class="mb-6">
     <div class="mb-4">
-      <%= link_to account_path(@article.account), class: "inline-flex items-center gap-2 text-text-secondary hover:text-brand transition" do %>
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <%= link_to account_path(@article.account), class: "inline-flex items-center gap-3 text-text-secondary hover:text-brand transition group" do %>
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
         </svg>
-        返回 <%= @article.account.nickname %>
+        <% if @article.account.round_head_img.present? %>
+          <img src="<%= @article.account.round_head_img %>" alt="<%= @article.account.nickname %>" class="h-8 w-8 rounded-full flex-shrink-0">
+        <% else %>
+          <div class="h-8 w-8 rounded-full bg-bg-secondary flex items-center justify-center text-text-secondary text-sm flex-shrink-0">
+            <%= @article.account.rednote? ? '📕' : '💬' %>
+          </div>
+        <% end %>
+        <span class="font-medium text-text-primary group-hover:text-brand transition"><%= @article.account.nickname %></span>
+        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium <%= @article.account.platform_badge_class %>">
+          <%= @article.account.platform_name %>
+        </span>
       <% end %>
     </div>
 
@@ -233,6 +243,7 @@
   .article-content {
     line-height: 1.8;
     color: var(--text-primary, #1f2937);
+    white-space: pre-wrap;
   }
 
   .article-content p {

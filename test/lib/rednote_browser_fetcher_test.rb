@@ -56,13 +56,13 @@ class RednoteBrowserFetcherTest < ActiveSupport::TestCase
 
   # ── 归一化（纯函数） ──────────────────────────────────
 
-  test "normalize_profile_payload 按 note_id 去重并保留首个 xsec_token" do
+  test "normalize_profile_payload 按 note_id 合并，后续有效跳转凭证补齐空值" do
     payload = {
       "nickname" => "测试号",
       "hasMore" => false,
       "notes" => [
-        { "id" => "note1", "xsec_token" => "tok-1", "title" => "第一篇", "cover" => "https://img/1.jpg" },
-        { "id" => "note1", "xsec_token" => "tok-dup", "title" => "重复" },
+        { "id" => "note1", "xsec_token" => "", "title" => "第一篇", "cover" => "https://img/1.jpg" },
+        { "id" => "note1", "xsec_token" => "tok-1", "xsec_source" => "profile_feed", "title" => "重复" },
         { "id" => "", "title" => "无 id 应丢弃" },
         { "id" => "note2", "xsec_token" => "", "title" => "第二篇", "cover" => "" }
       ]
@@ -73,8 +73,26 @@ class RednoteBrowserFetcherTest < ActiveSupport::TestCase
     assert_equal "测试号", result[:nickname]
     assert_equal false, result[:has_more]
     assert_equal [ "note1", "note2" ], result[:notes].map { |n| n[:note_id] }
-    assert_equal "tok-1", result[:notes].first[:xsec_token], "重复 id 保留先出现的项"
+    assert_equal "tok-1", result[:notes].first[:xsec_token]
+    assert_equal "profile_feed", result[:notes].first[:xsec_source]
+    assert_equal "第一篇", result[:notes].first[:title], "状态数据的首个非空展示字段应保留"
     assert_equal "https://img/1.jpg", result[:notes].first[:cover_url]
+  end
+
+  test "normalize_profile_payload 保留首个有效 xsec_token" do
+    result = RednoteBrowserFetcher.normalize_profile_payload(
+      "notes" => [
+        { "id" => "note1", "xsec_token" => "tok-first" },
+        { "id" => "note1", "xsec_token" => "tok-later" }
+      ]
+    )
+
+    assert_equal "tok-first", result[:notes].first[:xsec_token]
+  end
+
+  test "PROFILE_EXTRACT_JS 递归展开分页嵌套数组" do
+    assert_includes RednoteBrowserFetcher::PROFILE_EXTRACT_JS, "if (Array.isArray(item))"
+    assert_includes RednoteBrowserFetcher::PROFILE_EXTRACT_JS, "collect(item);"
   end
 
   test "normalize_profile_payload 只有显式 false 才认为没有更多" do
@@ -163,6 +181,8 @@ class RednoteBrowserFetcherTest < ActiveSupport::TestCase
                  RednoteBrowserFetcher.note_detail_url("abc123")
     assert_equal "https://www.xiaohongshu.com/explore/abc123?xsec_source=pc_user&xsec_token=tok%2Ba",
                  RednoteBrowserFetcher.note_detail_url("abc123", "tok+a")
+    assert_equal "https://www.xiaohongshu.com/explore/abc123?xsec_source=profile%2Bfeed&xsec_token=tok",
+                 RednoteBrowserFetcher.note_detail_url("abc123", "tok", xsec_source: "profile+feed")
   end
 
   # ── 会话流程（FakePage 驱动） ─────────────────────────
@@ -233,6 +253,26 @@ class RednoteBrowserFetcherTest < ActiveSupport::TestCase
     assert_match(/重新完成小红书网页版登录/, error.message)
   end
 
+  test "fetch_profile_notes 跨滚动用后续有效凭证补齐同一笔记" do
+    rounds = [
+      { "nickname" => "测试号", "notes" => [ listing_note("note1", xsec: "") ] },
+      { "notes" => [ listing_note("note1", xsec: "tok-later").merge("xsec_source" => "profile_feed") ], "hasMore" => false }
+    ]
+    index = -1
+    page = FakePage.new(evaluate: ->(js) do
+      next {} unless js.include?("__INITIAL_STATE__.user")
+      index += 1
+      rounds[[ index, rounds.size - 1 ].min]
+    end)
+    session = new_session(page)
+
+    result = session.fetch_profile_notes("user-1", max_scrolls: 2)
+
+    assert_equal 1, result[:notes].size
+    assert_equal "tok-later", result[:notes].first[:xsec_token]
+    assert_equal "profile_feed", result[:notes].first[:xsec_source]
+  end
+
   test "fetch_note_detail 返回原始 payload 供归一与留痕" do
     note_payload = {
       "note" => { "title" => "标题", "desc" => "正文", "time" => 1_714_500_000_000 },
@@ -243,11 +283,24 @@ class RednoteBrowserFetcherTest < ActiveSupport::TestCase
     end)
     session = new_session(page)
 
-    payload = session.fetch_note_detail("note1", xsec_token: "tok")
+    payload = session.fetch_note_detail("note1", xsec_token: "tok", xsec_source: "profile_feed")
 
     assert_equal note_payload, payload
     assert_includes page.navigated_to.first, "xsec_token=tok", "详情页跳转必须携带列表页的 xsec_token"
-    assert_includes page.navigated_to.first, "xsec_source=pc_user"
+    assert_includes page.navigated_to.first, "xsec_source=profile_feed"
+  end
+
+  test "fetch_note_detail 缺少 xsec_token 时不打开详情页" do
+    page = FakePage.new
+    session = new_session(page)
+
+    error = assert_raises(RednoteBrowserFetcher::NoteUnavailableError) do
+      session.fetch_note_detail("note1", xsec_token: " ")
+    end
+
+    assert_match(/note1/, error.message)
+    assert_match(/xsec_token/, error.message)
+    assert_empty page.navigated_to
   end
 
   test "fetch_note_detail 明确不可见的笔记抛 NoteUnavailableError" do

@@ -90,7 +90,11 @@ class RednoteBrowserCrawler < BaseCrawler
     end
 
     log(crawl_task, :debug, "正在获取笔记详情: #{note_id}")
-    payload = session.fetch_note_detail(note_id, xsec_token: item[:xsec_token])
+    payload = session.fetch_note_detail(
+      note_id,
+      xsec_token: item[:xsec_token],
+      xsec_source: item[:xsec_source]
+    )
     unless payload
       log(crawl_task, :warn, "笔记 #{note_id} 详情读取失败，跳过")
       return :error

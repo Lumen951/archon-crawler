@@ -57,6 +57,27 @@ class ArticlesControllerTest < ActionDispatch::IntegrationTest
     assert_select "a[href=?]", account_path(@article.account)
   end
 
+  test "shows account identity on article index and show" do
+    @account.update!(round_head_img: "https://example.com/avatar.png")
+
+    get articles_path
+    assert_response :success
+    assert_select "a[href=?] img[src=?][alt=?]", account_path(@account), @account.round_head_img, @account.nickname
+    assert_select "span", text: @account.platform_name
+
+    get article_path(@article)
+    assert_response :success
+    assert_select "a[href=?] img[src=?][alt=?]", account_path(@account), @account.round_head_img, @account.nickname
+    assert_select "span", text: @account.platform_name
+    assert_select "span", text: @article.author
+  end
+
+  test "shows account fallback avatar when image is missing" do
+    get articles_path
+    assert_response :success
+    assert_select "div.h-10.w-10", text: "💬"
+  end
+
   test "should get articles index" do
     get articles_path
     assert_response :success
