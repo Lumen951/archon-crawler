@@ -15,55 +15,14 @@
 
   <% if @articles.any? %>
     <div class="space-y-3">
-      <% @articles.each do |article| %>
-        <div class="bg-bg-card border border-border-primary rounded-lg p-4 hover:border-brand transition">
-          <div class="flex items-start gap-4">
-            <% if article.cover_url.present? %>
-              <img src="<%= article.cover_url %>" alt="" class="w-20 h-20 object-cover rounded-lg flex-shrink-0">
-            <% end %>
-            <div class="flex-1 min-w-0">
-              <div class="flex items-start justify-between gap-3">
-                <div class="flex-1 min-w-0">
-                  <h3 class="text-sm font-semibold text-text-primary">
-                    <%= link_to article.title, article_path(article), class: "hover:text-brand transition" %>
-                  </h3>
-                  <div class="flex items-center gap-3 mt-1.5 text-xs text-text-secondary">
-                    <span><%= article.account.nickname %></span>
-                    <% if article.author.present? %>
-                      <span>· <%= article.author %></span>
-                    <% end %>
-                    <% if article.published_at %>
-                      <span>· <%= article.published_at.strftime('%Y-%m-%d') %></span>
-                    <% end %>
-                  </div>
-                  <% if article.digest.present? %>
-                    <p class="text-xs text-text-muted mt-2 line-clamp-2"><%= article.digest %></p>
-                  <% end %>
-                </div>
-                <div class="flex items-center gap-2 flex-shrink-0">
-                  <%= link_to article.url, target: "_blank", rel: "noopener noreferrer", class: "text-text-secondary hover:text-brand transition", title: "查看原文" do %>
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
-                    </svg>
-                  <% end %>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      <% end %>
+      <%= render partial: "articles/card", collection: @articles, as: :article %>
     </div>
-
-    <% if @articles.total_pages > 1 %>
-      <div class="mt-6">
-        <%= paginate @articles %>
-      </div>
+    <% if @articles.respond_to?(:total_pages) && @articles.total_pages > 1 %>
+      <div class="mt-6"><%= paginate @articles %></div>
     <% end %>
   <% else %>
     <div class="bg-bg-card border border-border-primary rounded-lg text-center py-12">
-      <svg class="w-16 h-16 mx-auto text-text-muted mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"/>
-      </svg>
+      <svg class="w-16 h-16 mx-auto text-text-muted mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"/></svg>
       <p class="text-text-secondary">该任务暂无抓取到的文章</p>
     </div>
   <% end %>

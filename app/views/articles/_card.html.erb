@@ -1,0 +1,49 @@
+<div class="bg-bg-card border border-border-primary rounded-lg p-4 hover:border-brand transition">
+  <div class="flex items-start gap-4">
+    <% if article.cover_url.present? %>
+      <img src="<%= article.cover_url %>" alt="" class="w-20 h-20 object-cover rounded-lg flex-shrink-0">
+    <% end %>
+
+    <div class="flex-1 min-w-0">
+      <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <%= link_to article_path(article), target: "_blank", rel: "noopener noreferrer", class: "block" do %>
+            <h3 class="font-semibold text-text-primary line-clamp-2 hover:text-brand transition"><%= article.title %></h3>
+          <% end %>
+          <% if article.best_digest.present? %>
+            <p class="text-xs text-text-secondary mt-2 line-clamp-2"><%= truncate(article.best_digest, length: 120) %></p>
+          <% end %>
+        </div>
+
+        <%= link_to article.url, target: "_blank", rel: "noopener noreferrer", class: "text-text-muted hover:text-brand transition flex-shrink-0", title: "查看原文" do %>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+          </svg>
+        <% end %>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-x-4 gap-y-2 mt-3 text-xs text-text-secondary">
+        <%= link_to account_path(article.account), class: "inline-flex items-center gap-2 min-w-0 group" do %>
+          <% if article.account.round_head_img.present? %>
+            <img src="<%= article.account.round_head_img %>" alt="<%= article.account.nickname %>" class="h-10 w-10 rounded-full flex-shrink-0">
+          <% else %>
+            <div class="h-10 w-10 rounded-full bg-bg-secondary flex items-center justify-center text-text-secondary text-lg flex-shrink-0">
+              <%= article.account.rednote? ? '📕' : '💬' %>
+            </div>
+          <% end %>
+          <span class="group-hover:text-brand transition truncate"><%= article.account.nickname %></span>
+          <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium <%= article.account.platform_badge_class %>">
+            <%= article.account.platform_name %>
+          </span>
+        <% end %>
+
+        <% if article.author.present? %>
+          <span><%= article.author %></span>
+        <% end %>
+        <% if article.published_at %>
+          <span><%= article.published_at.strftime('%Y-%m-%d') %></span>
+        <% end %>
+      </div>
+    </div>
+  </div>
+</div>

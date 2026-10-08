@@ -51,10 +51,18 @@ class ArticlesControllerTest < ActionDispatch::IntegrationTest
     assert_select "a[href=?]", @article.url, text: "查看原文"
   end
 
-  test "should link back to account" do
+  test "should not link back to account" do
     get article_path(@article)
     assert_response :success
-    assert_select "a[href=?]", account_path(@article.account)
+    assert_select "a[href=?]", account_path(@article.account), count: 0
+  end
+
+  test "article show uses standalone layout" do
+    get article_path(@article)
+    assert_response :success
+    assert_select "header", count: 0
+    assert_select "[data-sidebar-target='panel']", count: 0
+    assert_select "h1", @article.title
   end
 
   test "shows account identity on article index and show" do
@@ -65,9 +73,14 @@ class ArticlesControllerTest < ActionDispatch::IntegrationTest
     assert_select "a[href=?] img[src=?][alt=?]", account_path(@account), @account.round_head_img, @account.nickname
     assert_select "span", text: @account.platform_name
 
+    @article.update!(cover_url: "https://example.com/cover.jpg")
+    get articles_path
+    assert_response :success
+    assert_select "img[src=?]", @article.cover_url
+
     get article_path(@article)
     assert_response :success
-    assert_select "a[href=?] img[src=?][alt=?]", account_path(@account), @account.round_head_img, @account.nickname
+    assert_select "img[src=?][alt=?]", @account.round_head_img, @account.nickname
     assert_select "span", text: @account.platform_name
     assert_select "span", text: @article.author
   end

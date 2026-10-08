@@ -63,7 +63,7 @@ class CrawlTasksController < ApplicationController
 
   def articles
     @crawl_task = CrawlTask.find(params[:id])
-    @articles = @crawl_task.articles.recent.page(params[:page]).per(20)
+    @articles = @crawl_task.articles.includes(:account).recent.page(params[:page]).per(20)
   end
 
   def poll
