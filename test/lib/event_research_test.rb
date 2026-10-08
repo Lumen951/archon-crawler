@@ -346,15 +346,29 @@ class EventResearchTest < ActiveSupport::TestCase
     assert_equal "CEO", result["awards"][0]["people"][0]["role"]
   end
 
-  test "关键词会追加为「活动名 + 关键词」的额外搜索词" do
+  test "固定与追加搜索组合按顺序执行" do
     search = recording_search
 
     run_research(search: search, pages: fake_page_fetcher(->(url) { success_page(url) }), llm: fake_llm,
                  keywords: [ "路演", "决赛" ])
 
-    assert_includes search.queries, '"测试大会" 获奖名单', "固定模板搜索词保留"
-    assert_includes search.queries, "测试大会 路演"
-    assert_includes search.queries, "测试大会 决赛"
+    assert_equal [
+      '"测试大会" 获奖名单',
+      '"测试大会" 获奖项目',
+      '"测试大会" 获奖人',
+      '"测试大会" 决赛 获奖',
+      '"测试大会" 总决赛',
+      '"测试大会" 一等奖 二等奖 三等奖',
+      '"测试大会" TOP50',
+      '"测试大会" TOP100',
+      '"测试大会" 排名',
+      '"测试大会" 项目名单',
+      '"测试大会" 参赛项目',
+      '"测试大会" 创始人',
+      '"测试大会" CEO',
+      "测试大会 路演",
+      "测试大会 决赛"
+    ], search.queries.first(15)
   end
 
   test "研究目的与补充信息注入抽取 prompt" do

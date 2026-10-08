@@ -75,12 +75,16 @@ class EventAccountsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_match "创建活动配置", response.body
+    assert_match "固定搜索组合（13 条）", response.body
+    assert_match CGI.escapeHTML('"活动名称" 获奖名单'), response.body
   end
 
   # --- 研究控制台 ------------------------------------------------------------
 
   test "管理员可以看到研究控制台的启动入口与运行记录" do
-    account = EventAccount.create!(nickname: "测试大会", fakeid: "event:console")
+    account = EventAccount.create!(
+      nickname: "测试大会", fakeid: "event:console", event_config: { keywords: [ "路演" ] }
+    )
     sign_in_as(@admin)
 
     get event_account_path(account)
@@ -88,6 +92,9 @@ class EventAccountsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_match "测试大会", response.body
     assert_match "活动配置", response.body
+    assert_match "固定搜索组合（13 条）", response.body
+    assert_match CGI.escapeHTML('"测试大会" 获奖名单'), response.body
+    assert_match "测试大会 路演", response.body
     assert_match "开始调研", response.body
   end
 

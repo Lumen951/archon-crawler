@@ -9,22 +9,6 @@
 # run 返回最终结果 Hash（{ "event", "awards", "people"?, "companies"?, "metadata" }），
 # 由调用方决定落盘方式：CLI 写 output/*.json，应用存进 EventResearchRun.result。
 class EventResearch::Researcher
-  SEARCH_QUERIES = [
-    '"%<event>s" 获奖名单',
-    '"%<event>s" 获奖项目',
-    '"%<event>s" 获奖人',
-    '"%<event>s" 决赛 获奖',
-    '"%<event>s" 总决赛',
-    '"%<event>s" 一等奖 二等奖 三等奖',
-    '"%<event>s" TOP50',
-    '"%<event>s" TOP100',
-    '"%<event>s" 排名',
-    '"%<event>s" 项目名单',
-    '"%<event>s" 参赛项目',
-    '"%<event>s" 创始人',
-    '"%<event>s" CEO'
-  ].freeze
-
   PERSON_QUERIES = [
     '"%<name>s" 简历',
     '"%<name>s" 教育经历',
@@ -161,8 +145,7 @@ class EventResearch::Researcher
 
   # 固定模板 + 账号配置的补充关键词（拼在活动名后面），全部走同一套失败容错。
   def event_queries
-    SEARCH_QUERIES.map { |template| format(template, event: @event) } +
-      @keywords.map { |keyword| "#{@event} #{keyword}" }
+    EventResearch::QueryBuilder.new(event: @event, keywords: @keywords).queries
   end
 
   def discover_event

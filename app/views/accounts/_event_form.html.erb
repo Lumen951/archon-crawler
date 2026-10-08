@@ -1,3 +1,5 @@
+<% search_queries = event_search_queries(@account.nickname.presence || "活动名称", keywords: @account.keywords) %>
+<% preview_uses_placeholder = @account.nickname.blank? %>
 <%# 活动研究账号共用表单：form_url / form_method / submit_label 由调用方传入 %>
 <%= form_with url: form_url, method: form_method, scope: :event_account, local: true do |f| %>
   <div class="space-y-4">
@@ -6,7 +8,7 @@
       <%= f.text_field :name, value: @account.nickname, required: true,
             placeholder: "例如：科创中国创新创业投资大会",
             class: "w-full px-4 py-3 border border-border-primary rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent" %>
-      <p class="mt-2 text-sm text-text-secondary">调研的检索主体，会按它生成获奖名单、获奖项目等固定搜索词。</p>
+      <p class="mt-2 text-sm text-text-secondary">调研的检索主体；系统会基于它执行下方列出的 13 条固定搜索组合。</p>
     </div>
 
     <div>
@@ -22,7 +24,38 @@
       <%= f.text_area :keywords, value: @account.keywords.join("\n"), rows: 4,
             placeholder: "例如：\n获奖名单\n决赛\n路演",
             class: "w-full px-4 py-3 border border-border-primary rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent" %>
-      <p class="mt-2 text-sm text-text-secondary">在固定搜索词之外追加的搜索组合（「活动名 + 关键词」）。</p>
+      <p class="mt-2 text-sm text-text-secondary">不会替换固定搜索组合；每项会额外执行一条「活动名 + 关键词」搜索。</p>
+    </div>
+
+    <div class="rounded-lg border border-border-primary bg-bg-secondary p-4">
+      <h3 class="text-sm font-semibold text-text-primary">本配置将执行的搜索组合</h3>
+      <% if preview_uses_placeholder %>
+        <p class="mt-1 text-xs text-text-secondary">请填写活动名称后保存；以下先以「活动名称」展示固定组合的格式。</p>
+      <% else %>
+        <p class="mt-1 text-xs text-text-secondary">以下内容基于当前已保存的活动名称和追加关键词生成；修改输入框后，保存并重新打开页面即可查看更新后的组合。</p>
+      <% end %>
+
+      <div class="mt-3">
+        <p class="text-xs font-medium text-text-secondary">固定搜索组合（13 条）</p>
+        <div class="mt-1.5 flex flex-wrap gap-1.5">
+          <% search_queries.fixed_queries.each do |query| %>
+            <span class="rounded bg-white px-2 py-1 text-xs text-text-primary border border-border-primary"><%= query %></span>
+          <% end %>
+        </div>
+      </div>
+
+      <div class="mt-3">
+        <p class="text-xs font-medium text-text-secondary">追加搜索组合</p>
+        <% if search_queries.appended_queries.any? %>
+          <div class="mt-1.5 flex flex-wrap gap-1.5">
+            <% search_queries.appended_queries.each do |query| %>
+              <span class="rounded bg-amber-50 px-2 py-1 text-xs text-amber-700"><%= query %></span>
+            <% end %>
+          </div>
+        <% else %>
+          <p class="mt-1 text-xs text-text-secondary">未配置追加关键词，不会执行额外搜索。</p>
+        <% end %>
+      </div>
     </div>
 
     <div>

@@ -3,4 +3,8 @@ module ApplicationHelper
   def nav_active?(*paths)
     paths.any? { |p| request.path == p || request.path.start_with?("#{p}/") }
   end
+
+  def event_search_queries(event, keywords: [])
+    EventResearch::QueryBuilder.new(event: event, keywords: keywords)
+  end
 end
