@@ -24,7 +24,7 @@ module Tools
     end
 
     test "returns matching articles with account info" do
-      response = Tools::SearchArticlesTool.call(server_context: {}, keyword: "爬虫")
+      response = Tools::SearchArticlesTool.call(server_context: {}, keyword: "爬虫调度")
       assert_not response.error?
 
       data = JSON.parse(response.content.first[:text])
@@ -37,17 +37,63 @@ module Tools
       assert_equal "Test Account", entry["account"]["nickname"]
       assert_equal "wechat", entry["account"]["platform"]
       assert_equal @matched.url, entry["url"]
-      assert_equal "爬虫", data["keyword"]
+      assert_equal "爬虫调度", data["keyword"]
+    end
+
+    # A term below the trigram minimum cannot use the GIN indexes, so the tool
+    # caps its scan (Article.with_search_timeout) rather than refusing it. A scan
+    # that runs past the cap comes back as a tool error with the reason.
+    test "reports a short keyword whose scan was cut off" do
+      stub_class_method(Article, :with_search_timeout, ->(*) { nil }) do
+        response = Tools::SearchArticlesTool.call(server_context: {}, keyword: "甄劢")
+
+        assert response.error?
+        assert_includes response.content.first[:text], "甄劢"
+        assert_includes response.content.first[:text], "超时"
+      end
+    end
+
+    test "searches a short keyword when the scan finishes in time" do
+      short_match = @account.articles.create!(
+        title: "教育行业观察",
+        url: "https://example.com/mcp-search-short-#{SecureRandom.hex(8)}",
+        published_at: 2.days.ago
+      )
+
+      queries = []
+      subscriber = ActiveSupport::Notifications.subscribe("sql.active_record") do |*, payload|
+        queries << payload[:sql].to_s if payload[:sql].to_s.match?(/ILIKE/i)
+      end
+      response = Tools::SearchArticlesTool.call(server_context: {}, keyword: "教育")
+      ActiveSupport::Notifications.unsubscribe(subscriber)
+
+      assert_not response.error?
+      assert_not_empty queries, "expected the short keyword to be searched, not refused"
+      assert_includes JSON.parse(response.content.first[:text])["articles"].map { |a| a["id"] }, short_match.id
+    end
+
+    test "accepts a keyword of exactly 3 characters" do
+      response = Tools::SearchArticlesTool.call(server_context: {}, keyword: "爬虫调")
+      assert_not response.error?
+    end
+
+    test "caps a keyword with one short term among long ones" do
+      stub_class_method(Article, :with_search_timeout, ->(*) { nil }) do
+        response = Tools::SearchArticlesTool.call(server_context: {}, keyword: "人工智能 甄劢")
+
+        assert response.error?
+        assert_includes response.content.first[:text], "甄劢"
+      end
     end
 
     test "filters by platform" do
-      response = Tools::SearchArticlesTool.call(server_context: {}, keyword: "爬虫", platform: "twitter")
+      response = Tools::SearchArticlesTool.call(server_context: {}, keyword: "爬虫调度", platform: "twitter")
       assert_not response.error?
       assert_empty JSON.parse(response.content.first[:text])["articles"]
     end
 
     test "rejects unknown platform" do
-      response = Tools::SearchArticlesTool.call(server_context: {}, keyword: "爬虫", platform: "facebook")
+      response = Tools::SearchArticlesTool.call(server_context: {}, keyword: "爬虫调度", platform: "facebook")
       assert response.error?
       assert_includes response.content.first[:text], "不支持的平台"
     end
@@ -58,7 +104,7 @@ module Tools
     end
 
     test "rejects invalid date" do
-      response = Tools::SearchArticlesTool.call(server_context: {}, keyword: "爬虫", start_date: "not-a-date")
+      response = Tools::SearchArticlesTool.call(server_context: {}, keyword: "爬虫调度", start_date: "not-a-date")
       assert response.error?
       assert_includes response.content.first[:text], "start_date 格式无效"
     end

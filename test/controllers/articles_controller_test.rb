@@ -124,6 +124,78 @@ class ArticlesControllerTest < ActionDispatch::IntegrationTest
     assert_select "a[href=?]", article_path(@article)
   end
 
+  # A term shorter than three characters yields no trigram, so it cannot use the
+  # GIN indexes and its scan is capped rather than refused. A high-frequency
+  # term reaches its LIMIT long before the cap and is searched normally; only a
+  # scan that runs past it is interrupted, and the page says so.
+  test "articles index runs a short keyword that finishes in time" do
+    short_match = @account.articles.create!(
+      title: "教育行业观察",
+      url: "https://example.com/short-#{SecureRandom.hex(4)}",
+      published_at: 1.day.ago
+    )
+
+    queries = search_queries { get articles_path, params: { keyword: "教育" } }
+
+    assert_response :success
+    assert_not_empty queries, "expected the short keyword to be searched, not refused"
+    assert_select "a[href=?]", article_path(short_match)
+    assert_select "p", text: /超时/, count: 0
+  end
+
+  test "articles index explains a short keyword whose scan was cut off" do
+    stub_class_method(Article, :with_search_timeout, ->(*) { nil }) do
+      get articles_path, params: { keyword: "甄劢" }
+    end
+
+    assert_response :success
+    assert_select "p", text: /关键词「甄劢」/
+    assert_select "p", text: /超时/
+    assert_select "a[href=?]", article_path(@article), count: 0
+  end
+
+  test "account page runs a short keyword that finishes in time" do
+    short_match = @account.articles.create!(
+      title: "教育行业观察",
+      url: "https://example.com/short-account-#{SecureRandom.hex(4)}",
+      published_at: 1.day.ago
+    )
+
+    get account_path(@account), params: { keyword: "教育" }
+
+    assert_response :success
+    assert_select "a[href=?]", article_path(short_match)
+  end
+
+  test "account page explains a short keyword whose scan was cut off" do
+    stub_class_method(Article, :with_search_timeout, ->(*) { nil }) do
+      get account_path(@account), params: { keyword: "甄劢" }
+    end
+
+    assert_response :success
+    assert_select "p", text: /关键词「甄劢」/
+    assert_select "p", text: /超时/
+  end
+
+  test "articles index accepts a keyword of exactly 3 characters" do
+    get articles_path, params: { keyword: "Art" }
+    assert_response :success
+    assert_select "a[href=?]", article_path(@article)
+  end
+
+  # One short term is enough to keep the indexes out of the query — the long
+  # term's bitmap just feeds candidates into the short term's per-row filter —
+  # so the whole keyword runs under the cap rather than being refused.
+  test "articles index caps a keyword with one short term among long ones" do
+    stub_class_method(Article, :with_search_timeout, ->(*) { nil }) do
+      get articles_path, params: { keyword: "人工智能 甄劢" }
+    end
+
+    assert_response :success
+    assert_select "p", text: /甄劢/
+    assert_select "p", text: /超时/
+  end
+
   # Kaminari's SELECT COUNT(*) has no LIMIT, so it cannot use the published_at
   # ordering index and has to evaluate the trigram OR over every article —
   # 16-28s on production. The index page now paginates with #without_count,
@@ -182,6 +254,20 @@ class ArticlesControllerTest < ActionDispatch::IntegrationTest
   end
 
   private
+
+  # The ILIKE statements issued while the block runs, so a test can tell a
+  # keyword that was actually searched from one whose search never started.
+  def search_queries
+    found = []
+    subscriber = ActiveSupport::Notifications.subscribe("sql.active_record") do |*, payload|
+      sql = payload[:sql].to_s
+      found << sql if payload[:name] != "SCHEMA" && sql.match?(/ILIKE/i)
+    end
+    yield
+    found
+  ensure
+    ActiveSupport::Notifications.unsubscribe(subscriber)
+  end
 
   # The SQL issued while the block runs, filtered to COUNT queries.
   def count_queries

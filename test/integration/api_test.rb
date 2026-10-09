@@ -303,7 +303,7 @@ class ApiTest < ActionDispatch::IntegrationTest
     json = JSON.parse(response.body)
 
     assert json["articles"].length > 0
-    assert json["pagination"]["total_count"] > 0
+    assert json["pagination"].key?("has_next_page")
     assert json["pagination"]["page"] == 1
 
     # Verify article structure
@@ -340,8 +340,7 @@ class ApiTest < ActionDispatch::IntegrationTest
     json = JSON.parse(response.body)
 
     assert_empty json["articles"]
-    assert_equal 0, json["pagination"]["total_count"]
-    assert_equal 0, json["pagination"]["total_pages"]
+    assert_equal false, json["pagination"]["has_next_page"]
   end
 
   test "GET /articles - success with platform filter" do
@@ -399,8 +398,8 @@ class ApiTest < ActionDispatch::IntegrationTest
 
     assert_equal 1, json["articles"].length
     assert_equal 1, json["pagination"]["per_page"]
-    assert json["pagination"]["total_count"] > 1
-    assert json["pagination"]["total_pages"] > 1
+    # More than one page of matches, reported without running a COUNT.
+    assert json["pagination"]["has_next_page"]
   end
 
   test "GET /articles - keyword search in account mode" do
@@ -520,6 +519,62 @@ class ApiTest < ActionDispatch::IntegrationTest
 
     assert_response :bad_request
     assert_includes JSON.parse(response.body)["error"], "不支持的平台"
+  end
+
+  # A term shorter than three characters yields no trigram, so it cannot use the
+  # GIN indexes and its scan is capped (Article.with_search_timeout) instead of
+  # being refused. A scan that runs past the cap is reported as 408 with the
+  # reason — not an empty 200, which would read as "no such article".
+  test "GET /articles - reports a short keyword whose scan was cut off in every mode" do
+    group = @user.groups.create!(ref_key: "short-keyword-group")
+    group.group_accounts.create!(account: @wechat_account)
+
+    modes = {
+      account: { account_id: @wechat_account.id, keyword: "甄劢" },
+      keyword: { keyword: "甄劢" },
+      group: {
+        group_ref_keys: [ "short-keyword-group" ],
+        start_date: 1.week.ago.to_date.to_s,
+        end_date: Date.today.to_s,
+        keyword: "甄劢"
+      }
+    }
+
+    stub_class_method(Article, :with_search_timeout, ->(*) { nil }) do
+      modes.each do |mode, params|
+        get "/api/v1/articles", params: params, headers: auth_headers
+
+        assert_response :request_timeout, "#{mode} mode hid a cut-off search"
+        assert_includes JSON.parse(response.body)["error"], "甄劢"
+      end
+    end
+  end
+
+  test "GET /articles - runs a short keyword when the scan finishes in time" do
+    # 招生 is two characters — below the trigram minimum — but it matches enough
+    # articles to reach the LIMIT long before the cap.
+    get "/api/v1/articles", params: { keyword: "招生" }, headers: auth_headers
+
+    assert_response :success
+    assert_includes JSON.parse(response.body)["articles"].map { |a| a["title"] }, @article1.title
+  end
+
+  test "GET /articles - caps a keyword with one short term among long ones" do
+    # The long term cannot rescue the short one: its bitmap merely feeds every
+    # candidate into the short term's per-row filter (22.4s measured), so the
+    # whole keyword runs under the cap.
+    stub_class_method(Article, :with_search_timeout, ->(*) { nil }) do
+      get "/api/v1/articles", params: { keyword: "人工智能 甄劢" }, headers: auth_headers
+    end
+
+    assert_response :request_timeout
+    assert_includes JSON.parse(response.body)["error"], "甄劢"
+  end
+
+  test "GET /articles - accepts a keyword of exactly 3 characters" do
+    get "/api/v1/articles", params: { keyword: "招生简" }, headers: auth_headers
+
+    assert_response :success
   end
 
   test "GET /articles - error missing group_ref_keys" do

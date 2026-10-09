@@ -376,7 +376,7 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
           </svg>
           <%= text_field_tag :keyword, params[:keyword],
-                placeholder: "搜索该账号的文章标题、摘要或正文…",
+                placeholder: "搜索该账号的文章标题、摘要或正文…（少于 3 个字符的词可能因超时被中断）",
                 class: "form-input pl-9" %>
         </div>
         <button type="submit"
@@ -389,7 +389,13 @@
       </div>
     <% end %>
 
-    <% if @articles.any? %>
+    <% if @keyword_error %>
+      <%# The search ran but was cut off: a term below the trigram minimum keeps
+          the indexes out of reach, and the scan hit the cap. %>
+      <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
+        <p class="text-sm text-amber-800"><%= @keyword_error %></p>
+      </div>
+    <% elsif @articles.any? %>
       <!-- Desktop Table -->
       <div class="hidden md:block bg-bg-card border border-border-primary rounded-lg overflow-hidden">
         <table class="min-w-full divide-y divide-border-primary">

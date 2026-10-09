@@ -91,8 +91,45 @@ module Tools
 
         assert_equal 3, data["page"]
         assert_equal 10, data[rows_key].length
-        assert_equal 30, data["total_count"]
+        # 30 rows over 3 pages of 10: the article tools say so with
+        # has_next_page, the small event-run table still counts.
+        if tool == "list_event_research_runs"
+          assert_equal 30, data["total_count"]
+        else
+          assert_equal false, data["has_next_page"]
+        end
       end
+    end
+
+    # The article tools paginate a `without_count` relation. That COUNT has no
+    # LIMIT, so it cannot use the published_at index and has to evaluate the
+    # whole trigram OR — 16-28s on production, more than the page query it
+    # accompanies. They report has_next_page instead.
+    test "article tools report has_next_page and never issue a COUNT" do
+      { "list_articles" => -> { ListArticlesTool.call(server_context: {}, account_id: @account.id) },
+        "search_articles" => -> { SearchArticlesTool.call(server_context: {}, keyword: "共同学") } }.each do |tool, call|
+        data = parsed(call.call)
+
+        assert_equal true, data["has_next_page"], tool
+        assert_not data.key?("total_count"), tool
+        assert_not data.key?("total_pages"), tool
+        assert_empty count_queries { call.call }, tool
+      end
+    end
+
+    private
+
+    # The SQL issued while the block runs, filtered to COUNT queries.
+    def count_queries
+      found = []
+      subscriber = ActiveSupport::Notifications.subscribe("sql.active_record") do |*, payload|
+        sql = payload[:sql].to_s
+        found << sql if payload[:name] != "SCHEMA" && sql.match?(/\bCOUNT\s*\(/i)
+      end
+      yield
+      found
+    ensure
+      ActiveSupport::Notifications.unsubscribe(subscriber)
     end
 
     # list_accounts paginates the global account table, so only the echoed

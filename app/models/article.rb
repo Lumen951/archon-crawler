@@ -49,12 +49,86 @@ class Article < ApplicationRecord
   scope :last_month, -> { where("published_at >= ?", 1.month.ago) }
   scope :wechat_missing_content, -> { joins(:account).where(accounts: { type: "WechatAccount" }, content_html: nil) }
 
+  # pg_trgm derives trigrams from runs of three characters, so LIKE/ILIKE on a
+  # shorter term yields no trigram, cannot use the GIN indexes at all, and
+  # degrades to reading every article — detoasting content_markdown, which
+  # 177,233 of 177,266 rows have. A short term AND-ed with an index-usable long
+  # one is no better (22.4s measured): the long term's bitmap merely feeds every
+  # candidate into the short term's per-row filter. `show_trgm` does report
+  # trigrams for a two-character *string* because it pads with spaces, but LIKE
+  # uses the unpadded form, so three characters is a hard floor for the index.
+  #
+  # What such a scan costs depends entirely on how quickly it reaches matches,
+  # because the LIMIT can only stop a scan that is finding rows:
+  #
+  #   教育   2 chars, 36,658 matches    331ms
+  #   甄劢   2 chars,      0 matches   27.8s
+  #   甄劢甲 3 chars,      0 matches     10ms  (index-served)
+  #
+  # Chinese two-character words are the norm, so refusing them outright is a
+  # large hole in the product. Instead the scan is capped (#with_search_timeout):
+  # high-frequency terms answer as usual and the rare ones are cut off with an
+  # explanation. Proper CJK indexing — a 2-gram index such as pg_bigm — is the
+  # real fix, and would make this cap unnecessary.
+  MIN_SEARCH_TERM_LENGTH = 3
+
+  # How long a scan behind a term too short for the indexes may run. Comfortably
+  # above the 331ms a high-frequency term needs, well below the 27.8s a rare one
+  # would take.
+  SEARCH_TIMEOUT_MS = 2_500
+
+  # Terms too short to be served by the trigram indexes, and so the terms that
+  # force #with_search_timeout to cap the scan.
+  def self.short_search_terms(keyword)
+    keyword.to_s.split.select { |term| term.length < MIN_SEARCH_TERM_LENGTH }
+  end
+
+  # The cap in milliseconds. A method rather than the bare constant so tests can
+  # stub it down and exercise the cut-off path without a slow query.
+  def self.search_timeout_ms
+    SEARCH_TIMEOUT_MS
+  end
+
+  # Runs the block under a statement timeout when the keyword cannot use the
+  # trigram indexes, and returns nil if the scan was cut off — callers show
+  # #short_search_timeout_message instead of an empty list. Keywords whose every
+  # term is three characters or longer are index-served and run untouched.
+  #
+  # The block's relation is loaded here, inside the transaction: a lazy relation
+  # would run its query after COMMIT, where SET LOCAL no longer applies.
+  # `requires_new` keeps the cap scoped to this block, and lets a cancelled
+  # statement roll back to its savepoint rather than poison an enclosing
+  # transaction (the test suite runs every test inside one).
+  def self.with_search_timeout(keyword)
+    return yield if short_search_terms(keyword).empty?
+
+    transaction(requires_new: true) do
+      connection.execute("SET LOCAL statement_timeout = #{search_timeout_ms}")
+      result = yield
+      result.load if result.is_a?(ActiveRecord::Relation)
+      result
+    end
+  rescue ActiveRecord::QueryCanceled
+    nil
+  end
+
+  # Why a search came back empty-handed, or nil when the keyword was fine. Kept
+  # here so the web, REST API and MCP surfaces explain it identically.
+  def self.short_search_timeout_message(keyword)
+    short = short_search_terms(keyword).first
+    return nil if short.nil?
+
+    "关键词「#{short}」只有 #{short.length} 个字符，无法使用索引，" \
+      "搜索在 #{format('%.1f', search_timeout_ms / 1000.0)} 秒后超时。" \
+      "请换用至少 #{MIN_SEARCH_TERM_LENGTH} 个字符的关键词。"
+  end
+
   # Fuzzy keyword search over title, digest and content_markdown.
   # Space-separated terms are AND-ed; every term must appear as a substring in
   # at least one of the three columns. Backed by the pg_trgm GIN indexes on all
   # three columns; content_html is never searched (content_markdown is the
-  # canonical body text). Terms shorter than three characters cannot form a
-  # trigram, so those queries fall back to a scan (see the migrations).
+  # canonical body text). Callers must run the query inside
+  # #with_search_timeout — see the note above it for why.
   def self.search_keyword(keyword)
     terms = keyword.to_s.split.reject(&:blank?)
     return all if terms.empty?

@@ -26,7 +26,16 @@ class AccountsController < ApplicationController
     # 活动研究账号有独立的研究控制台，不进文章账号的 show 页
     redirect_to event_account_path(@account) and return if @account.event?
 
-    @articles = @account.articles.recent.search_keyword(params[:keyword]).page(params[:page]).per(25)
+    # A too-short keyword cannot use the trigram indexes, so the scan behind it
+    # is capped; nil means it was cut off. See Article.with_search_timeout.
+    @articles = Article.with_search_timeout(params[:keyword]) do
+      @account.articles.recent.search_keyword(params[:keyword]).page(params[:page]).per(25)
+    end
+
+    if @articles.nil?
+      @keyword_error = Article.short_search_timeout_message(params[:keyword])
+      @articles = @account.articles.none.page(params[:page]).per(25)
+    end
     if @account.website?
       @monitor_pages = @account.monitor_pages.ordered.limit(20)
       @monitor_changes = @account.monitor_changes.recent.limit(10)

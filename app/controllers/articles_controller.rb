@@ -25,10 +25,20 @@ class ArticlesController < ApplicationController
     # decide whether a next page exists, so the view paginates with
     # #next_page/#prev_page rather than the `paginate` helper (which needs
     # total_count, and raises on a without_count relation).
-    @articles = scope.search_keyword(params[:keyword])
-                    .page(params[:page])
-                    .per(ARTICLES_PER_PAGE)
-                    .without_count
+    @articles = Article.with_search_timeout(params[:keyword]) do
+      scope.search_keyword(params[:keyword])
+           .page(params[:page])
+           .per(ARTICLES_PER_PAGE)
+           .without_count
+    end
+
+    # A nil relation means the scan behind a term too short for the trigram
+    # indexes was cut off (#with_search_timeout); the view explains instead of
+    # showing an empty result, which would read as "no such article".
+    if @articles.nil?
+      @keyword_error = Article.short_search_timeout_message(params[:keyword])
+      @articles = Article.none.page(params[:page]).per(ARTICLES_PER_PAGE).without_count
+    end
   end
 
   def show

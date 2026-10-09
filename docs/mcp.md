@@ -209,14 +209,14 @@ curl -X POST https://<your-host>/oauth/token \
 | Name | Required | Description |
 |------|----------|-------------|
 | `account_id` | ✅ | 账号 ID |
-| `keyword` | optional | 关键词模糊搜索，匹配标题、摘要或正文，多个词用空格分隔（AND 语义） |
+| `keyword` | optional | 关键词模糊搜索，匹配标题、摘要或正文，多个词用空格分隔（AND 语义）；少于 3 个字符的词用不上索引，查询超过 2.5 秒会被中断并返回提示 |
 | `start_date` | optional | 起始日期（YYYY-MM-DD） |
 | `end_date` | optional | 结束日期（YYYY-MM-DD） |
 | `fields` | optional | 只返回指定字段（`id` / `title` / `url` / `published_at` / `digest` / `content`），不传则返回除 content 外的全部字段 |
 | `page` | optional | 页码（默认 1） |
 | `per_page` | optional | 每页数量（默认 25，最小 1，最大 100） |
 
-**Returns:** 文章列表，包含 id、title、url、published_at、digest、content（完整正文 Markdown，需在 `fields` 中显式请求；无正文时为 null）。
+**Returns:** 文章列表，包含 id、title、url、published_at、digest、content（完整正文 Markdown，需在 `fields` 中显式请求；无正文时为 null），以及分页字段 `page`、`per_page`、`has_next_page`（不返回 `total_count`/`total_pages`：该 COUNT 无 LIMIT，无法走索引，会退化为全表扫描）。
 
 ---
 
@@ -227,7 +227,7 @@ curl -X POST https://<your-host>/oauth/token \
 **Parameters:**
 | Name | Required | Description |
 |------|----------|-------------|
-| `keyword` | ✅ | 搜索关键词，匹配标题、摘要或正文，多个词用空格分隔（AND 语义） |
+| `keyword` | ✅ | 搜索关键词，匹配标题、摘要或正文，多个词用空格分隔（AND 语义）；少于 3 个字符的词用不上索引，查询超过 2.5 秒会被中断并返回提示 |
 | `platform` | optional | `wechat` / `rednote` / `twitter` / `website` |
 | `start_date` | optional | 起始日期（YYYY-MM-DD） |
 | `end_date` | optional | 结束日期（YYYY-MM-DD） |
@@ -235,7 +235,7 @@ curl -X POST https://<your-host>/oauth/token \
 | `page` | optional | 页码（默认 1） |
 | `per_page` | optional | 每页数量（默认 25，最小 1，最大 100） |
 
-**Returns:** `keyword` 与文章列表，每篇文章除 `list_articles` 的字段外还带 `account`（id、fakeid、nickname、platform）。
+**Returns:** `keyword` 与文章列表，每篇文章除 `list_articles` 的字段外还带 `account`（id、fakeid、nickname、platform）；分页字段同 `list_articles`（`has_next_page`，无 `total_count`）。
 
 ---
 

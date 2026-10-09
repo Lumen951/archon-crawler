@@ -17,7 +17,7 @@
         <svg class="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
         </svg>
-        <%= text_field_tag :keyword, params[:keyword], placeholder: "搜索标题、摘要或正文…（多个词用空格分隔）", class: "w-full h-9 pl-9 pr-3 rounded-md border border-border-primary bg-bg-card text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand transition" %>
+        <%= text_field_tag :keyword, params[:keyword], placeholder: "搜索标题、摘要或正文…（多个词用空格分隔；少于 3 个字符的词可能因超时被中断）", class: "w-full h-9 pl-9 pr-3 rounded-md border border-border-primary bg-bg-card text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand transition" %>
       </div>
       <%= select_tag :platform, options_for_select([["全部平台", ""], ["微信公众号", "wechat"], ["小红书", "rednote"], ["Twitter", "twitter"], ["网站", "website"]], params[:platform]), class: "h-9 px-3 rounded-md border border-border-primary bg-bg-card text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand transition", data: { controller: "auto-submit" } %>
       <button type="submit" class="btn btn-primary">
@@ -27,7 +27,13 @@
     </div>
   <% end %>
 
-  <% if @articles.any? %>
+  <% if @keyword_error %>
+    <%# The search ran but was cut off: a term below the trigram minimum keeps
+        the indexes out of reach, and the scan hit the cap. %>
+    <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
+      <p class="text-sm text-amber-800"><%= @keyword_error %></p>
+    </div>
+  <% elsif @articles.any? %>
     <div class="space-y-3">
       <%= render partial: "articles/card", collection: @articles, as: :article %>
     </div>

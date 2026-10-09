@@ -105,7 +105,35 @@ class ApiPerPageTest < ActionDispatch::IntegrationTest
 
     assert_equal 2, json["pagination"]["page"]
     assert_equal 10, json["articles"].length
-    assert_equal 60, json["pagination"]["total_count"]
+    assert json["pagination"]["has_next_page"]
     assert_empty json["articles"].map { |a| a["id"] } & first_page["articles"].map { |a| a["id"] }
+  end
+
+  # Kaminari's SELECT COUNT(*) has no LIMIT, so it cannot use the published_at
+  # index and has to evaluate the whole trigram OR — 16-28s on production, more
+  # than the page query it accompanies. All three modes now skip it and report
+  # has_next_page from the extra row Kaminari fetches instead.
+  test "no mode issues a COUNT query" do
+    %i[group account keyword].each do |mode|
+      queries = count_queries { get "/api/v1/articles", params: article_params(mode), headers: auth_headers }
+
+      assert_response :success
+      assert_empty queries, "#{mode} mode ran a COUNT"
+      assert JSON.parse(response.body)["pagination"].key?("has_next_page")
+    end
+  end
+
+  private
+
+  def count_queries
+    found = []
+    subscriber = ActiveSupport::Notifications.subscribe("sql.active_record") do |*, payload|
+      sql = payload[:sql].to_s
+      found << sql if payload[:name] != "SCHEMA" && sql.match?(/\bCOUNT\s*\(/i)
+    end
+    yield
+    found
+  ensure
+    ActiveSupport::Notifications.unsubscribe(subscriber)
   end
 end

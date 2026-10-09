@@ -145,4 +145,111 @@ class ArticleTest < ActiveSupport::TestCase
     assert_equal Article.count, Article.search_keyword(nil).count
     assert_equal Article.count, Article.search_keyword("   ").count
   end
+
+  # search_keyword itself stays a pure SQL builder — the model's own tests above
+  # call it with two-character terms. The cap lives in with_search_timeout, which
+  # callers wrap around it.
+  test "short_search_terms lists every term below the trigram minimum" do
+    assert_equal [], Article.short_search_terms("爬虫调度")
+    assert_equal [], Article.short_search_terms("爬虫调")
+    assert_equal [], Article.short_search_terms(nil)
+    assert_equal [], Article.short_search_terms("")
+
+    assert_equal [ "甄劢" ], Article.short_search_terms("甄劢")
+    assert_equal [ "a" ], Article.short_search_terms("a 爬虫调度")
+    assert_equal [ "ab", "甄劢" ], Article.short_search_terms("ab 甄劢 爬虫调度")
+  end
+
+  test "short_search_timeout_message names the first short term or is nil" do
+    assert_nil Article.short_search_timeout_message("爬虫调度")
+    assert_nil Article.short_search_timeout_message(nil)
+
+    message = Article.short_search_timeout_message("ab 甄劢")
+    assert_includes message, "「ab」"
+    assert_includes message, Article::MIN_SEARCH_TERM_LENGTH.to_s
+    assert_includes message, (Article::SEARCH_TIMEOUT_MS / 1000.0).to_s
+  end
+
+  # The common case has to keep working: a two-character word that matches plenty
+  # of articles (教育 matched 36,658 of them in 331ms on production) reaches its
+  # LIMIT long before the cap, so the caller sees rows, not nil.
+  test "with_search_timeout returns matches for a short term that finishes in time" do
+    matched = @account.articles.create!(
+      title: "教育行业观察",
+      url: "https://example.com/search-short-#{SecureRandom.hex(8)}",
+      published_at: 9.days.ago
+    )
+
+    results = Article.with_search_timeout("教育") do
+      Article.search_keyword("教育").page(1).per(25).without_count
+    end
+
+    assert_includes results, matched
+  end
+
+  # The relation is loaded inside the transaction, so the block can return one
+  # lazily — a relation left unloaded would run after COMMIT, where SET LOCAL no
+  # longer applies. `requires_new` keeps the cancelled statement inside its own
+  # savepoint, so an enclosing transaction (the test suite wraps each test in
+  # one) survives and the connection stays usable.
+  test "with_search_timeout returns nil when the scan is cut off" do
+    stub_class_method(Article, :search_timeout_ms, -> { 20 }) do
+      result = Article.with_search_timeout("甄劢") do
+        Article.connection.execute("SELECT pg_sleep(0.5)")
+      end
+
+      assert_nil result
+
+      # The shape callers actually use: a lazy relation, loaded by
+      # with_search_timeout rather than by them.
+      slow_relation = Article.from("(SELECT pg_sleep(0.5)) AS articles").page(1).per(25).without_count
+      assert_nil Article.with_search_timeout("甄劢") { slow_relation }
+    end
+
+    assert_equal 1, Article.connection.select_value("SELECT 1")
+  end
+
+  # The cap is for short terms only. A keyword every term of which can use the
+  # indexes must not be touched, or the 2.5s ceiling would apply to ordinary
+  # searches too.
+  test "with_search_timeout leaves index-served keywords uncapped" do
+    stub_class_method(Article, :search_timeout_ms, -> { 20 }) do
+      result = Article.with_search_timeout("爬虫调度") do
+        Article.connection.execute("SELECT pg_sleep(0.5)")
+      end
+
+      assert_not_nil result
+    end
+  end
+
+  # A blank keyword has no terms at all, so nothing to cap and nothing to search.
+  test "with_search_timeout yields for a blank keyword" do
+    assert_equal :ran, Article.with_search_timeout(nil) { :ran }
+  end
+
+  # The cap is only as good as its coverage: one call site outside
+  # with_search_timeout silently reintroduces the ~28s scan. Fail here rather
+  # than in production. Bodies are split per method so a file-level mention of
+  # the cap (its own definition, in the model) cannot vouch for a method that
+  # never applies it.
+  test "every caller of search_keyword runs it under with_search_timeout" do
+    root = Rails.root.to_s
+    files = Dir.glob(File.join(root, "{app,lib}/**/*.rb")).select do |path|
+      File.read(path).match?(/\.search_keyword\b/)
+    end
+
+    assert_not_empty files, "expected to find search_keyword call sites"
+
+    uncapped = files.flat_map { |path|
+      File.read(path).split(/^\s*def /).filter_map { |body|
+        next unless body.match?(/\.search_keyword\b/)
+        next if body.start_with?("self.search_keyword") # the definition, not a call
+        next if body.include?("with_search_timeout")
+
+        "#{path.sub("#{root}/", "")}##{body[/\A(?:self\.)?([a-z_?!]+)/, 1]}"
+      }
+    }
+
+    assert_empty uncapped, "these call search_keyword without capping the scan"
+  end
 end

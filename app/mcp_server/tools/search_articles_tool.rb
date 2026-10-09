@@ -15,7 +15,7 @@ module Tools
 
     input_schema(
       properties: {
-        keyword: { type: "string", description: "搜索关键词，匹配标题、摘要或正文，多个词用空格分隔（AND 语义）" },
+        keyword: { type: "string", description: "搜索关键词，匹配标题、摘要或正文，多个词用空格分隔（AND 语义）；少于 3 个字符的词用不上索引，查询超过 #{Article::SEARCH_TIMEOUT_MS / 1000.0} 秒会被中断并返回提示" },
         platform: { type: "string", enum: PLATFORM_ACCOUNT_TYPES.keys, description: "平台过滤（可选）" },
         start_date: { type: "string", description: "起始日期（YYYY-MM-DD）" },
         end_date: { type: "string", description: "结束日期（YYYY-MM-DD）" },
@@ -77,14 +77,27 @@ module Tools
       requested_fields = fields&.map { |f| f.to_s.to_sym }
       want_content = requested_fields&.include?(:content)
 
-      articles = scope.includes(:account).page(page).per(per_page)
+      articles = Article.with_search_timeout(keyword) do
+        scope.includes(:account).page(page).per(per_page).without_count
+      end
+
+      # A term too short for the trigram indexes made the scan run past the cap.
+      if articles.nil?
+        return MCP::Tool::Response.new(
+          [ { type: "text", text: Article.short_search_timeout_message(keyword) } ],
+          error: true
+        )
+      end
 
       result = {
         keyword: keyword,
-        total_count: articles.total_count,
         page: articles.current_page,
         per_page: articles.limit_value,
-        total_pages: articles.total_pages,
+        # No total_count/total_pages: that COUNT has no LIMIT, cannot use the
+        # ordering index, and must evaluate the whole trigram OR (16-28s on
+        # production). Kaminari instead fetches one extra row on a
+        # `without_count` relation, which is what #next_page reads.
+        has_next_page: articles.next_page.present?,
         articles: articles.map { |a|
           full = {
             id: a.id,

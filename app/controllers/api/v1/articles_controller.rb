@@ -50,7 +50,10 @@ module Api
           end
         end
 
-        articles = scope.page(page).per(per_page)
+        articles = Article.with_search_timeout(params[:keyword]) do
+          scope.page(page).per(per_page).without_count
+        end
+        return render_search_timeout if articles.nil?
 
         render json: {
           account: {
@@ -69,12 +72,7 @@ module Api
               published_at: article.published_at&.iso8601
             }
           },
-          pagination: {
-            page: articles.current_page,
-            per_page: articles.limit_value,
-            total_count: articles.total_count,
-            total_pages: articles.total_pages
-          }
+          pagination: pagination_json(articles)
         }
       end
 
@@ -82,6 +80,7 @@ module Api
       # account or group, mirroring the MCP search_articles tool.
       def index_by_keyword
         page, per_page = pagination_params
+
         scope = Article.order(published_at: :desc).search_keyword(params[:keyword])
 
         if params[:platform].present?
@@ -109,7 +108,10 @@ module Api
           end
         end
 
-        articles = scope.includes(:account).page(page).per(per_page)
+        articles = Article.with_search_timeout(params[:keyword]) do
+          scope.includes(:account).page(page).per(per_page).without_count
+        end
+        return render_search_timeout if articles.nil?
 
         render json: {
           keyword: params[:keyword],
@@ -129,12 +131,7 @@ module Api
               }
             }
           },
-          pagination: {
-            page: articles.current_page,
-            per_page: articles.limit_value,
-            total_count: articles.total_count,
-            total_pages: articles.total_pages
-          }
+          pagination: pagination_json(articles)
         }
       end
 
@@ -195,14 +192,18 @@ module Api
         articles = articles.search_keyword(params[:keyword])
 
         # Execute query with pagination
-        articles = articles.includes(:account)
-                          .order(published_at: :desc)
-                          .page(page)
-                          .per(per_page)
+        page_of_articles = Article.with_search_timeout(params[:keyword]) do
+          articles.includes(:account)
+                  .order(published_at: :desc)
+                  .page(page)
+                  .per(per_page)
+                  .without_count
+        end
+        return render_search_timeout if page_of_articles.nil?
 
         # Build response
         render json: {
-          articles: articles.map { |article|
+          articles: page_of_articles.map { |article|
             {
               id: article.id,
               title: article.title,
@@ -218,13 +219,31 @@ module Api
               }
             }
           },
-          pagination: {
-            page: articles.current_page,
-            per_page: articles.limit_value,
-            total_count: articles.total_count,
-            total_pages: articles.total_pages
-          }
+          pagination: pagination_json(page_of_articles)
         }
+      end
+
+      # Kaminari's SELECT COUNT(*) has no LIMIT, so it cannot use the ordering
+      # index and has to evaluate the whole trigram OR — 16-28s on production,
+      # more than the page query it accompanies. `.without_count` drops it; the
+      # relation instead fetches one extra row to learn whether a next page
+      # exists, which is what #next_page reads. So the response reports
+      # has_next_page rather than total_count/total_pages.
+      def pagination_json(articles)
+        {
+          page: articles.current_page,
+          per_page: articles.limit_value,
+          has_next_page: articles.next_page.present?
+        }
+      end
+
+      # A keyword with a term below the trigram minimum cannot use the GIN
+      # indexes, so #with_search_timeout capped its scan and the relation came
+      # back nil. 408 rather than an empty 200, which would read as "no such
+      # article". Mirrors #platform_account_type in rendering and returning.
+      def render_search_timeout
+        render json: { error: Article.short_search_timeout_message(params[:keyword]) },
+               status: :request_timeout
       end
 
       def platform_account_type(platform)

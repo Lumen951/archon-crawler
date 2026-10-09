@@ -211,7 +211,7 @@
         ]},
         { name: "list_articles", badge: "查询", desc: "查询某账号的文章列表，支持关键词模糊搜索和日期范围过滤", params: [
           ["account_id", "必填", "账号 ID"],
-          ["keyword", "可选", "关键词模糊搜索标题/摘要/正文，多词空格分隔（AND）"],
+          ["keyword", "可选", "关键词模糊搜索标题/摘要/正文，多词空格分隔（AND）；少于 3 个字符的词查询超过 2.5 秒会被中断"],
           ["start_date", "可选", "起始日期（YYYY-MM-DD）"],
           ["end_date", "可选", "结束日期（YYYY-MM-DD）"],
           ["fields", "可选", "只返回指定字段（如 id、title、url、published_at、digest、content）"],
@@ -219,7 +219,7 @@
           ["per_page", "可选", "每页数量，默认 25，最小 1，最大 100"],
         ]},
         { name: "search_articles", badge: "查询", desc: "跨账号全局搜索文章，按关键词模糊匹配标题、摘要和正文", params: [
-          ["keyword", "必填", "搜索关键词，多词空格分隔（AND 语义）"],
+          ["keyword", "必填", "搜索关键词，多词空格分隔（AND 语义）；少于 3 个字符的词查询超过 2.5 秒会被中断"],
           ["platform", "可选", "wechat / rednote / twitter / website"],
           ["start_date", "可选", "起始日期（YYYY-MM-DD）"],
           ["end_date", "可选", "结束日期（YYYY-MM-DD）"],

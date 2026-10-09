@@ -137,8 +137,8 @@ class ApiDocsController < ApplicationController
           tags: ["Articles"],
           security: [{ BearerAuth: [] }],
           parameters: [
-            { name: "account_id", in: "query", required: false, schema: { type: "integer" }, description: "账号模式：按单个账号查询；可搭配 keyword、start_date、end_date" },
-            { name: "keyword", in: "query", required: false, schema: { type: "string" }, description: "全局搜索模式必填：未传 account_id 或 group_ref_keys 时按标题、摘要和正文全局模糊搜索；多个词用空格分隔（AND 语义）" },
+            { name: "account_id", in: "query", required: false, schema: { type: "integer" }, description: "账号模式：按单个账号查询；可搭配 keyword（少于 3 个字符的词查询超过 2.5 秒会被中断）、start_date、end_date" },
+            { name: "keyword", in: "query", required: false, schema: { type: "string" }, description: "全局搜索模式必填：未传 account_id 或 group_ref_keys 时按标题、摘要和正文全局模糊搜索；多个词用空格分隔（AND 语义）；少于 3 个字符的词用不上索引，查询超过 2.5 秒会被中断" },
             { name: "platform", in: "query", required: false, schema: { type: "string", enum: %w[wechat rednote twitter website] }, description: "全局搜索模式可选：按平台过滤" },
             { name: "start_date", in: "query", required: false, schema: { type: "string", format: "date" }, description: "账号或全局搜索模式可选；分组模式必填：起始日期（YYYY-MM-DD）" },
             { name: "end_date", in: "query", required: false, schema: { type: "string", format: "date" }, description: "账号或全局搜索模式可选；分组模式必填：结束日期（YYYY-MM-DD）" },
@@ -146,7 +146,11 @@ class ApiDocsController < ApplicationController
             { name: "page", in: "query", required: false, schema: { type: "integer", default: 1, minimum: 1 }, description: "可选：页码，默认 1" },
             { name: "per_page", in: "query", required: false, schema: { type: "integer", default: 25, minimum: 1, maximum: 100 }, description: "可选：每页数量，默认 25，最大 100" },
           ],
-          responses: { "200" => { description: "成功" } }
+          responses: {
+            "200" => { description: "成功" },
+            "400" => { description: "参数无效（不支持的平台或日期格式错误）" },
+            "408" => { description: "关键词中有短于 3 个字符的词，查询未能在 2.5 秒内完成" }
+          }
         }
       }
     }
@@ -276,7 +280,10 @@ class ApiDocsController < ApplicationController
     }
   end
 
+  # Articles endpoints report has_next_page instead of total_count/total_pages:
+  # that COUNT has no LIMIT, so it cannot use the published_at index and must
+  # evaluate the whole trigram OR (16-28s on production).
   def pagination_schema
-    { "Pagination" => { type: "object", properties: { page: { type: "integer" }, per_page: { type: "integer" }, total_count: { type: "integer" }, total_pages: { type: "integer" } } } }
+    { "Pagination" => { type: "object", properties: { page: { type: "integer" }, per_page: { type: "integer" }, has_next_page: { type: "boolean", description: "是否还有下一页；文章接口不返回 total_count/total_pages" } } } }
   end
 end
