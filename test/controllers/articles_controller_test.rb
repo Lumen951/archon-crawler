@@ -123,4 +123,76 @@ class ArticlesControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "a[href=?]", article_path(@article)
   end
+
+  # Kaminari's SELECT COUNT(*) has no LIMIT, so it cannot use the published_at
+  # ordering index and has to evaluate the trigram OR over every article —
+  # 16-28s on production. The index page now paginates with #without_count,
+  # fetching one extra row instead to decide whether a next page exists.
+  test "articles index issues no COUNT query" do
+    assert_empty count_queries { get articles_path }
+    assert_empty count_queries { get articles_path, params: { keyword: "Article" } }
+    assert_empty count_queries { get articles_path, params: { keyword: "Article", platform: "wechat" } }
+  end
+
+  test "articles index paginates with prev/next links instead of total pages" do
+    30.times do |i|
+      @account.articles.create!(
+        title: "分页文章 #{i}",
+        url: "https://example.com/page-#{i}-#{SecureRandom.hex(4)}",
+        published_at: i.days.ago
+      )
+    end
+
+    get articles_path
+    assert_response :success
+    assert_select "span", text: "第 1 页"
+    assert_select "p", text: "本页 25 篇"
+    assert_select "a", text: "下一页"
+    assert_select "a", text: "上一页", count: 0
+
+    get articles_path, params: { page: 2 }
+    assert_response :success
+    assert_select "span", text: "第 2 页"
+    assert_select "a", text: "上一页"
+    assert_select "a", text: "下一页", count: 0
+  end
+
+  test "articles index keeps filters when paginating" do
+    30.times do |i|
+      @account.articles.create!(
+        title: "筛选分页 #{i}",
+        url: "https://example.com/filter-page-#{i}-#{SecureRandom.hex(4)}",
+        published_at: i.days.ago
+      )
+    end
+
+    get articles_path, params: { keyword: "筛选分页", platform: "wechat" }
+    assert_response :success
+    next_link = css_select("a").find { |a| a.text.strip == "下一页" }
+    assert next_link, "expected a 下一页 link"
+    assert_includes next_link["href"], "keyword="
+    assert_includes next_link["href"], "platform=wechat"
+    assert_includes next_link["href"], "page=2"
+  end
+
+  test "articles index handles a page past the end" do
+    get articles_path, params: { page: 999 }
+    assert_response :success
+    assert_select "p", text: "没有匹配的文章"
+  end
+
+  private
+
+  # The SQL issued while the block runs, filtered to COUNT queries.
+  def count_queries
+    found = []
+    subscriber = ActiveSupport::Notifications.subscribe("sql.active_record") do |*, payload|
+      sql = payload[:sql].to_s
+      found << sql if payload[:name] != "SCHEMA" && sql.match?(/\bCOUNT\s*\(/i)
+    end
+    yield
+    found
+  ensure
+    ActiveSupport::Notifications.unsubscribe(subscriber)
+  end
 end

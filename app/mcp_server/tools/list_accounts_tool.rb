@@ -17,7 +17,7 @@ module Tools
         keyword: { type: "string", description: "按账号名称搜索" },
         fields: { type: "array", items: { type: "string" }, description: "只返回指定字段（可选值：#{AVAILABLE_FIELDS.join('、')}），不传则返回全部字段。用于减少返回数据量。" },
         page: { type: "integer", description: "页码（默认 1）" },
-        per_page: { type: "integer", description: "每页数量（默认 25，最大 100）" },
+        per_page: { type: "integer", description: "每页数量（默认 25，最小 1，最大 100）" },
       }
     )
 
@@ -74,7 +74,9 @@ module Tools
 
       # Pagination
       page = [[page.to_i, 1].max].min
-      per_page = [[per_page.to_i, 25].max, 100].min
+      per_page = per_page.to_i
+      per_page = 25 if per_page < 1
+      per_page = 100 if per_page > 100
 
       # Validate fields
       requested_fields = fields&.map { |f| f.to_s.to_sym }

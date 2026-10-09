@@ -8,6 +8,8 @@ class ArticlesController < ApplicationController
     "website" => "WebsiteAccount"
   }.freeze
 
+  ARTICLES_PER_PAGE = 25
+
   def index
     scope = Article.includes(:account).recent
 
@@ -16,7 +18,17 @@ class ArticlesController < ApplicationController
       scope = account_type ? scope.joins(:account).where(accounts: { type: account_type }) : scope.none
     end
 
-    @articles = scope.search_keyword(params[:keyword]).page(params[:page]).per(25)
+    # `.without_count` drops Kaminari's `SELECT COUNT(*)`. That count has no
+    # LIMIT, so it cannot use the ordering index and has to evaluate the
+    # trigram OR across every article — on production it cost 16-28s, more than
+    # the page query it accompanies. Kaminari instead fetches one extra row to
+    # decide whether a next page exists, so the view paginates with
+    # #next_page/#prev_page rather than the `paginate` helper (which needs
+    # total_count, and raises on a without_count relation).
+    @articles = scope.search_keyword(params[:keyword])
+                    .page(params[:page])
+                    .per(ARTICLES_PER_PAGE)
+                    .without_count
   end
 
   def show

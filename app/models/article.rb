@@ -19,13 +19,14 @@
 #
 # Indexes
 #
-#  index_articles_on_account_id_and_published_at  (account_id,published_at DESC)
-#  index_articles_on_content_markdown_trgm        (content_markdown) USING gin
-#  index_articles_on_crawl_task_id                (crawl_task_id)
-#  index_articles_on_digest_trgm                  (digest) USING gin
-#  index_articles_on_published_at                 (published_at)
-#  index_articles_on_title_trgm                   (title) USING gin
-#  index_articles_on_url                          (url) UNIQUE
+#  index_articles_on_account_id_and_published_at   (account_id,published_at DESC)
+#  index_articles_on_content_markdown_trgm         (content_markdown) USING gin
+#  index_articles_on_crawl_task_id                 (crawl_task_id)
+#  index_articles_on_digest_trgm                   (digest) USING gin
+#  index_articles_on_published_at                  (published_at)
+#  index_articles_on_published_at_desc_nulls_last  (published_at)
+#  index_articles_on_title_trgm                    (title) USING gin
+#  index_articles_on_url                           (url) UNIQUE
 #
 # Foreign Keys
 #

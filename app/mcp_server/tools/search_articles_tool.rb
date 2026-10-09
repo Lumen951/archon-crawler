@@ -21,7 +21,7 @@ module Tools
         end_date: { type: "string", description: "结束日期（YYYY-MM-DD）" },
         fields: { type: "array", items: { type: "string" }, description: "只返回指定文章字段（可选值：#{ARTICLE_FIELDS.join('、')}），不传则返回除 content 外的全部字段。content 较大，仅在需要时传入。" },
         page: { type: "integer", description: "页码（默认 1）" },
-        per_page: { type: "integer", description: "每页数量（默认 25，最大 100）" }
+        per_page: { type: "integer", description: "每页数量（默认 25，最小 1，最大 100）" }
       },
       required: [ "keyword" ]
     )
@@ -70,7 +70,9 @@ module Tools
       end
 
       page = [ [ page.to_i, 1 ].max ].min
-      per_page = [ [ per_page.to_i, 25 ].max, 100 ].min
+      per_page = per_page.to_i
+      per_page = 25 if per_page < 1
+      per_page = 100 if per_page > 100
 
       requested_fields = fields&.map { |f| f.to_s.to_sym }
       want_content = requested_fields&.include?(:content)

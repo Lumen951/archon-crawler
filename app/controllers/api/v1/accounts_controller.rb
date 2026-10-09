@@ -42,8 +42,7 @@ module Api
         end
 
         # Pagination
-        page = [params[:page].to_i, 1].max
-        per_page = [[params[:per_page].to_i, 25].max, 100].min
+        page, per_page = pagination_params
 
         accounts = scope.includes(:tags)
                        .order(activity_score: :desc, nickname: :asc)

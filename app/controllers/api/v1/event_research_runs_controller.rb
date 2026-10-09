@@ -27,8 +27,7 @@ module Api
           end
         end
 
-        page = [ params[:page].to_i, 1 ].max
-        per_page = [ [ params[:per_page].to_i, 25 ].max, 100 ].min
+        page, per_page = pagination_params
         runs = scope.page(page).per(per_page)
 
         render json: {

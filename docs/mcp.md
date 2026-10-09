@@ -178,7 +178,7 @@ curl -X POST https://<your-host>/oauth/token \
 | `tag_id` | optional | 按标签 ID 过滤 |
 | `keyword` | optional | 按账号名称搜索 |
 | `page` | optional | 页码（默认 1） |
-| `per_page` | optional | 每页数量（默认 25，最大 100） |
+| `per_page` | optional | 每页数量（默认 25，最小 1，最大 100） |
 
 **Returns:** 账号列表，包含 id、nickname、platform、status、activity_level、activity_score、total_articles、articles_last_7_days、articles_last_30_days、last_published_at、tags 等字段。
 
@@ -208,7 +208,7 @@ curl -X POST https://<your-host>/oauth/token \
 | `start_date` | optional | 起始日期（YYYY-MM-DD） |
 | `end_date` | optional | 结束日期（YYYY-MM-DD） |
 | `page` | optional | 页码（默认 1） |
-| `per_page` | optional | 每页数量（默认 25，最大 100） |
+| `per_page` | optional | 每页数量（默认 25，最小 1，最大 100） |
 
 **Returns:** 文章列表，包含 id、title、url、published_at、digest、content（完整正文 Markdown；无正文时为 null）。
 

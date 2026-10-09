@@ -10,7 +10,7 @@ module Tools
         status: { type: "string", description: "按状态过滤（可选：pending / running / completed / failed）" },
         latest: { type: "boolean", description: "为 true 时只返回每个账号最近一次成功调研（默认 false）" },
         page: { type: "integer", description: "页码（默认 1）" },
-        per_page: { type: "integer", description: "每页数量（默认 25，最大 100）" }
+        per_page: { type: "integer", description: "每页数量（默认 25，最小 1，最大 100）" }
       },
       required: []
     )
@@ -42,7 +42,9 @@ module Tools
       end
 
       page = [ page.to_i, 1 ].max
-      per_page = [ [ per_page.to_i, 25 ].max, 100 ].min
+      per_page = per_page.to_i
+      per_page = 25 if per_page < 1
+      per_page = 100 if per_page > 100
       runs = scope.page(page).per(per_page)
 
       result = {

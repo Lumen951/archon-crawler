@@ -24,8 +24,7 @@ module Api
       def index_by_account
         account = Account.find(params[:account_id])
 
-        page = [params[:page].to_i, 1].max
-        per_page = [[params[:per_page].to_i, 25].max, 100].min
+        page, per_page = pagination_params
 
         scope = account.articles.order(published_at: :desc)
 
@@ -82,8 +81,7 @@ module Api
       # Mode 3: Global keyword search. This intentionally does not require an
       # account or group, mirroring the MCP search_articles tool.
       def index_by_keyword
-        page = [ params[:page].to_i, 1 ].max
-        per_page = [ [ params[:per_page].to_i, 25 ].max, 100 ].min
+        page, per_page = pagination_params
         scope = Article.order(published_at: :desc).search_keyword(params[:keyword])
 
         if params[:platform].present?
@@ -144,8 +142,7 @@ module Api
       def index_by_group
         group_ref_keys = params[:group_ref_keys] || []
         source = params[:source].to_s.strip.presence
-        page = (params[:page] || 1).to_i
-        per_page = [(params[:per_page] || 25).to_i, 100].min
+        page, per_page = pagination_params
 
         # Validate parameters
         if group_ref_keys.empty?

@@ -194,8 +194,8 @@ class ApiDocsController < ApplicationController
             { name: "account_id", in: "query", schema: { type: "integer" }, description: "按活动账号过滤" },
             { name: "status", in: "query", schema: { type: "string", enum: %w[pending running completed failed] }, description: "按状态过滤" },
             { name: "latest", in: "query", schema: { type: "string", enum: %w[true false] }, description: "只看每个账号最近一次成功调研" },
-            { name: "page", in: "query", schema: { type: "integer", default: 1 } },
-            { name: "per_page", in: "query", schema: { type: "integer", default: 25, maximum: 100 } }
+            { name: "page", in: "query", schema: { type: "integer", default: 1, minimum: 1 }, description: "可选：页码，默认 1" },
+            { name: "per_page", in: "query", schema: { type: "integer", default: 25, minimum: 1, maximum: 100 }, description: "可选：每页数量，默认 25，最大 100" }
           ],
           responses: {
             "200" => {
