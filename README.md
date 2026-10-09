@@ -104,7 +104,7 @@ MP-Crawler 是一个基于 Ruby on Rails 的应用，用于自动抓取微信公
 - 基于用户 `ApiKey`（`has_secure_token`，SHA256 摘要存储）鉴权
 
 ### 11. MCP 服务与 OAuth 授权
-- `/mcp/endpoint`：Streamable HTTP 的 MCP 服务（10 个工具），详见 `docs/mcp.md`
+- `/mcp/endpoint`：Streamable HTTP 的 MCP 服务（13 个工具），详见 `docs/mcp.md`
 - **OAuth 2.1 授权**（推荐）：Claude Code / Codex 等客户端可自行发现并完成授权，用户无需手动粘贴 Token
   - 由 Doorkeeper 充当授权服务器，`McpController` 充当 OAuth 资源服务器
   - 遵循 MCP 授权规范（2026-07-28）：RFC 9728 资源元数据、RFC 8414 授权服务器元数据、RFC 7591 动态客户端注册、RFC 8707 resource 参数与受众校验、PKCE（仅 S256）
@@ -876,7 +876,7 @@ mp-crawler/
 │   │   ├── oauth/ (authorizations, tokens, registrations, device)
 │   │   ├── admin/ (settings, users, tags, analytics)
 │   │   └── api/v1/ (groups, accounts, articles)
-│   ├── mcp_server/tools/            (10 个 MCP 工具)
+│   ├── mcp_server/tools/            (13 个 MCP 工具)
 │   ├── models/
 │   │   ├── account.rb (STI base)
 │   │   ├── wechat_account.rb

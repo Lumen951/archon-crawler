@@ -172,15 +172,16 @@ curl -X POST https://<your-host>/oauth/token \
 **Parameters:**
 | Name | Required | Description |
 |------|----------|-------------|
-| `platform` | optional | `wechat` / `rednote` / `twitter` |
+| `platform` | optional | `wechat` / `rednote` / `twitter` / `website` |
 | `status` | optional | `active` / `inactive` |
 | `activity_level` | optional | `active` / `slow` / `dormant` / `dead` / `never` / `uncrawled` |
 | `tag_id` | optional | 按标签 ID 过滤 |
 | `keyword` | optional | 按账号名称搜索 |
+| `fields` | optional | 只返回指定字段（`id` / `fakeid` / `nickname` / `platform` / `status` / `activity_level` / `activity_score` / `total_articles` / `articles_last_7_days` / `articles_last_30_days` / `last_published_at` / `tags`），不传则返回全部字段 |
 | `page` | optional | 页码（默认 1） |
 | `per_page` | optional | 每页数量（默认 25，最小 1，最大 100） |
 
-**Returns:** 账号列表，包含 id、nickname、platform、status、activity_level、activity_score、total_articles、articles_last_7_days、articles_last_30_days、last_published_at、tags 等字段。
+**Returns:** 账号列表，包含 id、fakeid、nickname、platform、status、activity_level、activity_score、total_articles、articles_last_7_days、articles_last_30_days、last_published_at、tags 等字段。
 
 ---
 
@@ -192,25 +193,49 @@ curl -X POST https://<your-host>/oauth/token \
 | Name | Required | Description |
 |------|----------|-------------|
 | `account_id` | ✅ | 账号 ID |
+| `fields` | optional | 只返回指定字段（在 `list_accounts` 的基础上还有 `last_crawled_at` / `next_crawl_at` / `created_at` / `avatar_url` / `recent_articles`），不传则返回全部字段 |
+| `include_articles` | optional | 是否包含最近文章（默认 true）；设为 false 可大幅减少返回数据量 |
+| `articles_limit` | optional | 最近文章数量（默认 10，最大 20） |
 
-**Returns:** 账号完整信息，包含最近 10 篇文章的 id、title、url、published_at、digest。
+**Returns:** 账号完整信息，包含活动统计、标签，以及最近文章的 id、title、url、published_at、digest。
 
 ---
 
-### `list_articles` — 查询文章
+### `list_articles` — 查询某账号的文章
 
-查询某账号的文章列表，支持日期范围过滤和分页。
+查询某账号的文章列表，支持关键词模糊搜索（标题/摘要/正文）、日期范围过滤和分页。
 
 **Parameters:**
 | Name | Required | Description |
 |------|----------|-------------|
 | `account_id` | ✅ | 账号 ID |
+| `keyword` | optional | 关键词模糊搜索，匹配标题、摘要或正文，多个词用空格分隔（AND 语义） |
 | `start_date` | optional | 起始日期（YYYY-MM-DD） |
 | `end_date` | optional | 结束日期（YYYY-MM-DD） |
+| `fields` | optional | 只返回指定字段（`id` / `title` / `url` / `published_at` / `digest` / `content`），不传则返回除 content 外的全部字段 |
 | `page` | optional | 页码（默认 1） |
 | `per_page` | optional | 每页数量（默认 25，最小 1，最大 100） |
 
-**Returns:** 文章列表，包含 id、title、url、published_at、digest、content（完整正文 Markdown；无正文时为 null）。
+**Returns:** 文章列表，包含 id、title、url、published_at、digest、content（完整正文 Markdown，需在 `fields` 中显式请求；无正文时为 null）。
+
+---
+
+### `search_articles` — 跨账号搜索文章
+
+跨账号全局搜索文章，按关键词模糊匹配标题、摘要和正文。可按平台和日期范围过滤，用于按主题查找文章。
+
+**Parameters:**
+| Name | Required | Description |
+|------|----------|-------------|
+| `keyword` | ✅ | 搜索关键词，匹配标题、摘要或正文，多个词用空格分隔（AND 语义） |
+| `platform` | optional | `wechat` / `rednote` / `twitter` / `website` |
+| `start_date` | optional | 起始日期（YYYY-MM-DD） |
+| `end_date` | optional | 结束日期（YYYY-MM-DD） |
+| `fields` | optional | 同 `list_articles` |
+| `page` | optional | 页码（默认 1） |
+| `per_page` | optional | 每页数量（默认 25，最小 1，最大 100） |
+
+**Returns:** `keyword` 与文章列表，每篇文章除 `list_articles` 的字段外还带 `account`（id、fakeid、nickname、platform）。
 
 ---
 
@@ -257,6 +282,7 @@ curl -X POST https://<your-host>/oauth/token \
 | Name | Required | Description |
 |------|----------|-------------|
 | `keyword` | optional | 按标签名称搜索 |
+| `fields` | optional | 只返回指定字段（`id` / `name` / `color` / `description` / `accounts_count`），不传则返回全部字段 |
 
 **Returns:** 标签列表，包含 id、name、color、description、accounts_count。
 
@@ -269,6 +295,37 @@ curl -X POST https://<your-host>/oauth/token \
 **Parameters:** 无
 
 **Returns:** 各平台的 active/slow/dormant/dead/never/uncrawled 数量分布，以及汇总统计。
+
+---
+
+### `list_event_research_runs` — 查询活动调研运行记录
+
+查询活动调研（Event Research）的运行记录列表：状态、获奖/人物/公司计数、时间与错误信息。配合 `get_event_research_result` 获取完整调研数据。
+
+**Parameters:**
+| Name | Required | Description |
+|------|----------|-------------|
+| `account_id` | optional | 活动账号 ID |
+| `status` | optional | 按状态过滤：`pending` / `running` / `completed` / `failed` |
+| `latest` | optional | 为 true 时只返回每个账号最近一次**成功**调研（默认 false） |
+| `page` | optional | 页码（默认 1） |
+| `per_page` | optional | 每页数量（默认 25，最小 1，最大 100） |
+
+**Returns:** 运行记录列表，每条含 id、account（id、nickname）、status、award_count、people_count、company_count、error_message、started_at、completed_at、created_at。
+
+---
+
+### `get_event_research_result` — 获取活动调研结果
+
+获取一次活动调研的完整结果 JSON（获奖名单、人物教育/任职/联系方式、公司工商档案与来源出处）。传 `run_id` 取指定运行；或传 `account_id` 取该账号最近一次成功调研。
+
+**Parameters:**
+| Name | Required | Description |
+|------|----------|-------------|
+| `run_id` | optional | 调研运行 ID（与 `account_id` 二选一） |
+| `account_id` | optional | 活动账号 ID，取其最近一次成功调研（与 `run_id` 二选一） |
+
+**Returns:** 调研结果 JSON 原样返回。两个参数都不传、找不到记录，或该运行还没有结果（未完成 / 失败）时返回错误。
 
 ---
 
@@ -346,5 +403,5 @@ Agent: 批量操作：活跃账号打标签，停更账号标记为 inactive
 
 - **认证**: Bearer Token 存储为 SHA256 摘要（`ApiKey` 模型）；Device Code 流程符合 RFC 8628
 - **Transport**: Stateless HTTP (StreamableHTTP transport)，无需持久 SSE 会话
-- **MCP gem**: `mcp` gem v0.25.0 (Ruby)
+- **MCP gem**: `mcp` gem v1.3.0 (Ruby)
 - **调用日志**: 每次 tool call 记录到 `mcp_tool_calls` 表（user、tool_name、arguments、status、duration、ip）
