@@ -18,7 +18,7 @@
   </div>
 
   <!-- 筛选面板：标签 / 活跃度 / 搜索合并为一块，减少纵向空间占用 -->
-  <div class="bg-bg-card border border-border-primary rounded-lg p-4">
+  <div class="bg-bg-card border border-border-primary rounded-lg p-4" data-turbo-prefetch="false">
   <% if @tags.any? %>
     <div class="flex flex-wrap gap-2">
         <% q_raw = params[:q] || {}; base_q = q_raw.respond_to?(:to_unsafe_h) ? q_raw.to_unsafe_h.except("with_tag_id") : q_raw.except("with_tag_id") %>

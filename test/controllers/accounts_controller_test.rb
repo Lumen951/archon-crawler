@@ -16,6 +16,46 @@ class AccountsControllerTest < ActionDispatch::IntegrationTest
     }
   end
 
+  test "persists filters only after navigation and not prefetch" do
+    with_memory_cache do
+      selected = { "by_activity_level" => "active" }
+      hovered = { "by_activity_level" => "dead" }
+
+      get accounts_path, params: { q: selected }
+      assert_response :success
+      assert_select "[data-turbo-prefetch='false'] a[href=?]", accounts_path(q: hovered)
+
+      get accounts_path, params: { q: hovered }, headers: { "X-Sec-Purpose" => "prefetch" }
+      assert_response :success
+
+      get accounts_path
+      assert_redirected_to accounts_path(q: selected)
+
+      get accounts_path, params: { q: hovered }
+      assert_response :success
+      get accounts_path
+      assert_redirected_to accounts_path(q: hovered)
+    end
+  end
+
+  test "prefetching reset does not clear saved filters" do
+    with_memory_cache do
+      selected = { "by_activity_level" => "active" }
+      get accounts_path, params: { q: selected }
+      assert_response :success
+
+      get accounts_path, params: { reset: true }, headers: { "X-Sec-Purpose" => "prefetch" }
+      assert_response :success
+      get accounts_path
+      assert_redirected_to accounts_path(q: selected)
+
+      get accounts_path, params: { reset: true }
+      assert_response :success
+      get accounts_path
+      assert_response :success
+    end
+  end
+
   test "imports csv upload and reports invalid rows" do
     file = Rack::Test::UploadedFile.new(
       Rails.root.join("test/fixtures/files/accounts_import.csv"),

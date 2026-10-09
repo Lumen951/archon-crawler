@@ -71,6 +71,6 @@ module QueryPersistenceConcern
   end
 
   def query_persistence_enabled?
-    current_user.present?
+    current_user.present? && request.headers["X-Sec-Purpose"] != "prefetch"
   end
 end
