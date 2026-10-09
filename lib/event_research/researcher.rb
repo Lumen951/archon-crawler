@@ -1,4 +1,5 @@
-require_relative "search_error"
+require_relative "search_api_key_error"
+require_relative "search_api_error"
 
 # 调研主流程。所有外部调用（搜索 / 抓取 / LLM）都经过缓存，中断后重跑即可续上。
 #

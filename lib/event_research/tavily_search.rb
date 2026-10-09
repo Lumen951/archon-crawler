@@ -1,6 +1,7 @@
 require "faraday"
 require "faraday/retry"
-require_relative "search_error"
+require_relative "search_api_key_error"
+require_relative "search_api_error"
 
 # Tavily 搜索。带重试的 Faraday 连接；失败抛 ApiError（密钥问题抛 ApiKeyError）。
 class EventResearch::TavilySearch
