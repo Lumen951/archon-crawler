@@ -157,7 +157,50 @@ class EventResearchTest < ActiveSupport::TestCase
     end
   end
 
-  # --- TianyanchaClient ---------------------------------------------------
+  # --- TavilySearch -------------------------------------------------------
+
+  test "Tavily 搜索结果进缓存，使用 Bearer 认证并归一化 content" do
+    conn, requests = fake_tavily_connection(status: 200, body: {
+      "results" => [
+        { "title" => "标题", "url" => "https://a.com/1", "content" => "正文摘要" },
+        { "title" => "缺 URL", "content" => "应忽略" }
+      ]
+    }.to_json)
+    search = tavily_search(conn)
+
+    first = search.search("关键词", limit: 5)
+    second = search.search("关键词", limit: 5)
+
+    assert_equal [ { "title" => "标题", "url" => "https://a.com/1", "snippet" => "正文摘要" } ], first
+    assert_equal first, second
+    assert_equal 1, requests.length, "第二次应命中缓存"
+    assert_equal "Bearer test-key", requests.first.headers["Authorization"]
+    body = JSON.parse(requests.first.body)
+    assert_equal "关键词", body["query"]
+    assert_equal 5, body["max_results"]
+  end
+
+  test "Tavily 搜索鉴权失败抛 ApiKeyError 且不写缓存" do
+    conn, = fake_tavily_connection(status: 401, body: "unauthorized")
+
+    assert_raises(EventResearch::TavilySearch::ApiKeyError) { tavily_search(conn).search("关键词") }
+    assert_equal 0, @cache.stats["search"]["write"]
+  end
+
+  test "Tavily 搜索 5xx 抛 ApiError 且保留 HTTP 状态" do
+    conn, = fake_tavily_connection(status: 503, body: "unavailable")
+
+    error = assert_raises(EventResearch::TavilySearch::ApiError) { tavily_search(conn).search("关键词") }
+    assert_equal 503, error.status
+    assert_equal 0, @cache.stats["search"]["write"]
+  end
+
+  test "缺少 TAVILY_API_KEY 时构造即失败" do
+    assert_raises(EventResearch::TavilySearch::ApiKeyError) do
+      EventResearch::TavilySearch.new(api_key: "  ", cache: @cache, reporter: @reporter)
+    end
+  end
+
 
   test "天眼查结果进缓存，第二次不再请求" do
     conn, requests = fake_tianyancha_connection(body: tianyancha_body.to_json)
@@ -746,6 +789,34 @@ class EventResearchTest < ActiveSupport::TestCase
     EventResearch::SerperSearch.new(api_key: api_key, cache: @cache, reporter: @reporter).tap do |search|
       search.define_singleton_method(:connection) { connection }
     end
+  end
+
+  def tavily_search(connection, api_key: "test-key")
+    EventResearch::TavilySearch.new(api_key: api_key, cache: @cache, reporter: @reporter).tap do |search|
+      search.define_singleton_method(:connection) { connection }
+    end
+  end
+
+  def fake_tavily_connection(status:, body:)
+    response = Struct.new(:status, :body) do
+      def success?
+        status.between?(200, 299)
+      end
+    end.new(status, body)
+
+    requests = []
+    connection = Object.new
+    connection.define_singleton_method(:post) do |*_args, &block|
+      request = Faraday::Request.create(:post)
+      request.params = Faraday::Utils::ParamsHash.new
+      request.headers = Faraday::Utils::Headers.new
+      request.options = Faraday::RequestOptions.new
+      block&.call(request)
+      requests << request
+      response
+    end
+
+    [ connection, requests ]
   end
 
   # Serper 的假连接：记录每个请求（含 headers/body），返回给定响应

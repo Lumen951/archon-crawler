@@ -1,3 +1,5 @@
+require_relative "search_error"
+
 # 调研主流程。所有外部调用（搜索 / 抓取 / LLM）都经过缓存，中断后重跑即可续上。
 #
 # 输入除了活动名，还可以带活动账号上配置的补充信息（可选）：
@@ -156,15 +158,15 @@ class EventResearch::Researcher
     queries.each do |query|
       begin
         all_results.concat(@search.search(query, limit: SEARCH_LIMIT))
-      rescue EventResearch::SerperSearch::ApiKeyError
+      rescue EventResearch::SearchApiKeyError
         raise
-      rescue EventResearch::SerperSearch::ApiError => e
+      rescue EventResearch::SearchApiError => e
         failures += 1
         @reporter.error("搜索失败，跳过该词: #{query}（#{e.message}）")
       end
     end
 
-    raise EventResearch::SerperSearch::ApiError, "全部 #{queries.length} 条搜索都失败了" if all_results.empty?
+    raise EventResearch::SearchApiError, "全部 #{queries.length} 条搜索都失败了" if all_results.empty?
 
     @reporter.warn("#{failures} 条搜索失败，已跳过") if failures.positive?
     deduplicate_results(all_results)
@@ -487,9 +489,9 @@ class EventResearch::Researcher
 
       begin
         results.concat(@search.search(query, limit: PERSON_SEARCH_LIMIT))
-      rescue EventResearch::SerperSearch::ApiKeyError
+      rescue EventResearch::SearchApiKeyError
         raise
-      rescue EventResearch::SerperSearch::ApiError => e
+      rescue EventResearch::SearchApiError => e
         @reporter.error("搜索失败，跳过该词: #{query}（#{e.message}）")
       end
     end
@@ -506,7 +508,7 @@ class EventResearch::Researcher
 
     extracted = llm_json(extraction_prompt("Person research: #{name}", documents), label: "人物抽取: #{name}")
     merge_person(person, extracted_person(extracted))
-  rescue EventResearch::SerperSearch::ApiKeyError
+  rescue EventResearch::SearchApiKeyError
     # 密钥类问题不给人物级别兜底，直接中止整轮
     raise
   rescue StandardError => e

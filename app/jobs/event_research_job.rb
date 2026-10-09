@@ -45,7 +45,7 @@ class EventResearchJob < ApplicationJob
     result = EventResearch::Researcher.new(
       event: config.nickname,
       **config.research_config,
-      search: EventResearch::SerperSearch.new(api_key: serper_api_key, cache: cache, reporter: reporter),
+      search: search_client(cache: cache, reporter: reporter),
       pages: EventResearch::PageFetcher.new(cache: cache, reporter: reporter),
       llm: LlmClient.new,
       tianyancha: EventResearch::TianyanchaClient.new(api_key: Option.tianyancha_api_key, cache: cache, reporter: reporter),
@@ -71,16 +71,36 @@ class EventResearchJob < ApplicationJob
   def preflight_error
     return "未配置 LLM 密钥（openai_api_key），请先在 /admin/settings 配置" unless LlmClient.configured?
 
-    if serper_api_key.blank?
-      return "未配置 Serper API 密钥，请先在 /admin/settings 配置 serper_api_key（或环境变量 SERPER_API_KEY）"
+    if search_api_key.blank?
+      return "未配置 #{search_provider_name} API 密钥，请先在 /admin/settings 配置 #{search_option_key}（或环境变量 #{search_env_key}）"
     end
 
     nil
   end
 
-  # 环境变量优先（与 CLI 一致），便于本地开发
-  def serper_api_key
-    ENV["SERPER_API_KEY"].presence || Option.serper_api_key
+  def search_provider
+    Option.event_search_provider
+  end
+
+  def search_provider_name
+    search_provider == "tavily" ? "Tavily" : "Serper"
+  end
+
+  def search_option_key
+    search_provider == "tavily" ? "tavily_api_key" : "serper_api_key"
+  end
+
+  def search_env_key
+    search_provider == "tavily" ? "TAVILY_API_KEY" : "SERPER_API_KEY"
+  end
+
+  def search_api_key
+    ENV[search_env_key].presence || Option.public_send(search_option_key)
+  end
+
+  def search_client(cache:, reporter:)
+    client_class = search_provider == "tavily" ? EventResearch::TavilySearch : EventResearch::SerperSearch
+    client_class.new(api_key: search_api_key, cache: cache, reporter: reporter)
   end
 
   def cache_root(run)

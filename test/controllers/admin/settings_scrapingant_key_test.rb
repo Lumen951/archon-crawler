@@ -23,6 +23,52 @@ module Admin
       assert_match "未配置 ScrapingAnt API Key", response.body
     end
 
+    test "settings page renders the event research search settings" do
+      get admin_settings_path
+
+      assert_response :success
+      assert_match 'id="event-search"', response.body
+      assert_match "活动调研搜索", response.body
+      assert_match "Tavily API Key", response.body
+      assert_match "Serper API Key", response.body
+      assert_match "TAVILY_API_KEY", response.body
+      assert_match "SERPER_API_KEY", response.body
+    end
+
+    test "saving event research search settings persists provider and both keys" do
+      patch admin_settings_path, params: {
+        event_search_provider: "serper",
+        tavily_api_key: "tv-test-key",
+        serper_api_key: "sp-test-key"
+      }
+
+      assert_redirected_to admin_settings_path
+      assert_equal "serper", Option.event_search_provider
+      assert_equal "tv-test-key", Option.tavily_api_key
+      assert_equal "sp-test-key", Option.serper_api_key
+
+      follow_redirect!
+      assert_match "活动调研搜索", response.body
+      assert_match "sp-t****-key", response.body
+      assert_match "tv-t****-key", response.body
+    end
+
+    test "blank event research keys keep existing values" do
+      Option.event_search_provider = "serper"
+      Option.tavily_api_key = "keep-tavily"
+      Option.serper_api_key = "keep-serper"
+
+      patch admin_settings_path, params: {
+        event_search_provider: "tavily",
+        tavily_api_key: "",
+        serper_api_key: ""
+      }
+
+      assert_equal "tavily", Option.event_search_provider
+      assert_equal "keep-tavily", Option.tavily_api_key
+      assert_equal "keep-serper", Option.serper_api_key
+    end
+
     test "saving the key persists it and shows it masked afterwards" do
       patch admin_settings_path, params: { scrapingant_api_key: "sa-test-key-123456" }
 

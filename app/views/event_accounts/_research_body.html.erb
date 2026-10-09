@@ -25,7 +25,7 @@
       <p class="text-sm text-amber-800">
         还没有调研记录。确认
         <%= link_to "管理设置", admin_settings_path, class: "font-semibold underline" %>
-        里已配置 LLM 与 Serper 密钥后，点击下方按钮开始第一轮调研。
+        里已配置 LLM 与活动调研搜索 provider（当前：<%= Option.event_search_provider.capitalize %>）的密钥后，点击下方按钮开始第一轮调研。
       </p>
     </div>
   <% end %>
@@ -36,7 +36,7 @@
         <div>
           <h2 class="text-lg font-semibold text-text-primary">启动调研</h2>
           <p class="text-sm text-text-secondary mt-1">
-            流程：Serper 搜索 → 抓取网页 → LLM 抽取 → 逐人补充资料 → 天眼查工商补全。
+            流程：<%= Option.event_search_provider.capitalize %> 搜索 → 抓取网页 → LLM 抽取 → 逐人补充资料 → 天眼查工商补全。
             结果是结构化 JSON 数据，报告请基于数据自行生成。
           </p>
         </div>

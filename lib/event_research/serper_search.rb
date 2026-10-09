@@ -1,5 +1,6 @@
 require "faraday"
 require "faraday/retry"
+require_relative "search_error"
 
 # Serper（Google）搜索。带重试的 Faraday 连接；失败抛 ApiError（密钥问题抛 ApiKeyError）。
 class EventResearch::SerperSearch
@@ -7,17 +8,8 @@ class EventResearch::SerperSearch
   GL = "cn"
   HL = "zh-cn"
 
-  # 密钥无效/额度问题：重试与换词都没意义，交给入口直接中止
-  class ApiKeyError < StandardError; end
-
-  class ApiError < StandardError
-    attr_reader :status
-
-    def initialize(message, status: nil)
-      @status = status
-      super(message)
-    end
-  end
+  ApiKeyError = EventResearch::SearchApiKeyError
+  ApiError = EventResearch::SearchApiError
 
   def initialize(api_key:, cache:, reporter:)
     raise ApiKeyError, "SERPER_API_KEY 未设置" if api_key.to_s.strip.empty?

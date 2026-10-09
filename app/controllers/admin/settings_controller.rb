@@ -48,6 +48,16 @@ class Admin::SettingsController < Admin::BaseController
       message = "天眼查 API Token 更新成功"
     end
 
+    if params[:event_search_provider].present?
+      Option.event_search_provider = params[:event_search_provider]
+      message = "活动调研搜索 provider 已切换为 #{Option.event_search_provider}"
+    end
+
+    if params[:tavily_api_key].present?
+      Option.tavily_api_key = params[:tavily_api_key].to_s.strip
+      message = "Tavily API Key 更新成功"
+    end
+
     if params[:serper_api_key].present?
       Option.serper_api_key = params[:serper_api_key].to_s.strip
       message = "Serper API Key 更新成功"
@@ -674,6 +684,8 @@ class Admin::SettingsController < Admin::BaseController
     @twitter_proxy = Option.get('twitter_proxy')
     @tikhub_api_key = Option.tikhub_api_key
     @tianyancha_api_key = Option.tianyancha_api_key
+    @event_search_provider = Option.event_search_provider
+    @tavily_api_key = Option.tavily_api_key
     @serper_api_key = Option.serper_api_key
     @scrapingant_api_key = Option.scrapingant_api_key
     @website_render_fallbacks = Option.website_render_fallbacks

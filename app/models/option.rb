@@ -125,6 +125,30 @@ class Option < ApplicationRecord
       tianyancha_api_key.present?
     end
 
+    # Event research search provider. Defaults to Tavily, with Serper as fallback.
+    EVENT_SEARCH_PROVIDERS = %w[tavily serper].freeze
+
+    def event_search_provider
+      provider = get("event_search_provider").to_s
+      EVENT_SEARCH_PROVIDERS.include?(provider) ? provider : "tavily"
+    end
+
+    def event_search_provider=(val)
+      set("event_search_provider", EVENT_SEARCH_PROVIDERS.include?(val.to_s) ? val.to_s : "tavily")
+    end
+
+    def tavily_api_key
+      get("tavily_api_key")
+    end
+
+    def tavily_api_key=(val)
+      set("tavily_api_key", val)
+    end
+
+    def tavily_api_key_valid?
+      tavily_api_key.present?
+    end
+
     # Serper (Google Search) API key helpers（活动调研的搜索数据源）
     def serper_api_key
       get('serper_api_key')

@@ -15,7 +15,7 @@
       items: [
         { id: "tikhub", label: "TikHub", ok: @tikhub_api_key.present? },
         { id: "tianyancha", label: "天眼查", ok: @tianyancha_api_key.present? },
-        { id: "serper", label: "Serper", ok: @serper_api_key.present? },
+        { id: "event-search", label: "活动调研搜索", ok: @tavily_api_key.present? || @serper_api_key.present? },
         { id: "website-render", label: "官网渲染兜底", ok: @website_render_fallbacks.present? || @scrapingant_api_key.present? },
         { id: "openai", label: "OpenAI / LLM", ok: @openai_api_key.present? },
       ],
@@ -380,41 +380,52 @@
         </div>
       </section>
 
-      <%# ── Serper ── %>
-      <section class="panel scroll-mt-20 hidden" data-settings-nav-target="panel" data-panel-id="serper" id="serper">
+      <%# ── 活动调研搜索 ── %>
+      <section class="panel scroll-mt-20 hidden" data-settings-nav-target="panel" data-panel-id="event-search" id="event-search">
         <div class="panel-header">
-          <h2 class="panel-title">Serper API 密钥</h2>
-          <p class="text-sm text-text-secondary mt-1">用于活动调研的 Google 搜索（搜索获奖名单、人物资料等来源页面）</p>
+          <h2 class="panel-title">活动调研搜索</h2>
+          <p class="text-sm text-text-secondary mt-1">选择活动调研使用的搜索服务。默认使用 Tavily，也可切换为 Serper。</p>
         </div>
-        <div class="panel-body">
-          <% if @serper_api_key.present? %>
-            <div class="notice notice-success mb-4">
-              <p class="font-medium">当前 API Key</p>
-              <p class="mt-0.5 font-mono"><%= mask_api_key(@serper_api_key) %></p>
-            </div>
-          <% else %>
-            <div class="notice notice-warning mb-4">未配置 Serper API Key。活动调研无法启动（搜索是调研的第一步）。</div>
-          <% end %>
-
+        <div class="panel-body space-y-5">
           <%= form_with url: admin_settings_path, method: :patch do %>
             <div class="form-row">
               <div>
-                <label class="form-label">API Key</label>
-                <p class="form-hint">
-                  从 <a href="https://serper.dev" target="_blank" class="text-brand hover:underline">serper.dev</a>
-                  控制台获取 API Key。本地开发也可用环境变量 SERPER_API_KEY。
-                </p>
+                <label class="form-label">搜索 provider</label>
+                <p class="form-hint">只会使用当前选中的 provider 发起搜索。</p>
               </div>
               <div>
+                <%= select_tag :event_search_provider,
+                    options_for_select([["Tavily（推荐）", "tavily"], ["Serper", "serper"]], @event_search_provider),
+                    class: "form-input" %>
+              </div>
+            </div>
+            <div class="form-row">
+              <div>
+                <label class="form-label">Tavily API Key</label>
+                <p class="form-hint">可从 Tavily 控制台获取；本地开发也可使用环境变量 TAVILY_API_KEY。</p>
+              </div>
+              <div>
+                <% if @tavily_api_key.present? %><p class="mb-2 font-mono text-sm"><%= mask_api_key(@tavily_api_key) %></p><% end %>
+                <%= text_field_tag :tavily_api_key, nil, class: "form-input", placeholder: "输入 Tavily API Key" %>
+              </div>
+            </div>
+            <div class="form-row">
+              <div>
+                <label class="form-label">Serper API Key</label>
+                <p class="form-hint">兼容备用；本地开发也可使用环境变量 SERPER_API_KEY。</p>
+              </div>
+              <div>
+                <% if @serper_api_key.present? %><p class="mb-2 font-mono text-sm"><%= mask_api_key(@serper_api_key) %></p><% end %>
                 <%= text_field_tag :serper_api_key, nil, class: "form-input", placeholder: "输入 Serper API Key" %>
               </div>
             </div>
             <div class="flex flex-wrap items-center justify-end gap-2 pt-1">
-              <button type="submit" class="btn btn-primary">保存 Serper Key</button>
+              <button type="submit" class="btn btn-primary">保存活动调研搜索设置</button>
             </div>
           <% end %>
         </div>
       </section>
+
 
       <%# ── 官网渲染兜底 ── %>
       <section class="panel scroll-mt-20 hidden" data-settings-nav-target="panel" data-panel-id="website-render" id="website-render">

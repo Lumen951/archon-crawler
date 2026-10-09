@@ -9,7 +9,7 @@
 #
 # Usage:
 #
-#   set -a; source .env; set +a          # SERPER_API_KEY 在仓库根目录的 .env 里（也可用 Option）
+#   set -a; source .env; set +a          # TAVILY_API_KEY / SERPER_API_KEY 在仓库根目录的 .env 里（也可用 Option）
 #   ./script/event_research.rb "科创中国创新创业投资大会" [--refresh] [--concurrency N]
 #
 # Output:
@@ -21,7 +21,7 @@
 # 来自 Option（openai_api_key / openai_model / openai_proxy_url），在 /admin/settings 配置，
 # 所以脚本需要自己加载 Rails 环境（与 bin/website_crawler_debug.rb 一致）。
 #
-# SERPER_API_KEY 优先取环境变量，未设置时回落到 Option.serper_api_key；
+# TAVILY_API_KEY / SERPER_API_KEY 优先取环境变量，未设置时回落到对应 Option；默认 provider 为 Tavily。
 # 天眼查 Token 来自 Option（tianyancha_api_key），未配置时跳过工商信息补全。
 #
 # 关于断点续跑：抓取到的网页正文、Serper 结果、LLM 抽取结果都按 key 落盘到
@@ -77,7 +77,18 @@ module EventResearch
     end
   end
 
-  # 结果写文件（原子替换），并保留「不用一次空结果盖掉之前的好结果」的保护：
+  def self.search_client(provider:, cache:, reporter:)
+    if provider == "serper"
+      EventResearch::SerperSearch.new(
+        api_key: ENV["SERPER_API_KEY"].presence || Option.serper_api_key, cache: cache, reporter: reporter
+      )
+    else
+      EventResearch::TavilySearch.new(
+        api_key: ENV["TAVILY_API_KEY"].presence || Option.tavily_api_key, cache: cache, reporter: reporter
+      )
+    end
+  end
+
   # 退化结果另存 .degraded.json。应用内不走这里 —— 那边每次运行是独立的一行
   # EventResearchRun，退化结果直接标 failed 存库。
   module OutputWriter
@@ -155,7 +166,7 @@ if __FILE__ == $PROGRAM_NAME
 
       LLM 密钥 / 模型 / 代理地址来自 Option，在 /admin/settings 配置：
         openai_api_key / openai_model / openai_proxy_url
-      SERPER_API_KEY 取环境变量，未设置时回落 Option.serper_api_key。
+      TAVILY_API_KEY / SERPER_API_KEY 取环境变量，未设置时回落对应 Option；默认使用 Tavily。
       天眼查 Token 在 /admin/settings 配置（tianyancha_api_key），
       未配置时跳过工商信息补全。
     USAGE
@@ -182,9 +193,7 @@ if __FILE__ == $PROGRAM_NAME
 
     result = EventResearch::Researcher.new(
       event: event,
-      search: EventResearch::SerperSearch.new(
-        api_key: ENV["SERPER_API_KEY"].presence || Option.serper_api_key, cache: cache, reporter: reporter
-      ),
+      search: EventResearch.search_client(provider: Option.event_search_provider, cache: cache, reporter: reporter),
       pages: EventResearch::PageFetcher.new(cache: cache, reporter: reporter, concurrency: options[:concurrency]),
       llm: LlmClient.new,
       tianyancha: EventResearch::TianyanchaClient.new(
@@ -201,7 +210,7 @@ if __FILE__ == $PROGRAM_NAME
     reporter&.warn("已中断（Ctrl-C）。缓存已保留，重跑同一条命令会从断点继续。")
     reporter&.info("缓存统计: #{cache&.summary}")
     exit 130
-  rescue EventResearch::SerperSearch::ApiKeyError => e
+  rescue EventResearch::SearchApiKeyError => e
     reporter ? reporter.error(e.message, exception: e) : warn(e.message)
     exit 1
   rescue StandardError => e

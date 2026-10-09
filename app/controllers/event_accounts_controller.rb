@@ -20,8 +20,8 @@ class EventAccountsController < ApplicationController
     unless LlmClient.configured?
       redirect_to event_account_path(@account), flash: { error: "未配置 LLM 密钥（openai_api_key），请先在管理设置中配置" } and return
     end
-    unless serper_api_key.present?
-      redirect_to event_account_path(@account), flash: { error: "未配置 Serper API 密钥，请先在管理设置中配置 serper_api_key" } and return
+    unless search_api_key.present?
+      redirect_to event_account_path(@account), flash: { error: "未配置 #{search_provider_name} API 密钥，请先在管理设置中配置 #{search_option_key}" } and return
     end
 
     run = EventResearchRun.start_for!(@account, refresh_cache: params[:refresh_cache] == "1")
@@ -99,7 +99,20 @@ class EventAccountsController < ApplicationController
     @active_run || @account.event_research_runs.recent.first
   end
 
-  def serper_api_key
-    ENV["SERPER_API_KEY"].presence || Option.serper_api_key
+  def search_provider
+    Option.event_search_provider
+  end
+
+  def search_provider_name
+    search_provider == "tavily" ? "Tavily" : "Serper"
+  end
+
+  def search_option_key
+    search_provider == "tavily" ? "tavily_api_key" : "serper_api_key"
+  end
+
+  def search_api_key
+    env_key = search_provider == "tavily" ? "TAVILY_API_KEY" : "SERPER_API_KEY"
+    ENV[env_key].presence || Option.public_send(search_option_key)
   end
 end

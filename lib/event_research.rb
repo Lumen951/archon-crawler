@@ -1,4 +1,4 @@
-# 活动调研（Event Research）：输入一个活动名 → Serper 搜索 → 抓取结果页
+# 活动调研（Event Research）：输入一个活动名 → Tavily/Serper 搜索 → 抓取结果页
 # → LLM 抽取获奖人/项目 → 天眼查补全机构工商档案 → 对每个人再搜一轮补充资料
 # → 得到结构化 JSON 结果。
 #
@@ -11,6 +11,7 @@
 #   CrawlLogSink      应用侧的 Reporter sink
 #   RunCache          断点续跑的磁盘缓存（按 namespace 分 TTL）
 #   SerperSearch      Serper（Google）搜索
+#   TavilySearch      Tavily 搜索
 #   PageFetcher       网页正文抓取（复用 WebsiteCrawler::Fetcher/Extractor）
 #   TianyanchaClient  天眼查工商档案（按次计费，带单次运行上限）
 #   Researcher        主流程编排

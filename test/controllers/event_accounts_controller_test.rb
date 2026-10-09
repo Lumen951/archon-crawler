@@ -2,6 +2,7 @@ require "test_helper"
 
 class EventAccountsControllerTest < ActionDispatch::IntegrationTest
   setup do
+    Option.event_search_provider = "serper"
     @admin = User.create!(
       email_address: "event-admin@example.com", password: "password123",
       password_confirmation: "password123", role: :admin, email_confirmed_at: Time.current
@@ -14,6 +15,7 @@ class EventAccountsControllerTest < ActionDispatch::IntegrationTest
 
   teardown do
     Option.delete("serper_api_key")
+    Option.delete("event_search_provider")
   end
 
   # --- 导入 / 编辑配置（AccountsController） --------------------------------

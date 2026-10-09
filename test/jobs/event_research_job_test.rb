@@ -12,10 +12,12 @@ class EventResearchJobTest < ActiveSupport::TestCase
     )
     @run = EventResearchRun.create!(account: @account, status: :pending)
     Option.serper_api_key = "test-key"
+    Option.event_search_provider = "serper"
   end
 
   teardown do
     Option.delete("serper_api_key")
+    Option.delete("event_search_provider")
     FileUtils.rm_rf(Rails.root.join("tmp", "event_research"))
   end
 
