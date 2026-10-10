@@ -810,7 +810,7 @@ class AccountsController < ApplicationController
   end
 
   def event_account_params
-    params.require(:event_account).permit(:name, :url, :keywords, :other_information, :purpose)
+    params.require(:event_account).permit(:name, :url, :keywords, :other_information, :purpose, :weekly_research_enabled, :feishu_chat_id, :feishu_receive_id, :feishu_receive_id_type)
   end
 
   def assign_event_account_attributes
@@ -818,7 +818,11 @@ class AccountsController < ApplicationController
       url: event_account_params[:url],
       keywords: event_account_params[:keywords],
       other_information: event_account_params[:other_information],
-      purpose: event_account_params[:purpose]
+      purpose: event_account_params[:purpose],
+      weekly_research_enabled: event_account_params[:weekly_research_enabled],
+      feishu_chat_id: event_account_params[:feishu_chat_id],
+      feishu_receive_id: event_account_params[:feishu_receive_id],
+      feishu_receive_id_type: event_account_params[:feishu_receive_id_type]
     }
   end
 

@@ -18,10 +18,10 @@ development:
   #   class: WechatContentDownloadJob
   #   queue: default
   #   schedule: every day at 2am
-  cleanup_old_tasks:
-    class: CleanupOldTasksJob
+  weekly_event_research:
+    class: WeeklyEventResearchJob
     queue: default
-    schedule: every day at 3am
+    schedule: every monday at 9am
   # weread_login_reminder:
   #   class: FeishuLoginReminderJob
   #   queue: default
@@ -58,10 +58,10 @@ production:
   #   class: ValidateApiKeysJob
   #   queue: default
   #   schedule: every hour
-  cleanup_old_tasks:
-    class: CleanupOldTasksJob
+  weekly_event_research:
+    class: WeeklyEventResearchJob
     queue: default
-    schedule: every day at 3am
+    schedule: every monday at 9am
   # weread_login_reminder:
   #   class: FeishuLoginReminderJob
   #   queue: default

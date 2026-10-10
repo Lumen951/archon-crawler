@@ -54,3 +54,11 @@
 !/e2e/fixtures/samples/.keep
 
 __pycache__
+
+/.agents
+/.claude
+/.hermes
+/.zcode
+/.grok
+.zcodeignore
+skills-lock.json

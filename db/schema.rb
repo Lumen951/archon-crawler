@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_09_000001) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_10_000002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -143,6 +143,25 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_09_000001) do
     t.index ["expires_at"], name: "index_device_codes_on_expires_at"
     t.index ["user_code"], name: "index_device_codes_on_user_code", unique: true
     t.index ["user_id"], name: "index_device_codes_on_user_id"
+  end
+
+  create_table "event_research_notifications", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "baseline_run_id"
+    t.datetime "created_at", null: false
+    t.text "error_message"
+    t.bigint "event_research_run_id", null: false
+    t.integer "kind", default: 0, null: false
+    t.string "payload_digest"
+    t.text "payload_text"
+    t.datetime "sent_at"
+    t.integer "status", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "kind", "status"], name: "index_event_research_notifications_on_account_kind_status"
+    t.index ["account_id"], name: "index_event_research_notifications_on_account_id"
+    t.index ["baseline_run_id"], name: "index_event_research_notifications_on_baseline_run_id"
+    t.index ["event_research_run_id", "kind"], name: "index_event_research_notifications_on_run_and_kind", unique: true
+    t.index ["event_research_run_id"], name: "index_event_research_notifications_on_event_research_run_id"
   end
 
   create_table "event_research_runs", force: :cascade do |t|
@@ -437,6 +456,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_09_000001) do
   add_foreign_key "crawl_task_accounts", "accounts"
   add_foreign_key "crawl_task_accounts", "crawl_tasks"
   add_foreign_key "device_codes", "users"
+  add_foreign_key "event_research_notifications", "accounts"
+  add_foreign_key "event_research_notifications", "event_research_runs"
+  add_foreign_key "event_research_notifications", "event_research_runs", column: "baseline_run_id"
   add_foreign_key "event_research_runs", "accounts"
   add_foreign_key "group_accounts", "accounts"
   add_foreign_key "group_accounts", "groups"

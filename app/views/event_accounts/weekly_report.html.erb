@@ -1,0 +1,35 @@
+<div class="space-y-6">
+  <div class="flex items-center justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-bold text-text-primary"><%= @notification.initial? ? "首发研究通知" : "周报详情" %></h1>
+      <p class="text-text-secondary mt-1"><%= link_to "← 返回周报列表", weekly_reports_event_account_path(@account), class: "text-primary hover:underline" %></p>
+    </div>
+    <%= link_to "查看研究 Run", event_account_path(@account, run_id: @notification.event_research_run_id), class: "btn btn-secondary text-sm" %>
+    <% if current_user_is_admin? %>
+      <%= button_to "重新推送", resend_notification_event_account_path(@account, notification_id: @notification.id), method: :post, class: "btn btn-primary text-sm", data: { testid: "resend-notification-detail" } %>
+    <% end %>
+  </div>
+
+  <div class="card">
+    <dl class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+      <div><dt class="text-text-secondary">类型</dt><dd class="font-medium text-text-primary mt-1"><%= @notification.initial? ? "首发" : "周报" %></dd></div>
+      <div><dt class="text-text-secondary">状态</dt><dd class="font-medium text-text-primary mt-1"><%= @notification.status %></dd></div>
+      <div><dt class="text-text-secondary">研究 Run</dt><dd class="font-mono text-text-primary mt-1">#<%= @notification.event_research_run_id %></dd></div>
+      <div><dt class="text-text-secondary">基线 Run</dt><dd class="font-mono text-text-primary mt-1"><%= @notification.baseline_run_id ? "##{@notification.baseline_run_id}" : "—" %></dd></div>
+      <div><dt class="text-text-secondary">创建时间</dt><dd class="text-text-primary mt-1"><%= @notification.created_at.strftime('%Y-%m-%d %H:%M:%S') %></dd></div>
+      <div><dt class="text-text-secondary">发送时间</dt><dd class="text-text-primary mt-1"><%= @notification.sent_at&.strftime('%Y-%m-%d %H:%M:%S') || "—" %></dd></div>
+    </dl>
+    <% if @notification.error_message.present? %>
+      <div class="mt-4 rounded-lg bg-red-50 border border-red-100 px-4 py-3 text-sm text-red-700"><%= @notification.error_message %></div>
+    <% end %>
+  </div>
+
+  <div class="card">
+    <h2 class="text-lg font-semibold text-text-primary mb-3">实际生成的消息</h2>
+    <% if @notification.payload_text.present? %>
+      <pre class="whitespace-pre-wrap rounded-lg bg-bg-secondary border border-border-primary p-4 text-sm text-text-primary overflow-x-auto"><%= @notification.payload_text %></pre>
+    <% else %>
+      <p class="text-text-secondary text-sm">这条历史通知没有保存消息正文，请通过关联的研究 Run 查看结构化结果。</p>
+    <% end %>
+  </div>
+</div>

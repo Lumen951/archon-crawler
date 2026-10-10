@@ -75,9 +75,13 @@ Rails.application.routes.draw do
     member do
       post :start_research
       post :fail_run
+      post :generate_notification
+      post :resend_notification
       get :logs
       get :poll
       get :download
+      get :weekly_reports
+      get "weekly_reports/:notification_id", action: :weekly_report, as: :weekly_report
     end
   end
 

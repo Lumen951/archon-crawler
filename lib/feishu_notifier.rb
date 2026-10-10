@@ -24,12 +24,14 @@ class FeishuNotifier
 
   class Error < StandardError; end
 
-  # 配置齐全才算启用
+  # 应用凭据完整，目标由调用方显式传入或回退全局配置。
+  def self.credentials_enabled?
+    Option.feishu_enabled? && Option.feishu_app_id.present? && Option.feishu_app_secret.present?
+  end
+
+  # 配置齐全才算启用（兼容需要全局目标的旧调用方）。
   def self.enabled?
-    Option.feishu_enabled? &&
-      Option.feishu_app_id.present? &&
-      Option.feishu_app_secret.present? &&
-      Option.feishu_receive_id.present?
+    credentials_enabled? && Option.feishu_receive_id.present?
   end
 
   # 获取 tenant_access_token（缓存约 1 小时，token 有效期约 2 小时）

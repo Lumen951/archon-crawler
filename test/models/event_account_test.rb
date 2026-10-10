@@ -103,6 +103,23 @@ class EventAccountTest < ActiveSupport::TestCase
     assert_nil config[:other_information]
   end
 
+  test "活动级飞书目标支持群聊和私信，并回退到全局配置" do
+    account = EventAccount.new(
+      nickname: "测试大会",
+      event_config: { feishu_receive_id: "ou_user", feishu_receive_id_type: "open_id" }
+    )
+
+    assert_equal({ receive_id: "ou_user", receive_id_type: "open_id" }, account.feishu_target)
+
+    account.event_config = { feishu_receive_id: nil, feishu_receive_id_type: nil, feishu_chat_id: "oc_legacy" }
+    assert_equal({ receive_id: "oc_legacy", receive_id_type: "chat_id" }, account.feishu_target)
+
+    account.event_config = { feishu_receive_id: nil, feishu_receive_id_type: nil, feishu_chat_id: nil }
+    Option.feishu_receive_id = "oc_global"
+    Option.feishu_receive_id_type = "chat_id"
+    assert_equal({ receive_id: "oc_global", receive_id_type: "chat_id" }, account.feishu_target)
+  end
+
   test "删除账号时级联删除调研记录" do
     account = EventAccount.create!(nickname: "测试大会", fakeid: "event:test-4")
     run = EventResearchRun.create!(account: account, status: :completed)

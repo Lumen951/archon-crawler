@@ -44,6 +44,7 @@ class EventAccount < Account
 
   # 外键是 accounts.account_id（belongs_to :account），不是按关联名推断的 event_account_id
   has_many :event_research_runs, foreign_key: :account_id, dependent: :destroy
+  has_many :event_research_notifications, foreign_key: :account_id, dependent: :destroy
 
   # 调研不走抓取管线：调度器（due_for_crawl_ids_by_platform）与批量抓取都跳过本平台。
   def self.crawl_enabled?
@@ -87,6 +88,38 @@ class EventAccount < Account
     event_config["purpose"].to_s
   end
 
+  def weekly_research_enabled?
+    ActiveModel::Type::Boolean.new.cast(event_config["weekly_research_enabled"])
+  end
+
+  def feishu_chat_id
+    event_config["feishu_chat_id"].to_s.strip.presence
+  end
+
+  def feishu_receive_id
+    event_config["feishu_receive_id"].to_s.strip.presence || feishu_chat_id
+  end
+
+  def feishu_receive_id_type
+    value = event_config["feishu_receive_id_type"].to_s.strip
+    return value if %w[open_id chat_id].include?(value)
+    return "chat_id" if feishu_chat_id.present?
+
+    nil
+  end
+
+  def feishu_target
+    if feishu_receive_id.present?
+      { receive_id: feishu_receive_id, receive_id_type: feishu_receive_id_type || "chat_id" }
+    elsif Option.feishu_receive_id.present?
+      { receive_id: Option.feishu_receive_id, receive_id_type: Option.feishu_receive_id_type.presence || "open_id" }
+    end
+  end
+
+  scope :weekly_research_enabled, -> {
+    where("metadata -> 'event_config' ->> 'weekly_research_enabled' = ?", "true")
+  }
+
   # 传给 EventResearch::Researcher 的调研配置（键与 Researcher 的关键字参数对齐）。
   def research_config
     {
@@ -117,6 +150,11 @@ class EventAccount < Account
     config["keywords"] = normalize_keywords(config["keywords"])
     config["other_information"] = config["other_information"].to_s.strip.presence
     config["purpose"] = config["purpose"].to_s.strip.presence
+    config["weekly_research_enabled"] = ActiveModel::Type::Boolean.new.cast(config["weekly_research_enabled"])
+    config["feishu_chat_id"] = config["feishu_chat_id"].to_s.strip.presence
+    config["feishu_receive_id"] = config["feishu_receive_id"].to_s.strip.presence
+    config["feishu_receive_id_type"] = config["feishu_receive_id_type"].to_s.strip.presence
+    config["feishu_receive_id_type"] = nil unless %w[open_id chat_id].include?(config["feishu_receive_id_type"])
     self.metadata = (metadata.is_a?(Hash) ? metadata : {}).merge(EVENT_CONFIG_KEY => config)
   end
 

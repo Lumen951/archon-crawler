@@ -58,6 +58,7 @@ class EventResearchJob < ApplicationJob
 
     if run.completed?
       reporter.info("调研完成：获奖 #{run.award_count} 条，人物 #{run.people_count} 人，公司 #{run.company_count} 家，结果已存入 run##{run.id}")
+      EventResearchNotificationJob.perform_later(run.id)
     else
       reporter.warn("调研结束但没有得到有效数据（#{run.error_message}）")
     end

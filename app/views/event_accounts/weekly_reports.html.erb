@@ -1,0 +1,48 @@
+<div class="space-y-6">
+  <div class="flex items-center justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-bold text-text-primary">周报 / 飞书通知</h1>
+      <p class="text-text-secondary mt-1"><%= link_to "← 返回 #{@account.nickname}", event_account_path(@account), class: "text-primary hover:underline" %></p>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div class="card"><p class="text-xs text-text-secondary">通知总数</p><p class="text-2xl font-semibold text-text-primary mt-1"><%= @notifications.size %></p></div>
+    <div class="card"><p class="text-xs text-text-secondary">已发送</p><p class="text-2xl font-semibold text-green-700 mt-1"><%= @notifications.count(&:sent?) %></p></div>
+    <div class="card"><p class="text-xs text-text-secondary">失败</p><p class="text-2xl font-semibold text-red-700 mt-1"><%= @notifications.count(&:failed?) %></p></div>
+    <div class="card"><p class="text-xs text-text-secondary">跳过</p><p class="text-2xl font-semibold text-text-secondary mt-1"><%= @notifications.count(&:skipped?) %></p></div>
+  </div>
+
+  <div class="card">
+    <h2 class="text-lg font-semibold text-text-primary mb-3">通知记录</h2>
+    <% if @notifications.any? %>
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-sm">
+          <thead><tr class="text-left text-text-secondary border-b border-border-primary">
+            <th class="py-2 pr-4 font-medium">类型</th><th class="py-2 pr-4 font-medium">状态</th><th class="py-2 pr-4 font-medium">研究 Run</th><th class="py-2 pr-4 font-medium">基线 Run</th><th class="py-2 pr-4 font-medium">创建时间</th><th class="py-2 pr-4 font-medium">发送时间</th><th class="py-2 pr-4 font-medium">目标</th><th class="py-2 pr-4 font-medium">备注</th><% if current_user_is_admin? %><th class="py-2 font-medium">操作</th><% end %>
+          </tr></thead>
+          <tbody>
+            <% @notifications.each do |notification| %>
+              <tr class="border-b border-border-primary">
+                <td class="py-2.5 pr-4"><%= link_to notification.initial? ? "首发" : "周报", weekly_report_event_account_path(@account, notification_id: notification.id), class: "text-primary hover:underline" %></td>
+                <td class="py-2.5 pr-4"><span class="px-2 py-0.5 rounded text-xs font-medium bg-bg-secondary text-text-primary"><%= notification.status %></span></td>
+                <td class="py-2.5 pr-4 font-mono text-xs">#<%= notification.event_research_run_id %></td>
+                <td class="py-2.5 pr-4 font-mono text-xs"><%= notification.baseline_run_id ? "##{notification.baseline_run_id}" : "—" %></td>
+                <td class="py-2.5 pr-4 text-text-secondary"><%= notification.created_at.strftime('%Y-%m-%d %H:%M') %></td>
+                <td class="py-2.5 pr-4 text-text-secondary"><%= notification.sent_at&.strftime('%Y-%m-%d %H:%M') || "—" %></td>
+                <% target = @account.feishu_target %>
+                <td class="py-2.5 pr-4 text-text-secondary"><%= target ? "#{target[:receive_id_type]} / #{target[:receive_id]}" : "未配置" %></td>
+                <td class="py-2.5 pr-4 text-text-secondary max-w-[280px] truncate" title="<%= notification.error_message %>"><%= notification.error_message || "—" %></td>
+                <% if current_user_is_admin? %>
+                  <td class="py-2.5"><%= button_to "重新推送", resend_notification_event_account_path(@account, notification_id: notification.id), method: :post, class: "btn btn-secondary text-xs", data: { testid: "resend-notification-#{notification.id}" } %></td>
+                <% end %>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% else %>
+      <p class="text-text-secondary text-sm">暂无周报记录。完成一次活动研究后，这里会显示首发通知。</p>
+    <% end %>
+  </div>
+</div>

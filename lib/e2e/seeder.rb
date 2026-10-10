@@ -55,6 +55,7 @@ module E2e
 
     def seed_options
       Option.set("wechat_api_provider", "weread_native")
+      Option.set("event_search_provider", "serper")
       Option.set("max_crawl_pages", 1)
       # 活动调研（event research）的外部密钥全部是占位值：对应的
       # google.serper.dev / openai-proxy / open.api.tianyancha.com 都由
@@ -62,6 +63,11 @@ module E2e
       Option.set("openai_api_key", "e2e-mock-llm-key")
       Option.set("serper_api_key", "e2e-mock-serper-key")
       Option.set("tianyancha_api_key", "e2e-mock-tianyancha-key")
+      Option.set("feishu_enabled", true)
+      Option.set("feishu_app_id", "e2e-mock-app-id")
+      Option.set("feishu_app_secret", "e2e-mock-app-secret")
+      Option.set("feishu_receive_id", "oc_e2e_weekly")
+      Option.set("feishu_receive_id_type", "chat_id")
       # 调研断点缓存在磁盘上（tmp/event_research），而 run id 会被
       # reset_db 的 TRUNCATE 重置复用——不清掉的话第二轮 e2e 会全程命中
       # 旧缓存，测不到真实管线。

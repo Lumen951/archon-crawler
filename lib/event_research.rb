@@ -18,6 +18,8 @@
 #
 # CLI 入口见 script/event_research.rb；应用侧由 EventResearchJob 驱动。
 module EventResearch
+  autoload :ResultDiff, "event_research/result_diff"
+  autoload :NotificationSummary, "event_research/notification_summary"
   # 缓存有效期（秒）。search 是约定好的 1 天；网页正文一周内基本不变；
   # LLM 抽取最贵，留一周，隔天重跑也能直接命中。
   # 天眼查按次计费，而工商登记信息变化极慢，所以缓存留得最激进（30 天）——

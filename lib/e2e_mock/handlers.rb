@@ -252,7 +252,10 @@ module E2eMock
 
     # ── open.feishu.cn：推送接口一律成功 ──────────────────────────────
     module Feishu
-      def self.handle(_request)
+      def self.handle(request)
+        return { status: 200, body: { tenant_access_token: "e2e-mock-token" }.to_json,
+                 headers: { "Content-Type" => "application/json; charset=utf-8" } } if request.uri.path.include?("tenant_access_token")
+
         { status: 200, body: { code: 0, msg: "ok (e2e mock)" }.to_json,
           headers: { "Content-Type" => "application/json; charset=utf-8" } }
       end
@@ -294,8 +297,13 @@ module E2eMock
     # 事件抽取与人物抽取共用同一份响应：fixture 的 output_text 内嵌一段
     # 抽取结果 JSON（人物抽取按 awards[0].people[0] 取人，两个阶段都兼容）。
     module LlmProxy
+      @request_count = 0
+
       def self.handle(_request)
-        { status: 200, body: E2eMock.fixture("event_research/llm_response.json"),
+        @request_count += 1
+        body = E2eMock.fixture("event_research/llm_response.json").force_encoding(Encoding::UTF_8)
+        body = body.gsub("E2E示例科技有限公司", "E2E新增科技有限公司") if @request_count > 2
+        { status: 200, body: body,
           headers: { "Content-Type" => "application/json; charset=utf-8" } }
       end
     end

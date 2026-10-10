@@ -16,6 +16,9 @@ test("导入活动研究账号并展示配置摘要", async ({ page, shot }) => 
   await page.getByPlaceholder("https://... 官网、获奖公示页等").fill("https://news.e2e-event.test/award-list");
   await page.getByPlaceholder("例如：\n获奖名单\n决赛\n路演").fill("获奖名单\n路演");
   await page.getByPlaceholder("例如：找出获奖项目的创始人联系方式，用于投资尽调").fill("找出获奖项目创始人背景");
+  await page.getByRole("checkbox", { name: "每周自动研究并推送新增信息" }).check();
+  await page.getByLabel("飞书目标类型").selectOption("chat_id");
+  await page.getByLabel("飞书目标 ID（可选）").fill("oc_e2e_weekly");
 
   await page.getByRole("button", { name: "创建活动配置" }).click();
 
@@ -86,6 +89,37 @@ test("重新启动调研（忽略缓存）产生新一轮运行", async ({ page,
   await expect(page.getByRole("cell", { name: "忽略缓存" })).toBeVisible();
   await expect(page.locator('[data-task-status] tr', { hasText: "completed" })).toHaveCount(2);
   await shot("83-重启调研");
+});
+
+test("查看生成的周报及实际消息正文", async ({ page, shot }) => {
+  await login(page);
+  await gotoAccounts(page);
+  await page.getByRole("link", { name: EVENT_NAME }).first().click();
+  await expect(page).toHaveURL(/\/event_accounts\/\d+/);
+
+  await page.getByRole("link", { name: "查看周报" }).click();
+  await expect(page).toHaveURL(/\/event_accounts\/\d+\/weekly_reports/);
+  await expect(page.getByRole("heading", { name: "周报 \/ 飞书通知" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "首发" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "周报" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "生成通知" })).toHaveCount(0);
+  await expect(page.getByText("chat_id / oc_e2e_weekly").first()).toBeVisible();
+  const notificationCount = await page.locator("tbody tr").count();
+  await shot("85-周报列表");
+
+  await page.getByRole("link", { name: "周报" }).first().click();
+  await expect(page).toHaveURL(/\/weekly_reports\/\d+/);
+  await expect(page.getByRole("heading", { name: "周报详情" })).toBeVisible();
+  await expect(page.getByText("实际生成的消息")).toBeVisible();
+  await expect(page.locator("pre")).toContainText("本周新增与补充");
+  await shot("86-周报详情");
+
+  await page.getByRole("link", { name: "← 返回周报列表" }).click();
+  await expect(page).toHaveURL(/\/weekly_reports/);
+  await page.getByRole("button", { name: "重新推送" }).first().click();
+  await expect(page).toHaveURL(/\/weekly_reports/);
+  await expect(page.getByText("已加入重新推送队列")).toBeVisible();
+  await expect(page.locator("tbody tr")).toHaveCount(notificationCount);
 });
 
 test("下载数据 JSON：结果以 JSON 形态提供", async ({ page, shot }) => {

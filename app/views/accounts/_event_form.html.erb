@@ -7,7 +7,7 @@
       <label class="block text-sm font-medium text-text-primary mb-2">活动名称 <span class="text-red-500">*</span></label>
       <%= f.text_field :name, value: @account.nickname, required: true,
             placeholder: "例如：科创中国创新创业投资大会",
-            class: "w-full px-4 py-3 border border-border-primary rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent" %>
+            class: "w-full bg-white px-4 py-3 border border-border-primary rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent" %>
       <p class="mt-2 text-sm text-text-secondary">调研的检索主体；系统会基于它执行下方列出的 13 条固定搜索组合。</p>
     </div>
 
@@ -15,7 +15,7 @@
       <label class="block text-sm font-medium text-text-primary mb-2">指定页面（可选）</label>
       <%= f.url_field :url, value: @account.event_url,
             placeholder: "https://... 官网、获奖公示页等",
-            class: "w-full px-4 py-3 border border-border-primary rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent" %>
+            class: "w-full bg-white px-4 py-3 border border-border-primary rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent" %>
       <p class="mt-2 text-sm text-text-secondary">填写后这页会最先被抓取并排进分析材料最前面。</p>
     </div>
 
@@ -23,7 +23,7 @@
       <label class="block text-sm font-medium text-text-primary mb-2">搜索关键词（可选，每行一个）</label>
       <%= f.text_area :keywords, value: @account.keywords.join("\n"), rows: 4,
             placeholder: "例如：\n获奖名单\n决赛\n路演",
-            class: "w-full px-4 py-3 border border-border-primary rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent" %>
+            class: "w-full bg-white px-4 py-3 border border-border-primary rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent" %>
       <p class="mt-2 text-sm text-text-secondary">不会替换固定搜索组合；每项会额外执行一条「活动名 + 关键词」搜索。</p>
     </div>
 
@@ -62,7 +62,7 @@
       <label class="block text-sm font-medium text-text-primary mb-2">研究目的（可选）</label>
       <%= f.text_area :purpose, value: @account.purpose, rows: 3,
             placeholder: "例如：找出获奖项目的创始人联系方式，用于投资尽调",
-            class: "w-full px-4 py-3 border border-border-primary rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent" %>
+            class: "w-full bg-white px-4 py-3 border border-border-primary rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent" %>
       <p class="mt-2 text-sm text-text-secondary">会注入抽取提示词，让调研围绕这些关注点组织。</p>
     </div>
 
@@ -70,7 +70,29 @@
       <label class="block text-sm font-medium text-text-primary mb-2">其它背景信息（可选）</label>
       <%= f.text_area :other_information, value: @account.other_information, rows: 3,
             placeholder: "同名活动、往届届次、主办方口径等需要消歧的信息",
-            class: "w-full px-4 py-3 border border-border-primary rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent" %>
+            class: "w-full bg-white px-4 py-3 border border-border-primary rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent" %>
+    </div>
+
+    <div class="rounded-lg border border-border-primary bg-white p-4 space-y-3">
+      <label class="flex items-center gap-2 text-sm font-medium text-text-primary">
+        <%= f.check_box :weekly_research_enabled, { checked: @account.weekly_research_enabled? }, "true", "false" %>
+        每周自动研究并推送新增信息
+      </label>
+      <div>
+        <%= f.label :feishu_receive_id_type, "飞书目标类型", class: "block text-sm font-medium text-text-primary mb-2" %>
+        <%= f.select :feishu_receive_id_type,
+              [["私信（open_id）", "open_id"], ["群聊（chat_id）", "chat_id"]],
+              { selected: @account.event_config["feishu_receive_id_type"].presence, include_blank: "跟随全局配置" },
+              class: "w-full bg-white px-4 py-3 border border-border-primary rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent" %>
+      </div>
+      <div>
+        <%= f.label :feishu_receive_id, "飞书目标 ID（可选）", class: "block text-sm font-medium text-text-primary mb-2" %>
+        <%= f.text_field :feishu_receive_id, value: @account.feishu_receive_id,
+              placeholder: "群聊填 chat_id，私信填 open_id；留空则使用全局配置",
+              class: "w-full bg-white px-4 py-3 border border-border-primary rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent" %>
+        <p class="mt-2 text-xs text-text-secondary">活动级目标优先于全局配置；旧版 feishu_chat_id 仍兼容。</p>
+      </div>
+
     </div>
 
     <div class="flex justify-end">
