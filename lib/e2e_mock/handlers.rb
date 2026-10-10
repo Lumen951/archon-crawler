@@ -222,7 +222,7 @@ module E2eMock
           book_id = query["bookId"].to_s
           name = "weread_native/cover/#{File.basename(book_id)}.json"
           body = if E2eMock.fixture_exist?(name)
-                   E2eMock.fixture(name)
+                   fresh_cover(E2eMock.fixture(name))
                  else
                    # 没有 fixture 的帐号：无最新文章（与上游「未订阅/无内容」行为一致）
                    { errCode: 0, reviewId: "" }
@@ -236,7 +236,21 @@ module E2eMock
           review_id = query["reviewId"].to_s
           name = "weread_native/content/#{File.basename(review_id)}.html"
           body = E2eMock.fixture_exist?(name) ? E2eMock.fixture(name) : E2eMock.fixture("weread_native/content/e2ereview0001.html")
-          { status: 200, body: body, headers: { "Content-Type" => "text/html; charset=utf-8" } }
+          { status: 200, body: fresh_create_time(body), headers: { "Content-Type" => "text/html; charset=utf-8" } }
+        end
+
+        # fixture 里的发布时间写死于录制当天，会随真实日期滑出 RSS「最近7天」
+        # 这类时间窗口；回放时统一替换为当前时间，闭环不依赖墙钟日期。
+        def fresh_cover(raw)
+          cover = JSON.parse(raw)
+          cover["time"] = Time.current.to_i if cover.is_a?(Hash)
+          JSON.generate(cover)
+        rescue JSON::ParserError
+          raw
+        end
+
+        def fresh_create_time(html)
+          html.gsub(/create_time:\s*'[^']*'/, "create_time: '#{Time.current.strftime('%Y-%m-%d %H:%M')}'")
         end
 
         def json(hash, extra_headers = {})

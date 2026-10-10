@@ -124,6 +124,9 @@ module E2e
       articles_file = SAMPLE_ROOT.join("wechat_articles.json")
       return unless articles_file.exist?
 
+      rows = JSON.parse(articles_file.read)
+      shift = sample_published_at_shift(rows)
+
       cover_cycle = ASSETS.grep(/\Acover-/).cycle
       JSON.parse(articles_file.read).each do |row|
         account = WechatAccount.find_by(fakeid: row["account_fakeid"])
@@ -138,7 +141,7 @@ module E2e
           author: row["author"].presence,
           digest: row["digest"].presence,
           cover_url: cover_cycle.next,
-          published_at: row["published_at"] ? Time.at(row["published_at"]) : nil,
+          published_at: row["published_at"] ? Time.at(row["published_at"] + shift) : nil,
           content_html: sample_content_html(row["content_key"])
         )
       rescue ActiveRecord::RecordInvalid, StandardError => e
@@ -146,6 +149,13 @@ module E2e
       end
 
       puts "[e2e:seed] 已导入生产样本：帐号 #{rows.size} 篇文章 #{Article.where.not(content_html: nil).count} 篇有正文"
+    end
+
+    # 样本发布时间是导出当天写死的，会随真实日期滑出 RSS「最近7天」这类
+    # 时间窗口；整体平移到最新一篇 ≈ 当前时间，保持相对顺序与间隔。
+    def sample_published_at_shift(rows)
+      newest = rows.filter_map { |row| row["published_at"] }.max
+      newest ? Time.current.to_i - newest : 0
     end
 
     # 样本帐号的微信读书 book_id：MP_WXS_ 形态原样用；base64 biz 形态解码出
