@@ -19,6 +19,10 @@ class EventResearchNotificationJobTest < ActiveSupport::TestCase
     assert notification.initial?
     assert notification.sent?
     assert_match "完整研究结果", notification.payload_text
+    assert_match "奖项/项目", notification.payload_text
+    refute_match "query:", notification.payload_text
+    assert_match research_url(@run), notification.payload_text
+    assert_equal notification.payload_text, sent.first.first
     assert_equal "oc_test", sent.first.last[:receive_id]
     assert_equal "chat_id", sent.first.last[:receive_id_type]
   end
@@ -48,6 +52,8 @@ class EventResearchNotificationJobTest < ActiveSupport::TestCase
     weekly = EventResearchNotification.find_by!(event_research_run: second)
     assert weekly.weekly?
     assert_match "乙公司", weekly.payload_text
+    assert_match research_url(second), weekly.payload_text
+    refute_match research_url(@run), weekly.payload_text
   end
 
   test "管理员重推复用原正文且不创建新通知" do
@@ -65,6 +71,17 @@ class EventResearchNotificationJobTest < ActiveSupport::TestCase
     assert EventResearchNotification.find_by!(event_research_run: @run).sent?
   end
 
+  private
+
+  def research_url(run)
+    Rails.application.routes.url_helpers.event_account_url(
+      @account,
+      run_id: run.id,
+      host: "localhost",
+      port: 3000,
+      protocol: "http"
+    )
+  end
 
   def result(person, company)
     { "event" => { "name" => "测试大会" }, "awards" => [ { "rank" => "一等奖", "people" => [ { "name" => person } ] } ], "companies" => [ { "name" => company } ] }

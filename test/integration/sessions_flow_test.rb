@@ -56,6 +56,20 @@ class SessionsFlowTest < ActionDispatch::IntegrationTest
     assert_match SessionsController::MAGIC_LINK_REQUEST_NOTICE, response.body
   end
 
+  test "password login returns to the requested event research run" do
+    account = EventAccount.create!(nickname: "测试大会", fakeid: "event:login-return")
+    run = EventResearchRun.create!(account: account, status: :completed, completed_at: Time.current)
+    destination = event_account_path(account, run_id: run.id)
+
+    get destination
+
+    assert_redirected_to new_session_path
+
+    post session_path, params: { email_address: @confirmed_user.email_address, password: "password123" }
+
+    assert_redirected_to destination
+  end
+
   test "magic link logs in confirmed user" do
     get magic_link_path(@confirmed_user.generate_magic_link_token)
 
