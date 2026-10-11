@@ -298,4 +298,100 @@ class AccountsControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to account_path(account)
     assert_equal "sitemap", account.reload.crawl_mode
   end
+
+  test "default tab lists article accounts but not event accounts" do
+    wechat = WechatAccount.create!(fakeid: "tabs_wechat", nickname: "普通公众号")
+    event = EventAccount.create!(nickname: "标签页活动", fakeid: "event:tabs", event_config: { weekly_research_enabled: true })
+
+    get accounts_path
+
+    assert_response :success
+    assert_select "a[href=?]", account_path(wechat), text: wechat.nickname
+    assert_select "a[href=?]", event_account_path(event), text: event.nickname, count: 0
+  end
+
+  test "event tab lists event accounts with research status and excludes article accounts" do
+    event = EventAccount.create!(nickname: "标签页活动", fakeid: "event:tabs", event_config: { weekly_research_enabled: true })
+    EventResearchRun.create!(account: event, status: :completed)
+    WechatAccount.create!(fakeid: "tabs_wechat", nickname: "普通公众号")
+
+    get accounts_path, params: { scope: "event" }
+
+    assert_response :success
+    assert_select "a[href=?]", event_account_path(event), text: event.nickname
+    assert_select "a[href=?]", account_path(WechatAccount.find_by!(fakeid: "tabs_wechat")), count: 0
+    assert_select "td", text: /1 次调研/
+    assert_select "td", text: /完成 1/
+  end
+
+  test "event tab renders empty state without event accounts" do
+    get accounts_path, params: { scope: "event" }
+
+    assert_response :success
+    assert_select "p", text: "未找到活动"
+    assert_select "form[action=?]", bulk_enable_weekly_research_accounts_path
+  end
+
+  test "bulk weekly research toggle updates only event accounts and preserves other config" do
+    event_on = EventAccount.create!(nickname: "待开启活动", fakeid: "event:bulk-on")
+    event_off = EventAccount.create!(nickname: "待关闭活动", fakeid: "event:bulk-off",
+      event_config: { weekly_research_enabled: true, keywords: [ "获奖名单" ] })
+    wechat = WechatAccount.create!(fakeid: "bulk_wechat", nickname: "普通公众号", metadata: { "foo" => "bar" })
+
+    post bulk_enable_weekly_research_accounts_path, params: { account_ids: [ event_on.id, wechat.id ], scope: "event" }
+
+    assert_redirected_to accounts_path(scope: "event")
+    follow_redirect!
+    assert_match "已开启 1 个活动的每周定期调研", response.body
+    assert event_on.reload.weekly_research_enabled?
+    assert_equal({ "foo" => "bar" }, wechat.reload.metadata)
+
+    post bulk_disable_weekly_research_accounts_path, params: { account_ids: [ event_off.id ], scope: "event" }
+
+    assert_redirected_to accounts_path(scope: "event")
+    account = event_off.reload
+    assert_not account.weekly_research_enabled?
+    assert_equal [ "获奖名单" ], account.keywords
+  end
+
+  test "toggle status redirects back to the event tab when scoped" do
+    event = EventAccount.create!(nickname: "切换状态活动", fakeid: "event:toggle-scope")
+
+    post toggle_status_account_path(event), params: { scope: "event" }
+    assert_redirected_to accounts_path(scope: "event")
+    assert event.reload.inactive?
+
+    post toggle_status_account_path(event)
+    assert_redirected_to accounts_path
+    assert event.reload.active?
+  end
+
+  test "select all on event tab only resolves event accounts" do
+    event = EventAccount.create!(nickname: "全选活动", fakeid: "event:select-all")
+    wechat = WechatAccount.create!(fakeid: "select_all_wechat", nickname: "普通公众号", metadata: { "foo" => "bar" })
+
+    post bulk_enable_weekly_research_accounts_path, params: { select_all: "true", scope: "event" }
+
+    assert event.reload.weekly_research_enabled?
+    assert_equal({ "foo" => "bar" }, wechat.reload.metadata)
+  end
+
+  test "weekly research bulk toggle requires admin" do
+    user = User.create!(
+      email_address: "member_bulk@example.com",
+      password: "password123",
+      password_confirmation: "password123",
+      role: :user,
+      email_confirmed_at: Time.current
+    )
+    event = EventAccount.create!(nickname: "权限活动", fakeid: "event:perm")
+
+    delete session_path
+    post session_path, params: { email_address: user.email_address, password: "password123" }
+
+    post bulk_enable_weekly_research_accounts_path, params: { account_ids: [ event.id ] }
+
+    assert_redirected_to root_path
+    assert_not event.reload.weekly_research_enabled?
+  end
 end

@@ -13,8 +13,9 @@ require "base64"
 #
 # 配置（Option）:
 #   feishu_app_id / feishu_app_secret  自建应用凭据
-#   feishu_receive_id                  推送目标：私聊 open_id 或群 chat_id
+#   feishu_receive_id                  扫码登录提醒的推送目标：私聊 open_id 或群 chat_id
 #   feishu_receive_id_type             "open_id"（默认）或 "chat_id"
+#   event_feishu_receive_id(_type)     活动调研通知的默认目标（与登录提醒独立，默认 chat_id）
 #
 class FeishuNotifier
   # 注意：BASE_URL 只写 origin，路径前缀 /open-apis 放到每个请求里。

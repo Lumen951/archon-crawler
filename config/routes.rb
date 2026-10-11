@@ -29,6 +29,8 @@ Rails.application.routes.draw do
       post :bulk_untag
       post :bulk_enable
       post :bulk_disable
+      post :bulk_enable_weekly_research
+      post :bulk_disable_weekly_research
       post :bulk_destroy
       post :bulk_crawl
       get  :tag_suggestions

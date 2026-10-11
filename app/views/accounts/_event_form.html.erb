@@ -88,9 +88,9 @@
       <div>
         <%= f.label :feishu_receive_id, "飞书目标 ID（可选）", class: "block text-sm font-medium text-text-primary mb-2" %>
         <%= f.text_field :feishu_receive_id, value: @account.feishu_receive_id,
-              placeholder: "群聊填 chat_id，私信填 open_id；留空则使用全局配置",
+              placeholder: "群聊填 chat_id，私信填 open_id；留空则使用全局活动调研默认目标",
               class: "w-full bg-white px-4 py-3 border border-border-primary rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent" %>
-        <p class="mt-2 text-xs text-text-secondary">活动级目标优先于全局配置；旧版 feishu_chat_id 仍兼容。</p>
+        <p class="mt-2 text-xs text-text-secondary">活动级目标优先；留空时使用管理设置里的「活动调研默认推送目标」，与扫码登录提醒的目标相互独立。旧版 feishu_chat_id 仍兼容。</p>
       </div>
 
     </div>

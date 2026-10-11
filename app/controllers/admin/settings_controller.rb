@@ -225,6 +225,17 @@ class Admin::SettingsController < Admin::BaseController
       message = "飞书推送配置更新成功"
     end
 
+    # 活动调研通知的独立默认目标：表单总是提交该字段，留空表示清除
+    if params.key?(:event_feishu_receive_id)
+      Option.event_feishu_receive_id = params[:event_feishu_receive_id].to_s.strip.presence
+      message = "飞书推送配置更新成功"
+    end
+
+    if params.key?(:event_feishu_receive_id_type) && params[:event_feishu_receive_id_type].in?(%w[open_id chat_id])
+      Option.event_feishu_receive_id_type = params[:event_feishu_receive_id_type]
+      message = "飞书推送配置更新成功"
+    end
+
     if params[:feishu_encrypt_key].present?
       Option.feishu_encrypt_key = params[:feishu_encrypt_key].to_s.strip
       message = "飞书推送配置更新成功"
@@ -733,6 +744,8 @@ class Admin::SettingsController < Admin::BaseController
     @feishu_app_secret = Option.feishu_app_secret
     @feishu_receive_id = Option.feishu_receive_id
     @feishu_receive_id_type = Option.feishu_receive_id_type
+    @event_feishu_receive_id = Option.event_feishu_receive_id
+    @event_feishu_receive_id_type = Option.event_feishu_receive_id_type
     @feishu_encrypt_key = Option.feishu_encrypt_key
     @feishu_login_mode = Option.feishu_login_mode
     @feishu_callback_url = build_feishu_callback_url

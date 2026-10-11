@@ -4,7 +4,7 @@ import { Controller } from "@hotwired/stimulus"
 // and select-all-matching modes. Works with the sticky action bar.
 export default class extends Controller {
   static targets = ["checkbox", "selectAll", "count", "actionBar", "selectMatching", "matchingCount"]
-  static values = { total: Number }
+  static values = { total: Number, scope: String }
 
   connect() {
     this.selected = new Set()
@@ -105,6 +105,15 @@ export default class extends Controller {
           form.appendChild(qInput)
         }
       })
+      // 保留当前 tab（scope=event 为活动调研），服务端 select-all 按 tab 圈定范围
+      const scope = urlParams.get('scope')
+      if (scope) {
+        const scopeInput = document.createElement('input')
+        scopeInput.type = 'hidden'
+        scopeInput.name = 'scope'
+        scopeInput.value = scope
+        form.appendChild(scopeInput)
+      }
     } else {
       this.selected.forEach(id => {
         const input = document.createElement('input')
@@ -160,15 +169,20 @@ export default class extends Controller {
     this._saveToStorage()
   }
 
+  // 选中状态按 scope（帐号 tab）隔离，切换 tab 时互不残留
+  _storageKey() {
+    return `bulk_selected:${this.scopeValue || "default"}`
+  }
+
   _saveToStorage() {
     try {
-      sessionStorage.setItem('bulk_selected', JSON.stringify([...this.selected]))
+      sessionStorage.setItem(this._storageKey(), JSON.stringify([...this.selected]))
     } catch (_) {}
   }
 
   _loadFromStorage() {
     try {
-      const data = sessionStorage.getItem('bulk_selected')
+      const data = sessionStorage.getItem(this._storageKey())
       if (data) {
         const ids = JSON.parse(data)
         ids.forEach(id => this.selected.add(id))

@@ -14,4 +14,19 @@ class WeeklyEventResearchJobTest < ActiveSupport::TestCase
     run = enabled.event_research_runs.sole
     assert run.refresh_cache?
   end
+
+  test "停用的账号即使开着周调研也不启动" do
+    inactive = EventAccount.create!(
+      nickname: "停用但开了周调研",
+      fakeid: "event:weekly-inactive",
+      status: :inactive,
+      event_config: { weekly_research_enabled: true }
+    )
+
+    assert_no_enqueued_jobs only: EventResearchJob do
+      WeeklyEventResearchJob.perform_now
+    end
+
+    assert_empty inactive.event_research_runs.reload
+  end
 end

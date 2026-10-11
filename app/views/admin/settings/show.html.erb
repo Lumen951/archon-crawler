@@ -801,13 +801,15 @@
           <p class="text-sm text-text-secondary mt-1">
             每天定时提醒扫码登录：微信读书（无条件推送，用于扩充账号池）与微信公众号平台（仅在会话失效时推送）。
             推送方式可选单二维码（推一张码）或交互卡片（成员各自点击后私聊二维码）。
+            活动调研通知（首发/周报）使用下方独立的「活动调研默认推送目标」，与扫码登录提醒互不影响。
           </p>
         </div>
         <div class="panel-body">
           <% if @feishu_enabled && @feishu_app_id.present? && @feishu_receive_id.present? %>
             <div class="notice notice-success mb-4">
               <p class="font-medium">✓ 已启用</p>
-              <p class="mt-0.5 text-text-secondary">目标：<span class="font-mono"><%= @feishu_receive_id_type %></span> / <%= @feishu_receive_id %></p>
+              <p class="mt-0.5 text-text-secondary">扫码登录目标：<span class="font-mono"><%= @feishu_receive_id_type %></span> / <%= @feishu_receive_id %></p>
+              <p class="mt-0.5 text-text-secondary">活动调研目标：<% if @event_feishu_receive_id.present? %><span class="font-mono"><%= @event_feishu_receive_id_type %></span> / <%= @event_feishu_receive_id %><% else %>未配置（活动账号未单独配置目标时不推送）<% end %></p>
             </div>
           <% else %>
             <div class="notice notice-warning mb-4">未配置飞书推送。配置完成后，每天将自动提醒登录微信读书账号。</div>
@@ -849,7 +851,8 @@
 
             <div class="form-row">
               <div>
-                <label class="form-label">推送目标 ID</label>
+                <label class="form-label">推送目标 ID（扫码登录提醒）</label>
+                <p class="form-hint">仅用于微信读书/公众号平台的扫码登录提醒，不影响活动调研通知。</p>
               </div>
               <div>
                 <input type="text" name="feishu_receive_id" value="<%= @feishu_receive_id %>" class="form-input"
@@ -859,12 +862,35 @@
 
             <div class="form-row">
               <div>
-                <label class="form-label">目标类型</label>
+                <label class="form-label">扫码登录目标类型</label>
               </div>
               <div>
                 <select name="feishu_receive_id_type" class="form-input max-w-60">
                   <option value="open_id" <%= 'selected' if @feishu_receive_id_type == 'open_id' %>>私聊（open_id）</option>
                   <option value="chat_id" <%= 'selected' if @feishu_receive_id_type == 'chat_id' %>>群聊（chat_id）</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div>
+                <label class="form-label">活动调研默认推送目标</label>
+                <p class="form-hint">活动调研的首发/周报通知，在活动账号未单独配置飞书目标时发到这里；留空则该类活动不推送。</p>
+              </div>
+              <div>
+                <input type="text" name="event_feishu_receive_id" value="<%= @event_feishu_receive_id %>" class="form-input"
+                       placeholder="群填 chat_id（oc_xxx），私聊填 open_id（ou_xxx）">
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div>
+                <label class="form-label">活动调研目标类型</label>
+              </div>
+              <div>
+                <select name="event_feishu_receive_id_type" class="form-input max-w-60">
+                  <option value="chat_id" <%= 'selected' if @event_feishu_receive_id_type == 'chat_id' %>>群聊（chat_id）</option>
+                  <option value="open_id" <%= 'selected' if @event_feishu_receive_id_type == 'open_id' %>>私聊（open_id）</option>
                 </select>
               </div>
             </div>

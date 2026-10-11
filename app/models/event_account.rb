@@ -108,17 +108,48 @@ class EventAccount < Account
     nil
   end
 
+  # 推送目标：活动级配置 > 管理设置里的「活动调研默认推送目标」。
+  # 不回退到扫码登录提醒的 feishu_receive_id —— 两类通知的受众不同。
   def feishu_target
     if feishu_receive_id.present?
       { receive_id: feishu_receive_id, receive_id_type: feishu_receive_id_type || "chat_id" }
-    elsif Option.feishu_receive_id.present?
-      { receive_id: Option.feishu_receive_id, receive_id_type: Option.feishu_receive_id_type.presence || "open_id" }
+    elsif Option.event_feishu_receive_id.present?
+      { receive_id: Option.event_feishu_receive_id, receive_id_type: Option.event_feishu_receive_id_type.presence || "chat_id" }
     end
   end
 
   scope :weekly_research_enabled, -> {
     where("metadata -> 'event_config' ->> 'weekly_research_enabled' = ?", "true")
   }
+
+  # IS DISTINCT FROM 而不是 where.not：weekly_research_enabled 为 NULL
+  #（从未配置过）的活动也算「未开启」，where.not 的 NOT (NULL) 会把它们漏掉
+  scope :weekly_research_disabled, -> {
+    where("metadata -> 'event_config' ->> 'weekly_research_enabled' IS DISTINCT FROM ?", "true")
+  }
+
+  # 周调研列表筛选（q[with_weekly_research] = enabled / disabled），空值表示不过滤
+  scope :with_weekly_research, ->(flag) {
+    case flag
+    when "enabled" then weekly_research_enabled
+    when "disabled" then weekly_research_disabled
+    else all
+    end
+  }
+
+  # 周调研是否真的会执行：既要在配置里开启，账号也不能处于停用状态
+  # （WeeklyEventResearchJob 只调研启用中的账号）
+  def weekly_research_active?
+    weekly_research_enabled? && active?
+  end
+
+  def self.ransackable_scopes(auth_object = nil)
+    super + %w[with_weekly_research]
+  end
+
+  def self.ransackable_scopes_skip_sanitize_args
+    super + %w[with_weekly_research]
+  end
 
   # 传给 EventResearch::Researcher 的调研配置（键与 Researcher 的关键字参数对齐）。
   def research_config

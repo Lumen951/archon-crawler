@@ -115,9 +115,28 @@ class EventAccountTest < ActiveSupport::TestCase
     assert_equal({ receive_id: "oc_legacy", receive_id_type: "chat_id" }, account.feishu_target)
 
     account.event_config = { feishu_receive_id: nil, feishu_receive_id_type: nil, feishu_chat_id: nil }
-    Option.feishu_receive_id = "oc_global"
+    # 扫码登录提醒的全局目标不作为活动通知的回退，两者受众不同
+    Option.feishu_receive_id = "oc_login"
     Option.feishu_receive_id_type = "chat_id"
-    assert_equal({ receive_id: "oc_global", receive_id_type: "chat_id" }, account.feishu_target)
+    assert_nil account.feishu_target
+
+    Option.event_feishu_receive_id = "oc_event"
+    Option.event_feishu_receive_id_type = "chat_id"
+    assert_equal({ receive_id: "oc_event", receive_id_type: "chat_id" }, account.feishu_target)
+  end
+
+  test "with_weekly_research 筛选 scope：enabled/disabled 各取一边，all/nil 不过滤" do
+    enabled = EventAccount.create!(nickname: "周调研开", fakeid: "event:filter-on", event_config: { weekly_research_enabled: true })
+    disabled = EventAccount.create!(nickname: "周调研关", fakeid: "event:filter-off")
+
+    assert_includes EventAccount.with_weekly_research("enabled"), enabled
+    assert_not_includes EventAccount.with_weekly_research("enabled"), disabled
+    assert_includes EventAccount.with_weekly_research("disabled"), disabled
+    # 「全部活动」pill 显式传 all：必须等价于不过滤
+    assert_includes EventAccount.with_weekly_research("all"), enabled
+    assert_includes EventAccount.with_weekly_research("all"), disabled
+    assert_includes EventAccount.with_weekly_research(nil), enabled
+    assert_includes EventAccount.with_weekly_research(nil), disabled
   end
 
   test "删除账号时级联删除调研记录" do

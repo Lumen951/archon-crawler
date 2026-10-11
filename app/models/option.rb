@@ -750,6 +750,25 @@ class Option < ApplicationRecord
       set("feishu_receive_id_type", val)
     end
 
+    # 活动调研通知（首发/周报推送）的默认推送目标，与扫码登录提醒的
+    # feishu_receive_id 相互独立 —— 登录提醒面向管理员群，调研报告通常发业务群。
+    def event_feishu_receive_id
+      get("event_feishu_receive_id")
+    end
+
+    def event_feishu_receive_id=(val)
+      set("event_feishu_receive_id", val)
+    end
+
+    # 默认 chat_id：调研报告的常见形态是发到群里
+    def event_feishu_receive_id_type
+      get("event_feishu_receive_id_type") || "chat_id"
+    end
+
+    def event_feishu_receive_id_type=(val)
+      set("event_feishu_receive_id_type", val)
+    end
+
     def feishu_encrypt_key
       get("feishu_encrypt_key")
     end

@@ -1,7 +1,9 @@
 class AccountsController < ApplicationController
   include QueryPersistenceConcern
 
-  before_action :require_admin, only: [ :import_event_page, :import_event, :edit_event, :update_event ]
+  before_action :require_admin,
+    only: [ :import_event_page, :import_event, :edit_event, :update_event,
+            :bulk_enable_weekly_research, :bulk_disable_weekly_research ]
 
   # Maximum length for flash error messages to avoid cookie overflow
   MAX_FLASH_ERROR_LENGTH = 200
@@ -9,16 +11,17 @@ class AccountsController < ApplicationController
   persist_query_for :index
 
   def index
-    q_params = params.fetch(:q, {})
-    q_hash = q_params.respond_to?(:to_unsafe_h) ? q_params.to_unsafe_h : q_params.to_h
-    @q = Account.ransack(q_hash)
-    @accounts = @q.result(distinct: true).includes(:tags).order(activity_score: :desc, last_published_at: :desc).page(params[:page]).per(20)
-    @tags = Tag.ordered
-    @active_tag_id = params.dig(:q, :with_tag_id).to_s.presence
-    @active_tag = @active_tag_id.present? && @active_tag_id != "none" ? Tag.find_by(id: @active_tag_id) : nil
-    @total_filtered_count = @accounts.total_count
-    @due_for_crawl_count = @q.result.due_for_crawl.count
-    @crawl_progress = Account.activity_crawl_progress
+    # 帐号管理分两个 tab：文章帐号走抓取管线；活动调研（EventAccount）不抓文章，
+    # 关注点是完全不同的调研状态，列表、筛选与批量操作各自独立。
+    @event_scope = params[:scope] == "event"
+    @articles_tab_count = Account.where.not(type: "EventAccount").count
+    @event_tab_count = EventAccount.count
+
+    if @event_scope
+      load_event_index
+    else
+      load_accounts_index
+    end
   end
 
   def show
@@ -373,7 +376,7 @@ class AccountsController < ApplicationController
     @account = Account.find(params[:id])
     @account.update!(status: @account.active? ? :inactive : :active)
     flash[:success] = "帐号状态已更新"
-    redirect_back fallback_location: accounts_path
+    redirect_back fallback_location: accounts_index_fallback
   end
 
   def destroy
@@ -387,7 +390,7 @@ class AccountsController < ApplicationController
     redirect_to accounts_path
   rescue StandardError => e
     flash[:error] = "删除失败：#{e.message}"
-    redirect_back fallback_location: accounts_path
+    redirect_back fallback_location: accounts_index_fallback
   end
 
   def bulk_tag
@@ -396,7 +399,7 @@ class AccountsController < ApplicationController
 
     if tag_names.blank? || account_ids.blank?
       flash[:error] = "请选择帐号并输入标签"
-      redirect_back fallback_location: accounts_path and return
+      redirect_back fallback_location: accounts_index_fallback and return
     end
 
     tags = tag_names.map { |name| Tag.find_or_create_by_name(name) }.compact
@@ -408,10 +411,10 @@ class AccountsController < ApplicationController
       end
     end
     flash[:success] = "已为 #{account_ids.size} 个帐号添加 #{tags.size} 个标签"
-    redirect_back fallback_location: accounts_path
+    redirect_back fallback_location: accounts_index_fallback
   rescue StandardError => e
     flash[:error] = "操作失败：#{e.message}"
-    redirect_back fallback_location: accounts_path
+    redirect_back fallback_location: accounts_index_fallback
   end
 
   def bulk_untag
@@ -420,74 +423,82 @@ class AccountsController < ApplicationController
 
     if tag_ids.blank? || account_ids.blank?
       flash[:error] = "请选择帐号和标签"
-      redirect_back fallback_location: accounts_path and return
+      redirect_back fallback_location: accounts_index_fallback and return
     end
 
     removed = TagAccount.where(tag_id: tag_ids, account_id: account_ids).destroy_all.count
     flash[:success] = "已移除 #{removed} 个标签关联"
-    redirect_back fallback_location: accounts_path
+    redirect_back fallback_location: accounts_index_fallback
   rescue StandardError => e
     flash[:error] = "操作失败：#{e.message}"
-    redirect_back fallback_location: accounts_path
+    redirect_back fallback_location: accounts_index_fallback
   end
 
   def bulk_enable
     account_ids = resolve_bulk_account_ids
     if account_ids.blank?
       flash[:error] = "请选择帐号"
-      redirect_back fallback_location: accounts_path and return
+      redirect_back fallback_location: accounts_index_fallback and return
     end
 
     count = Account.where(id: account_ids).update_all(status: :active)
     flash[:success] = "已启用 #{count} 个帐号"
-    redirect_back fallback_location: accounts_path
+    redirect_back fallback_location: accounts_index_fallback
   rescue StandardError => e
     flash[:error] = "操作失败：#{e.message}"
-    redirect_back fallback_location: accounts_path
+    redirect_back fallback_location: accounts_index_fallback
   end
 
   def bulk_disable
     account_ids = resolve_bulk_account_ids
     if account_ids.blank?
       flash[:error] = "请选择帐号"
-      redirect_back fallback_location: accounts_path and return
+      redirect_back fallback_location: accounts_index_fallback and return
     end
 
     count = Account.where(id: account_ids).update_all(status: :inactive)
     flash[:success] = "已停用 #{count} 个帐号"
-    redirect_back fallback_location: accounts_path
+    redirect_back fallback_location: accounts_index_fallback
   rescue StandardError => e
     flash[:error] = "操作失败：#{e.message}"
-    redirect_back fallback_location: accounts_path
+    redirect_back fallback_location: accounts_index_fallback
   end
 
   def bulk_destroy
     account_ids = resolve_bulk_account_ids
     if account_ids.blank?
       flash[:error] = "请选择帐号"
-      redirect_back fallback_location: accounts_path and return
+      redirect_back fallback_location: accounts_index_fallback and return
     end
 
     count = Account.where(id: account_ids).destroy_all.count
     flash[:success] = "已删除 #{count} 个帐号"
-    redirect_to accounts_path
+    redirect_back fallback_location: accounts_index_fallback
   rescue StandardError => e
     flash[:error] = "删除失败：#{e.message}"
-    redirect_back fallback_location: accounts_path
+    redirect_back fallback_location: accounts_index_fallback
+  end
+
+  def bulk_enable_weekly_research
+    bulk_update_weekly_research(true)
+  end
+
+  def bulk_disable_weekly_research
+    bulk_update_weekly_research(false)
   end
 
   def bulk_crawl
     account_ids = resolve_bulk_account_ids
     if account_ids.blank?
       flash[:error] = "请选择帐号"
-      redirect_back fallback_location: accounts_path and return
+      redirect_back fallback_location: accounts_index_fallback and return
     end
 
     # 活动研究账号不走抓取管线（研究在各自的控制台单独启动）
     accounts = Account.where(id: account_ids).active.where.not(type: "EventAccount")
     if accounts.empty?
       flash[:error] = "选中的帐号中没有活跃帐号"
-      redirect_back fallback_location: accounts_path and return
+      redirect_back fallback_location: accounts_index_fallback and return
     end
 
     crawl_task = CrawlTask.create!(account_ids: accounts.ids, status: :pending)
@@ -496,7 +507,7 @@ class AccountsController < ApplicationController
     redirect_to crawl_task_path(crawl_task)
   rescue StandardError => e
     flash[:error] = "启动抓取失败：#{e.message}"
-    redirect_back fallback_location: accounts_path
+    redirect_back fallback_location: accounts_index_fallback
   end
 
   def tag_suggestions
@@ -840,16 +851,100 @@ class AccountsController < ApplicationController
 
   def resolve_bulk_account_ids
     if params[:select_all] == "true"
+      # select-all 只作用于当前 tab 的账号集合：活动调研 tab 不会误伤文章帐号，反之亦然
+      scope = params[:scope] == "event" ? EventAccount.all : Account.where.not(type: "EventAccount")
       if params[:q].present?
-        q_params = params[:q]
-        q_hash = q_params.respond_to?(:to_unsafe_h) ? q_params.to_unsafe_h : q_params.to_h
-        scope = Account.ransack(q_hash).result
-      else
-        scope = Account.all
+        scope = scope.ransack(index_q_hash).result
       end
       scope.pluck(:id)
     else
       Array(params[:account_ids]).map(&:to_i).reject(&:zero?)
     end
+  end
+
+  def load_accounts_index
+    scope = Account.where.not(type: "EventAccount")
+    @q = scope.ransack(index_q_hash)
+    @accounts = @q.result(distinct: true).includes(:tags).order(activity_score: :desc, last_published_at: :desc).page(params[:page]).per(20)
+    @tags = Tag.ordered
+    @active_tag_id = params.dig(:q, :with_tag_id).to_s.presence
+    @active_tag = @active_tag_id.present? && @active_tag_id != "none" ? Tag.find_by(id: @active_tag_id) : nil
+    @total_filtered_count = @accounts.total_count
+    @due_for_crawl_count = @q.result.due_for_crawl.count
+    # 活动研究账号不进抓取管线，活跃度/抓取进度统计不把它们算进去
+    @crawl_progress = Account.activity_crawl_progress(scope)
+  end
+
+  def load_event_index
+    @q = EventAccount.ransack(index_q_hash)
+    @accounts = @q.result(distinct: true).order(created_at: :desc).page(params[:page]).per(20)
+    @total_filtered_count = @accounts.total_count
+    @weekly_enabled_count = EventAccount.weekly_research_enabled.count
+    load_event_run_stats
+  end
+
+  # 每个活动账号的调研概况（总次数 / 完成次数 / 最近一轮），两次聚合查询取齐一页数据
+  def load_event_run_stats
+    # distinct + order 的关系不能直接 .ids（pluck 会丢排序列），从记录取
+    account_ids = @accounts.map(&:id)
+    @event_run_stats = {}
+    @last_event_runs = {}
+    return if account_ids.empty?
+
+    completed_status = EventResearchRun.statuses.fetch(:completed)
+    rows = EventResearchRun.where(account_id: account_ids).group(:account_id).pluck(
+      :account_id,
+      Arel.sql("COUNT(*)"),
+      Arel.sql("COUNT(*) FILTER (WHERE status = #{completed_status})"),
+      Arel.sql("MAX(id)")
+    )
+    @event_run_stats = rows.each_with_object({}) do |row, stats|
+      account_id, total, completed_count, last_run_id = row
+      stats[account_id] = { total: total, completed: completed_count, last_run_id: last_run_id }
+    end
+    last_run_ids = @event_run_stats.values.map { |stats| stats[:last_run_id] }
+    @last_event_runs = EventResearchRun.where(id: last_run_ids).index_by(&:account_id)
+  end
+
+  # 活动账号的批量周调研开关。只写 event_config 子对象的这一个键，
+  # 保存时的 normalize 会保留 url/keywords/飞书等其它配置。
+  def bulk_update_weekly_research(enabled)
+    account_ids = resolve_bulk_account_ids
+    if account_ids.blank?
+      flash[:error] = "请选择帐号"
+      redirect_back fallback_location: accounts_index_fallback and return
+    end
+
+    count = 0
+    EventAccount.where(id: account_ids).find_each do |account|
+      account.event_config = { weekly_research_enabled: enabled }
+      account.save!
+      count += 1
+    end
+
+    state = enabled ? "开启" : "关闭"
+    flash[:success] = "已#{state} #{count} 个活动的每周定期调研"
+    redirect_back fallback_location: accounts_index_fallback
+  rescue StandardError => e
+    flash[:error] = "操作失败：#{e.message}"
+    redirect_back fallback_location: accounts_index_fallback
+  end
+
+  def index_q_hash
+    q_params = params.fetch(:q, {})
+    q_params.respond_to?(:to_unsafe_h) ? q_params.to_unsafe_h : q_params.to_h
+  end
+
+  # 布局是 <meta name="referrer" content="no-referrer">，Turbo 提交表单不带
+  # Referer，redirect_back 实际总是落在 fallback 上。所以所有列表操作都按
+  # 当前 tab（scope=event 为活动调研）显式回退，避免操作后被甩到普通帐号列表。
+  def accounts_index_fallback
+    params[:scope] == "event" ? accounts_path(scope: "event") : accounts_path
+  end
+
+  # 两个 tab 的筛选条件分开记忆（QueryPersistenceConcern 按此 key 存取），
+  # 避免 tab 之间互相恢复对方的筛选状态。restore 是 before_action，只能看 params。
+  def query_persistence_cache_key
+    "#{super}:#{params[:scope] == "event" ? "event" : "accounts"}"
   end
 end

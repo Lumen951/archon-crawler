@@ -46,3 +46,10 @@ export async function gotoAccounts(page: Page): Promise<void> {
   await page.goto("/accounts?reset=1");
   await expect(page.getByRole("heading", { name: "帐号管理" })).toBeVisible();
 }
+
+// 活动调研 tab：活动账号（EventAccount）在独立 tab，不与文章账号混排
+export async function gotoEventAccounts(page: Page): Promise<void> {
+  await page.goto("/accounts?reset=1&scope=event");
+  await expect(page.getByRole("heading", { name: "帐号管理" })).toBeVisible();
+  await expect(page.getByText("全部活动")).toBeVisible();
+}

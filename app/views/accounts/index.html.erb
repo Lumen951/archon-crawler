@@ -1,21 +1,58 @@
-<div class="space-y-8" data-controller="bulk-selector" data-bulk-selector-total-value="<%= @total_filtered_count %>">
+<div class="space-y-8" data-controller="bulk-selector" data-bulk-selector-total-value="<%= @total_filtered_count %>" data-bulk-selector-scope-value="<%= @event_scope ? 'event' : 'accounts' %>">
   <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
     <div>
       <h1 class="text-2xl font-bold text-text-primary">帐号管理</h1>
-      <p class="mt-1 text-sm text-text-secondary">
-        <%= @total_filtered_count %> 个帐号
-        <% if @due_for_crawl_count > 0 %>
-          · <span class="text-brand font-semibold"><%= @due_for_crawl_count %> 个待抓取</span>
-        <% end %>
-      </p>
+      <% if @event_scope %>
+        <p class="mt-1 text-sm text-text-secondary">
+          <%= @total_filtered_count %> 个活动
+          <% if @weekly_enabled_count > 0 %>
+            · <span class="text-brand font-semibold"><%= @weekly_enabled_count %> 个已开启周调研</span>
+          <% end %>
+        </p>
+      <% else %>
+        <p class="mt-1 text-sm text-text-secondary">
+          <%= @total_filtered_count %> 个帐号
+          <% if @due_for_crawl_count > 0 %>
+            · <span class="text-brand font-semibold"><%= @due_for_crawl_count %> 个待抓取</span>
+          <% end %>
+        </p>
+      <% end %>
     </div>
-    <%= link_to import_accounts_path, class: "btn btn-primary" do %>
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-      </svg>
-      导入帐号
+    <% if @event_scope %>
+      <%= link_to import_event_page_accounts_path, class: "btn btn-primary" do %>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        新建活动调研
+      <% end %>
+    <% else %>
+      <%= link_to import_accounts_path, class: "btn btn-primary" do %>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        导入帐号
+      <% end %>
     <% end %>
   </div>
+
+  <!-- Tab 切换：文章帐号（抓取）与活动调研（调研）分开展示 -->
+  <div class="flex gap-1 bg-bg-secondary rounded-lg p-1 w-fit" data-turbo-prefetch="false">
+    <%= link_to accounts_path,
+        class: "inline-flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-medium transition #{@event_scope ? 'text-text-secondary hover:text-text-primary' : 'bg-bg-card text-text-primary shadow-sm'}" do %>
+      文章帐号
+      <span class="text-xs <%= @event_scope ? 'text-text-muted' : 'text-text-secondary' %>"><%= @articles_tab_count %></span>
+    <% end %>
+    <%= link_to accounts_path(scope: "event"),
+        class: "inline-flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-medium transition #{@event_scope ? 'bg-bg-card text-text-primary shadow-sm' : 'text-text-secondary hover:text-text-primary'}" do %>
+      活动调研
+      <span class="text-xs <%= @event_scope ? 'text-text-secondary' : 'text-text-muted' %>"><%= @event_tab_count %></span>
+    <% end %>
+  </div>
+
+  <% if @event_scope %>
+    <%= render "accounts/event_list" %>
+    <%= render "accounts/event_bulk_bar" %>
+  <% else %>
 
   <!-- 筛选面板：标签 / 活跃度 / 搜索合并为一块，减少纵向空间占用 -->
   <div class="bg-bg-card border border-border-primary rounded-lg p-4" data-turbo-prefetch="false">
@@ -134,7 +171,7 @@
             data: { controller: "auto-submit" } %>
         <%= f.select :type_eq,
             options_for_select(
-              [["全部平台", ""]] + Account.platform_classes.map { |klass| [klass.new.platform_name, klass.name] },
+              [["全部平台", ""]] + Account.platform_classes.reject { |klass| klass.name == "EventAccount" }.map { |klass| [klass.new.platform_name, klass.name] },
               params.dig(:q, :type_eq)
             ),
             {},
@@ -645,4 +682,5 @@
       </div>
     </div>
   </div>
+  <% end %>
 </div>

@@ -1,5 +1,5 @@
 import { expect } from "@playwright/test";
-import { gotoAccounts, login, shot, test } from "../support/helpers";
+import { DEMO_ACCOUNT_NAME, gotoAccounts, gotoEventAccounts, login, shot, test } from "../support/helpers";
 
 // 活动研究（Event Research）端到端闭环：
 // 导入活动配置 → 研究控制台 → 启动调研（Serper/网页/LLM/天眼查全部 mock）→
@@ -34,8 +34,8 @@ test("导入活动研究账号并展示配置摘要", async ({ page, shot }) => 
 test("启动调研：后台跑完后展示结果数据与过程日志", async ({ page, shot }) => {
   await login(page);
 
-  // 从帐号列表点击活动账号，应被引导到研究控制台
-  await gotoAccounts(page);
+  // 从活动调研 tab 点击活动账号，应被引导到研究控制台
+  await gotoEventAccounts(page);
   await page.getByRole("link", { name: EVENT_NAME }).first().click();
   await expect(page).toHaveURL(/\/event_accounts\/\d+/);
 
@@ -76,7 +76,7 @@ test("启动调研：后台跑完后展示结果数据与过程日志", async ({
 
 test("重新启动调研（忽略缓存）产生新一轮运行", async ({ page, shot }) => {
   await login(page);
-  await gotoAccounts(page);
+  await gotoEventAccounts(page);
   await page.getByRole("link", { name: EVENT_NAME }).first().click();
   await expect(page).toHaveURL(/\/event_accounts\/\d+/);
 
@@ -93,7 +93,7 @@ test("重新启动调研（忽略缓存）产生新一轮运行", async ({ page,
 
 test("查看生成的周报及实际消息正文", async ({ page, shot }) => {
   await login(page);
-  await gotoAccounts(page);
+  await gotoEventAccounts(page);
   await page.getByRole("link", { name: EVENT_NAME }).first().click();
   await expect(page).toHaveURL(/\/event_accounts\/\d+/);
 
@@ -124,7 +124,7 @@ test("查看生成的周报及实际消息正文", async ({ page, shot }) => {
 
 test("下载数据 JSON：结果以 JSON 形态提供", async ({ page, shot }) => {
   await login(page);
-  await gotoAccounts(page);
+  await gotoEventAccounts(page);
   await page.getByRole("link", { name: EVENT_NAME }).first().click();
   await expect(page).toHaveURL(/\/event_accounts\/\d+/);
 
@@ -140,4 +140,70 @@ test("下载数据 JSON：结果以 JSON 形态提供", async ({ page, shot }) =
   expect(data.awards[0].people[0].name).toBe("张三");
   expect(data.metadata.research_config.purpose).toBe("找出获奖项目创始人背景");
   await shot("84-数据下载");
+});
+
+test("活动调研 tab：列表展示调研概况，文章帐号不混排", async ({ page, shot }) => {
+  await login(page);
+
+  // 默认 tab 只有文章帐号，活动账号不在其中
+  await gotoAccounts(page);
+  await expect(page.getByRole("link", { name: EVENT_NAME })).toHaveCount(0);
+
+  await gotoEventAccounts(page);
+  const row = page.locator("tbody tr", { hasText: EVENT_NAME });
+  await expect(page.getByRole("link", { name: EVENT_NAME }).first()).toBeVisible();
+  // 调研概况：此前用例已完成两轮调研
+  await expect(row.getByText("2 次调研 · 完成 2")).toBeVisible();
+  await expect(row.getByText(/最近：/)).toBeVisible();
+  // 周定期调研徽标（种子活动开启了每周研究且帐号启用中）
+  await expect(row.getByText("已开启", { exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: DEMO_ACCOUNT_NAME })).toHaveCount(0);
+  await shot("87-活动调研列表");
+
+  // 周调研筛选 pills：点「周调研已开启」仍能看到该活动
+  await page.getByRole("link", { name: /周调研已开启/ }).click();
+  await expect(page.getByRole("link", { name: EVENT_NAME }).first()).toBeVisible();
+  await shot("88-周调研筛选");
+
+  // 再点「全部活动」要真正清除筛选（显式传 all，不能被 QueryPersistence 恢复回旧筛选）
+  await page.getByRole("link", { name: /全部活动/ }).click();
+  await expect(page).toHaveURL(/with_weekly_research%5D=all/);
+  await expect(page.getByRole("link", { name: EVENT_NAME }).first()).toBeVisible();
+});
+
+test("批量开启/关闭周调研", async ({ page, shot }) => {
+  await login(page);
+  await gotoEventAccounts(page);
+
+  const row = page.locator("tbody tr", { hasText: EVENT_NAME });
+  await page.locator('input[data-bulk-selector-target="checkbox"]').first().check();
+  const bar = page.locator('[data-bulk-selector-target="actionBar"]');
+  await expect(bar).toBeVisible();
+
+  await bar.getByRole("button", { name: "关闭周调研" }).click();
+  // 操作后必须停留在活动 tab（页面 no-referrer，服务端按 scope 显式回退）
+  await expect(page).toHaveURL(/scope=event/);
+  await expect(page.getByText("已关闭 1 个活动的每周定期调研")).toBeVisible();
+  await expect(row.getByText("未开启", { exact: true })).toBeVisible();
+
+  await page.locator('input[data-bulk-selector-target="checkbox"]').first().check();
+  await bar.getByRole("button", { name: "开启周调研" }).click();
+  await expect(page).toHaveURL(/scope=event/);
+  await expect(page.getByText("已开启 1 个活动的每周定期调研")).toBeVisible();
+  await expect(row.getByText("已开启", { exact: true })).toBeVisible();
+  await shot("89-批量周调研");
+});
+
+test("行内停用/启用后停留在活动 tab", async ({ page }) => {
+  await login(page);
+  await gotoEventAccounts(page);
+
+  const row = page.locator("tbody tr", { hasText: EVENT_NAME });
+  await row.getByRole("button", { name: "停用" }).click();
+  await expect(page).toHaveURL(/scope=event/);
+  await expect(row.getByRole("button", { name: "启用" })).toBeVisible();
+
+  await row.getByRole("button", { name: "启用" }).click();
+  await expect(page).toHaveURL(/scope=event/);
+  await expect(row.getByRole("button", { name: "停用" })).toBeVisible();
 });
