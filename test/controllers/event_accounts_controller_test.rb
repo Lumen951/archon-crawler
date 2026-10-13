@@ -143,21 +143,22 @@ class EventAccountsControllerTest < ActionDispatch::IntegrationTest
 
   # --- 启动调研 ---------------------------------------------------------------
 
-  test "管理员启动调研：创建运行记录并入队 EventResearchJob" do
+  test "管理员启动调研：创建任务快照并入队任务执行" do
     account = EventAccount.create!(nickname: "测试大会", fakeid: "event:start")
     Option.serper_api_key = "test-key"
     sign_in_as(@admin)
 
     stub_class_method(LlmClient, :configured?, -> { true }) do
-      assert_enqueued_with(job: EventResearchJob) do
+      assert_enqueued_with(job: EventResearchTaskJob) do
         post start_research_event_account_path(account), params: { refresh_cache: "1" }
       end
     end
 
-    run = EventResearchRun.order(:id).last
-    assert_redirected_to event_account_path(account, run_id: run.id)
-    assert_equal "pending", run.status
-    assert run.refresh_cache?
+    task = EventResearchTask.order(:id).last
+    assert_redirected_to event_research_task_path(task)
+    assert task.manual_single?
+    assert task.refresh_cache?
+    assert_equal [ account.id ], task.event_research_task_accounts.pluck(:account_id)
   end
 
   test "未配置 Serper 密钥时启动直接被挡下，不创建运行记录" do
@@ -184,7 +185,7 @@ class EventAccountsControllerTest < ActionDispatch::IntegrationTest
     assert_empty EventResearchRun.where(account: account)
   end
 
-  test "已有进行中的调研时再次启动被拦截" do
+  test "已有进行中的调研时仍创建任务，运行时会跳过该活动" do
     account = EventAccount.create!(nickname: "测试大会", fakeid: "event:dup")
     EventResearchRun.create!(account: account, status: :running)
     Option.serper_api_key = "test-key"
@@ -194,8 +195,9 @@ class EventAccountsControllerTest < ActionDispatch::IntegrationTest
       post start_research_event_account_path(account)
     end
 
-    assert_redirected_to event_account_path(account)
-    assert_match(/已有进行中的调研/, flash[:warning])
+    task = EventResearchTask.order(:id).last
+    assert_redirected_to event_research_task_path(task)
+    assert_equal [ account.id ], task.event_research_task_accounts.pluck(:account_id)
     assert_equal 1, EventResearchRun.where(account: account).count
   end
 
@@ -211,71 +213,13 @@ class EventAccountsControllerTest < ActionDispatch::IntegrationTest
     assert_equal "failed", run.reload.status
 
     stub_class_method(LlmClient, :configured?, -> { true }) do
-      assert_enqueued_with(job: EventResearchJob) do
+      assert_enqueued_with(job: EventResearchTaskJob) do
         post start_research_event_account_path(account)
       end
     end
-    assert_equal 2, EventResearchRun.where(account: account).count
+    assert_equal 1, EventResearchRun.where(account: account).count
+    assert_equal 1, EventResearchTask.where(source: :manual_single).count
   end
-
-  test "管理员可以为没有通知记录的旧完成 Run 生成通知" do
-    account = EventAccount.create!(nickname: "测试大会", fakeid: "event:generate-notification")
-    run = EventResearchRun.create!(account: account, status: :completed, result: { "event" => { "name" => "测试大会" } })
-    sign_in_as(@admin)
-
-    assert_enqueued_with(job: EventResearchNotificationJob, args: [ run.id ]) do
-      post generate_notification_event_account_path(account), params: { run_id: run.id }
-    end
-
-    assert_redirected_to event_account_path(account, run_id: run.id)
-    assert_equal "已加入通知生成队列", flash[:success]
-  end
-
-  test "普通用户不能为旧 Run 生成通知" do
-    account = EventAccount.create!(nickname: "测试大会", fakeid: "event:generate-deny")
-    run = EventResearchRun.create!(account: account, status: :completed)
-    sign_in_as(@user)
-
-    post generate_notification_event_account_path(account), params: { run_id: run.id }
-
-    assert_redirected_to root_path
-    assert_no_enqueued_jobs only: EventResearchNotificationJob
-  end
-
-  test "生成通知只接受已完成 Run 且已有通知时不重复入队" do
-    account = EventAccount.create!(nickname: "测试大会", fakeid: "event:generate-duplicate")
-    running = EventResearchRun.create!(account: account, status: :running)
-    completed = EventResearchRun.create!(account: account, status: :completed)
-    EventResearchNotification.create!(account: account, event_research_run: completed, kind: :initial, status: :sent)
-    sign_in_as(@admin)
-
-    post generate_notification_event_account_path(account), params: { run_id: running.id }
-    assert_redirected_to event_account_path(account, run_id: running.id)
-    assert_match "只能为已完成", flash[:error]
-
-    post generate_notification_event_account_path(account), params: { run_id: completed.id }
-    assert_redirected_to event_account_path(account, run_id: completed.id)
-    assert_match "已经有通知记录", flash[:warning]
-    assert_no_enqueued_jobs only: EventResearchNotificationJob
-  end
-
-  test "管理员可以重新推送已有通知，普通用户不能" do
-    account = EventAccount.create!(nickname: "测试大会", fakeid: "event:resend")
-    run = EventResearchRun.create!(account: account, status: :completed)
-    notification = EventResearchNotification.create!(account: account, event_research_run: run, kind: :initial, status: :sent, payload_text: "正文")
-
-    sign_in_as(@user)
-    post resend_notification_event_account_path(account), params: { notification_id: notification.id }
-    assert_redirected_to root_path
-
-    sign_in_as(@admin)
-    assert_enqueued_with(job: EventResearchNotificationJob) do
-      post resend_notification_event_account_path(account), params: { notification_id: notification.id }
-    end
-    assert_redirected_to weekly_reports_event_account_path(account)
-    assert_equal "已加入重新推送队列", flash[:success]
-  end
-
 
   test "日志页按级别过滤并分页" do
     account = EventAccount.create!(nickname: "测试大会", fakeid: "event:logs")
@@ -301,38 +245,6 @@ class EventAccountsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_match "turbo-stream", response.body
     assert_match "research_body", response.body
-  end
-
-  test "周报列表和详情展示实际通知正文并隔离账号" do
-    account = EventAccount.create!(nickname: "测试大会", fakeid: "event:weekly-ui")
-    other = EventAccount.create!(nickname: "其它大会", fakeid: "event:weekly-other")
-    run = EventResearchRun.create!(account: account, status: :completed)
-    notification = EventResearchNotification.create!(
-      account: account,
-      event_research_run: run,
-      kind: :weekly,
-      status: :sent,
-      payload_text: "本周新增与补充：测试大会\n- 新增项目",
-      sent_at: Time.current
-    )
-    other_run = EventResearchRun.create!(account: other, status: :completed)
-    other_notification = EventResearchNotification.create!(account: other, event_research_run: other_run, kind: :initial, status: :sent, payload_text: "其它正文")
-    sign_in_as(@user)
-
-    get weekly_reports_event_account_path(account)
-    assert_response :success
-    assert_match "周报 / 飞书通知", response.body
-    assert_match "周报", response.body
-    assert_match notification.id.to_s, response.body
-    assert_no_match weekly_report_event_account_path(other, notification_id: other_notification.id), response.body
-
-    get weekly_report_event_account_path(account, notification_id: notification.id)
-    assert_response :success
-    assert_match "本周新增与补充：测试大会", response.body
-    assert_match "新增项目", response.body
-
-    get weekly_report_event_account_path(account, notification_id: other_notification.id)
-    assert_redirected_to weekly_reports_event_account_path(account)
   end
 
   test "下载按钮返回调研结果 JSON 文件" do

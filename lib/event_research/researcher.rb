@@ -47,6 +47,11 @@ class EventResearch::Researcher
 
     Do not invent facts.
 
+    Focus the output on entrepreneurship networking intelligence:
+    people worth following up, their companies, projects, awards, and explicit
+    contact methods. Every person/company/project/award/contact fact must carry
+    evidence from the supplied sources.
+
     If a fact is not found, use null or [].
 
     Important:
@@ -122,6 +127,7 @@ class EventResearch::Researcher
     merge_enriched_people(result, enrich_people(people))
     # 必须在人物合并之后回填 —— merge_person 会重建整个 person Hash
     attach_tianyancha_links(result)
+    result["intelligence"] = EventResearch::Intelligence.normalize(result)
 
     result["metadata"] = metadata(search_results, documents, people)
 
@@ -618,6 +624,9 @@ class EventResearch::Researcher
       #{event}
       #{research_context_block}
       Extract all identifiable award-winning / ranked people and projects.
+      Also extract networking intelligence for startup follow-up: people,
+      companies, projects, awards, and contact methods. Contacts must only come
+      from explicit source text; never infer a private email, phone or WeChat.
 
       Return exactly this structure:
 
@@ -685,7 +694,86 @@ class EventResearch::Researcher
               }
             ]
           }
-        ]
+        ],
+        "intelligence": {
+          "people": [
+            {
+              "name": null,
+              "role_or_title": null,
+              "company": null,
+              "project": null,
+              "description": null,
+              "awards": [],
+              "contact_methods": [
+                {
+                  "type": "email | phone | website | url | form | wechat | other",
+                  "value": null,
+                  "context": null,
+                  "evidence": [
+                    { "quote": null, "source_url": null, "source_title": null }
+                  ]
+                }
+              ],
+              "evidence": [
+                { "field": null, "quote": null, "source_url": null, "source_title": null }
+              ],
+              "confidence": "high | medium | low"
+            }
+          ],
+          "companies": [
+            {
+              "name": null,
+              "description": null,
+              "industry": null,
+              "project": null,
+              "people": [],
+              "evidence": [
+                { "field": null, "quote": null, "source_url": null, "source_title": null }
+              ],
+              "confidence": "high | medium | low"
+            }
+          ],
+          "projects": [
+            {
+              "name": null,
+              "company": null,
+              "description": null,
+              "stage_or_context": null,
+              "people": [],
+              "awards": [],
+              "contacts": [],
+              "evidence": [
+                { "field": null, "quote": null, "source_url": null, "source_title": null }
+              ],
+              "confidence": "high | medium | low"
+            }
+          ],
+          "awards": [
+            {
+              "name": null,
+              "recipient_person": null,
+              "recipient_company_or_project": null,
+              "event_name": null,
+              "date": null,
+              "evidence": [
+                { "field": null, "quote": null, "source_url": null, "source_title": null }
+              ],
+              "confidence": "high | medium | low"
+            }
+          ],
+          "contacts": [
+            {
+              "type": "email | phone | website | url | form | wechat | other",
+              "value": null,
+              "belongs_to": null,
+              "context": null,
+              "evidence": [
+                { "field": null, "quote": null, "source_url": null, "source_title": null }
+              ],
+              "confidence": "high | medium | low"
+            }
+          ]
+        }
       }
 
       SOURCES:

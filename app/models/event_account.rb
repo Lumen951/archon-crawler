@@ -44,7 +44,6 @@ class EventAccount < Account
 
   # 外键是 accounts.account_id（belongs_to :account），不是按关联名推断的 event_account_id
   has_many :event_research_runs, foreign_key: :account_id, dependent: :destroy
-  has_many :event_research_notifications, foreign_key: :account_id, dependent: :destroy
 
   # 调研不走抓取管线：调度器（due_for_crawl_ids_by_platform）与批量抓取都跳过本平台。
   def self.crawl_enabled?

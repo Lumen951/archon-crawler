@@ -21,7 +21,7 @@ development:
   weekly_event_research:
     class: WeeklyEventResearchJob
     queue: default
-    schedule: every monday at 9am
+    schedule: every monday at 2am
   # weread_login_reminder:
   #   class: FeishuLoginReminderJob
   #   queue: default
@@ -61,7 +61,7 @@ production:
   weekly_event_research:
     class: WeeklyEventResearchJob
     queue: default
-    schedule: every monday at 9am
+    schedule: every monday at 2am
   # weread_login_reminder:
   #   class: FeishuLoginReminderJob
   #   queue: default

@@ -18,8 +18,9 @@
 #
 # CLI 入口见 script/event_research.rb；应用侧由 EventResearchJob 驱动。
 module EventResearch
-  autoload :ResultDiff, "event_research/result_diff"
-  autoload :NotificationSummary, "event_research/notification_summary"
+  autoload :Intelligence, "event_research/intelligence"
+  autoload :WeeklyDigestBuilder, "event_research/weekly_digest_builder"
+  autoload :WeeklyDigestText, "event_research/weekly_digest_text"
   # 缓存有效期（秒）。search 是约定好的 1 天；网页正文一周内基本不变；
   # LLM 抽取最贵，留一周，隔天重跑也能直接命中。
   # 天眼查按次计费，而工商登记信息变化极慢，所以缓存留得最激进（30 天）——
@@ -52,6 +53,13 @@ module EventResearch
   # 模型被超长 prompt / 截断搞崩时会返回一个空壳。这种结果不写缓存（下次重跑会重试），
   # 应用侧也不会把它当成一次成功的调研。
   def self.degenerate_result?(data)
-    data.blank? || (data["awards"].to_a.empty? && data["people"].to_a.empty? && data["person"].blank?)
+    data.blank? || (
+      data["awards"].to_a.empty? &&
+      data["people"].to_a.empty? &&
+      data.dig("intelligence", "people").to_a.empty? &&
+      data.dig("intelligence", "projects").to_a.empty? &&
+      data.dig("intelligence", "awards").to_a.empty? &&
+      data["person"].blank?
+    )
   end
 end

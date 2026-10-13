@@ -3,7 +3,8 @@ import { DEMO_ACCOUNT_NAME, gotoAccounts, gotoEventAccounts, login, shot, test }
 
 // 活动研究（Event Research）端到端闭环：
 // 导入活动配置 → 研究控制台 → 启动调研（Serper/网页/LLM/天眼查全部 mock）→
-// 结果 JSON 落库并渲染 → 随时重启调研 → 下载数据 JSON。
+// 结果 JSON 落库并渲染 → 随时重启调研 → 下载数据 JSON →
+// 全部活动合并成人脉视角的聚合周报。
 const EVENT_NAME = "E2E创新创业大赛";
 
 test("导入活动研究账号并展示配置摘要", async ({ page, shot }) => {
@@ -91,35 +92,38 @@ test("重新启动调研（忽略缓存）产生新一轮运行", async ({ page,
   await shot("83-重启调研");
 });
 
-test("查看生成的周报及实际消息正文", async ({ page, shot }) => {
+test("聚合周报：全部活动合并，人脉优先", async ({ page, shot }) => {
   await login(page);
+
+  // 从活动调研 tab 的「周报」入口进入
   await gotoEventAccounts(page);
-  await page.getByRole("link", { name: EVENT_NAME }).first().click();
-  await expect(page).toHaveURL(/\/event_accounts\/\d+/);
+  await page.getByRole("link", { name: "周报" }).click();
+  await expect(page).toHaveURL(/event_weekly_digests/);
+  await expect(page.getByRole("heading", { name: "创业人脉情报报告" })).toBeVisible();
 
-  await page.getByRole("link", { name: "查看周报" }).click();
-  await expect(page).toHaveURL(/\/event_accounts\/\d+\/weekly_reports/);
-  await expect(page.getByRole("heading", { name: "周报 \/ 飞书通知" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "首发" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "周报" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "生成通知" })).toHaveCount(0);
-  await expect(page.getByText("chat_id / oc_e2e_weekly").first()).toBeVisible();
-  const notificationCount = await page.locator("tbody tr").count();
-  await shot("85-周报列表");
+  // 生成（本周调研已完成，立即出稿；飞书推送在 e2e 中 mock 成功）
+  await page.getByRole("button", { name: "生成本周周报" }).click();
+  await expect(page.getByText("已开始生成本周周报")).toBeVisible();
 
-  await page.getByRole("link", { name: "周报" }).first().click();
-  await expect(page).toHaveURL(/\/weekly_reports\/\d+/);
-  await expect(page.getByRole("heading", { name: "周报详情" })).toBeVisible();
-  await expect(page.getByText("实际生成的消息")).toBeVisible();
-  await expect(page.locator("pre")).toContainText("本周新增与补充");
-  await shot("86-周报详情");
+  // 打开本期周报：创业人脉情报优先 —— 人物、项目、联系方式和证据先于活动明细
+  await page.getByRole("link", { name: /\d{2}-\d{2} ~ \d{2}-\d{2}/ }).first().click();
+  await expect(page).toHaveURL(/event_weekly_digests\/\d+/);
+  await expect(page.getByRole("heading", { name: /创业人脉情报报告/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "重点人脉" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "新增项目" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "可跟进联系方式" })).toBeVisible();
+  await expect(page.getByText(EVENT_NAME).first()).toBeVisible();
+  await expect(page.getByText("张三").first()).toBeVisible();
+  await expect(page.getByText("zhangsan@e2e-mock.dev").first()).toBeVisible();
+  await expect(page.getByText("E2E智能助手").first()).toBeVisible();
+  await expect(page.getByText(/证据：一等奖由E2E示例科技有限公司张三获得|证据：联系张三/).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: "获奖名单" }).first()).toBeVisible();
+  await expect(page.locator('[data-testid="resend-digest"]')).toBeVisible();
+  await shot("90-聚合周报");
 
-  await page.getByRole("link", { name: "← 返回周报列表" }).click();
-  await expect(page).toHaveURL(/\/weekly_reports/);
-  await page.getByRole("button", { name: "重新推送" }).first().click();
-  await expect(page).toHaveURL(/\/weekly_reports/);
+  // 重发走已保存正文
+  await page.locator('[data-testid="resend-digest"]').click();
   await expect(page.getByText("已加入重新推送队列")).toBeVisible();
-  await expect(page.locator("tbody tr")).toHaveCount(notificationCount);
 });
 
 test("下载数据 JSON：结果以 JSON 形态提供", async ({ page, shot }) => {
@@ -137,7 +141,8 @@ test("下载数据 JSON：结果以 JSON 形态提供", async ({ page, shot }) =
 
   const data = await response.json();
   expect(data.event.name).toBe(EVENT_NAME);
-  expect(data.awards[0].people[0].name).toBe("张三");
+  expect(data.intelligence.people[0].name).toBe("张三");
+  expect(data.intelligence.contacts[0].value).toBe("zhangsan@e2e-mock.dev");
   expect(data.metadata.research_config.purpose).toBe("找出获奖项目创始人背景");
   await shot("84-数据下载");
 });

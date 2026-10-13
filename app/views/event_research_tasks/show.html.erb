@@ -1,0 +1,11 @@
+<% content_for :head do %>
+  <meta name="turbo-cache-control" content="no-cache">
+<% end %>
+
+<div class="space-y-6" <%= "data-controller=\"task-poller\" data-task-poller-url-value=\"#{poll_event_research_task_path(@task)}\" data-task-poller-interval-value=\"3000\"".html_safe if @task.pending? || @task.running? %>>
+  <div>
+    <h1 class="text-2xl font-bold text-text-primary">活动研究任务</h1>
+    <p class="mt-1 text-sm text-text-secondary"><%= link_to "← 返回任务列表", event_research_tasks_path, class: "text-primary hover:underline" %></p>
+  </div>
+  <%= render "show_body", task: @task, items: @items, recent_logs: @recent_logs %>
+</div>

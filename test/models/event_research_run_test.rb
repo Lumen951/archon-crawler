@@ -93,8 +93,10 @@ class EventResearchRunTest < ActiveSupport::TestCase
     run.store_result!(result)
 
     assert_equal "completed", run.reload.status
-    assert_equal result, run.result
-    assert_equal 1, run.award_count
+    assert_equal result["event"], run.result.fetch("event")
+    assert_equal result["awards"], run.result.fetch("awards")
+    assert_equal result["companies"], run.result.fetch("companies")
+    assert_equal "张三", run.result.dig("intelligence", "people").sole.fetch("name")
     assert_equal 1, run.people_count
     assert_equal 1, run.company_count
     assert_nil run.error_message
@@ -108,7 +110,8 @@ class EventResearchRunTest < ActiveSupport::TestCase
     run.store_result!(result)
 
     assert_equal "failed", run.reload.status
-    assert_equal result, run.result
+    assert_equal result["awards"], run.result.fetch("awards")
+    assert_equal [], run.result.dig("intelligence", "people")
     assert_match(/没有提取到有效数据/, run.error_message)
   end
 

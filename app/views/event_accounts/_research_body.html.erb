@@ -97,9 +97,6 @@
                   <% if run.result.present? %>
                     · <%= link_to "下载 JSON", download_event_account_path(@account, run_id: run.id), class: "text-primary hover:underline text-sm" %>
                   <% end %>
-                  <% if current_user_is_admin? && run.completed? && !@notification_run_ids.include?(run.id) %>
-                    · <%= button_to "生成通知", generate_notification_event_account_path(@account, run_id: run.id), method: :post, class: "text-primary hover:underline text-sm", data: { testid: "generate-notification-#{run.id}" } %>
-                  <% end %>
                 </td>
               </tr>
             <% end %>
@@ -111,41 +108,14 @@
     <% end %>
   </div>
 
-  <!-- 周报历史 -->
   <div class="card">
     <div class="flex items-center justify-between gap-3">
       <div>
-        <h2 class="text-lg font-semibold text-text-primary">周报 / 飞书通知</h2>
-        <p class="text-sm text-text-secondary mt-1">查看首发结果和后续每周增量通知。</p>
+        <h2 class="text-lg font-semibold text-text-primary">研究报告</h2>
+        <p class="text-sm text-text-secondary mt-1">每个活动研究任务结束后生成一份独立报告，包含本活动在各任务中的调研结果。</p>
       </div>
-      <%= link_to "查看周报", weekly_reports_event_account_path(@account), class: "btn btn-secondary text-sm" %>
+      <%= link_to "查看研究报告", event_weekly_digests_path, class: "btn btn-primary text-sm" %>
     </div>
-    <% if @notifications.any? %>
-      <div class="mt-4 overflow-x-auto">
-        <table class="min-w-full text-sm">
-          <thead>
-            <tr class="text-left text-text-secondary border-b border-border-primary">
-              <th class="py-2 pr-4 font-medium">类型</th>
-              <th class="py-2 pr-4 font-medium">状态</th>
-              <th class="py-2 pr-4 font-medium">Run</th>
-              <th class="py-2 font-medium">时间</th>
-            </tr>
-          </thead>
-          <tbody>
-            <% @notifications.first(5).each do |notification| %>
-              <tr class="border-b border-border-primary">
-                <td class="py-2.5 pr-4"><%= notification.initial? ? "首发" : "周报" %></td>
-                <td class="py-2.5 pr-4"><span class="px-2 py-0.5 rounded text-xs font-medium bg-bg-secondary text-text-primary"><%= notification.status %></span></td>
-                <td class="py-2.5 pr-4 font-mono text-xs">#<%= notification.event_research_run_id %></td>
-                <td class="py-2.5 text-text-secondary"><%= link_to notification.created_at.strftime('%m-%d %H:%M'), weekly_report_event_account_path(@account, notification_id: notification.id), class: "text-primary hover:underline" %></td>
-              </tr>
-            <% end %>
-          </tbody>
-        </table>
-      </div>
-    <% else %>
-      <p class="mt-4 text-text-secondary text-sm">暂无周报记录。研究完成后会在这里显示通知状态。</p>
-    <% end %>
   </div>
 
   <% if @run %>

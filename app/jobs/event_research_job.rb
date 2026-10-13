@@ -19,19 +19,14 @@ class EventResearchJob < ApplicationJob
     end
     return if run.completed?
 
-    # 重复投递时 mark_running! 返回 false，二次进入的 job 直接退出
-    return unless run.mark_running!
-
-    execute(run)
+    self.class.execute_run(run)
   end
 
-  private
+  def self.execute_run(run)
+    return unless run.mark_running!
 
-  def execute(run)
     reporter = EventResearch::Reporter.new(EventResearch::CrawlLogSink.new(run))
-
-    error = preflight_error
-    if error
+    if (error = preflight_error)
       reporter.error("前置检查未通过：#{error}")
       run.mark_failed!(error)
       return
@@ -58,7 +53,6 @@ class EventResearchJob < ApplicationJob
 
     if run.completed?
       reporter.info("调研完成：获奖 #{run.award_count} 条，人物 #{run.people_count} 人，公司 #{run.company_count} 家，结果已存入 run##{run.id}")
-      EventResearchNotificationJob.perform_later(run.id)
     else
       reporter.warn("调研结束但没有得到有效数据（#{run.error_message}）")
     end
@@ -69,7 +63,7 @@ class EventResearchJob < ApplicationJob
   end
 
   # 密钥缺失时尽早失败，给出可操作的指引。天眼查是可选增强，不在这里挡。
-  def preflight_error
+  def self.preflight_error
     return "未配置 LLM 密钥（openai_api_key），请先在 /admin/settings 配置" unless LlmClient.configured?
 
     if search_api_key.blank?
@@ -79,32 +73,32 @@ class EventResearchJob < ApplicationJob
     nil
   end
 
-  def search_provider
+  def self.search_provider
     Option.event_search_provider
   end
 
-  def search_provider_name
+  def self.search_provider_name
     search_provider == "tavily" ? "Tavily" : "Serper"
   end
 
-  def search_option_key
+  def self.search_option_key
     search_provider == "tavily" ? "tavily_api_key" : "serper_api_key"
   end
 
-  def search_env_key
+  def self.search_env_key
     search_provider == "tavily" ? "TAVILY_API_KEY" : "SERPER_API_KEY"
   end
 
-  def search_api_key
+  def self.search_api_key
     ENV[search_env_key].presence || Option.public_send(search_option_key)
   end
 
-  def search_client(cache:, reporter:)
+  def self.search_client(cache:, reporter:)
     client_class = search_provider == "tavily" ? EventResearch::TavilySearch : EventResearch::SerperSearch
     client_class.new(api_key: search_api_key, cache: cache, reporter: reporter)
   end
 
-  def cache_root(run)
+  def self.cache_root(run)
     Rails.root.join("tmp", "event_research", "run-#{run.id}")
   end
 end

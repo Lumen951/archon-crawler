@@ -77,13 +77,26 @@ Rails.application.routes.draw do
     member do
       post :start_research
       post :fail_run
-      post :generate_notification
-      post :resend_notification
       get :logs
       get :poll
       get :download
-      get :weekly_reports
-      get "weekly_reports/:notification_id", action: :weekly_report, as: :weekly_report
+    end
+  end
+
+  resources :event_research_tasks, only: [ :index, :show, :create, :destroy ] do
+    member do
+      post :pause
+      post :resume
+      post :fail
+      get :logs
+      get :poll
+    end
+  end
+
+  # 每个活动研究任务的一份聚合报告；仅定时任务自动推送
+  resources :event_weekly_digests, only: [ :index, :show ] do
+    member do
+      post :resend
     end
   end
 

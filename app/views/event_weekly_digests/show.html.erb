@@ -1,0 +1,211 @@
+<% sections = @digest.sections.is_a?(Hash) ? @digest.sections : {} %>
+<% summary = sections["summary"].is_a?(Hash) ? sections["summary"] : {} %>
+<% highlights = sections["highlights"].is_a?(Hash) ? sections["highlights"] : {} %>
+<% events = Array(sections["events"]) %>
+
+<div class="space-y-6">
+  <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-bold text-text-primary"><%= @digest.title %></h1>
+      <p class="mt-1 flex items-center gap-3 text-sm">
+        <%= render 'shared/status_badge', status: @digest.status %>
+        <% if @digest.sent_at.present? %>
+          <span class="text-text-secondary">发送于 <%= @digest.sent_at.strftime('%Y-%m-%d %H:%M') %></span>
+        <% end %>
+        <%= link_to "← 返回研究报告列表", event_weekly_digests_path, class: "text-primary hover:underline" %>
+      </p>
+    </div>
+    <% if current_user_is_admin? %>
+      <%= button_to "重新推送", resend_event_weekly_digest_path(@digest), method: :post, class: "btn btn-secondary text-sm", data: { testid: "resend-digest" } %>
+    <% end %>
+  </div>
+
+  <% if @digest.error_message.present? %>
+    <div class="rounded-lg bg-red-50 border border-red-100 px-4 py-3 text-sm text-red-700"><%= @digest.error_message %></div>
+  <% end %>
+
+  <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+    <div class="card py-4"><div class="text-xs text-text-muted">覆盖活动</div><div class="mt-1 text-2xl font-semibold text-text-primary"><%= summary.key?("events") ? summary["events"].to_i : events.length %></div></div>
+    <div class="card py-4"><div class="text-xs text-text-muted">重点人脉</div><div class="mt-1 text-2xl font-semibold text-text-primary"><%= summary["people"].to_i %></div></div>
+    <div class="card py-4"><div class="text-xs text-text-muted">项目</div><div class="mt-1 text-2xl font-semibold text-text-primary"><%= summary["projects"].to_i %></div></div>
+    <div class="card py-4"><div class="text-xs text-text-muted">奖项/入选</div><div class="mt-1 text-2xl font-semibold text-text-primary"><%= summary["awards"].to_i %></div></div>
+    <div class="card py-4"><div class="text-xs text-text-muted">联系方式</div><div class="mt-1 text-2xl font-semibold text-text-primary"><%= summary["contacts"].to_i %></div></div>
+  </div>
+
+  <div class="card">
+    <h2 class="text-lg font-semibold text-text-primary mb-4">重点人脉</h2>
+    <% people = Array(highlights["people"]) %>
+    <% if people.any? %>
+      <div class="space-y-4">
+        <% people.each do |person| %>
+          <div class="rounded-lg border border-border-primary p-4">
+            <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+              <div>
+                <div class="font-semibold text-text-primary"><%= person["name"] %></div>
+                <div class="mt-1 text-sm text-text-secondary"><%= [ person["role_or_title"], person["company"], person["project"] ].filter_map(&:presence).join("｜").presence || "—" %></div>
+              </div>
+              <% if person["event_nickname"].present? %>
+                <span class="text-xs text-text-muted"><%= person["event_nickname"] %></span>
+              <% end %>
+            </div>
+            <% if person["description"].present? %><p class="mt-2 text-sm text-text-primary"><%= person["description"] %></p><% end %>
+            <% if Array(person["awards"]).any? %><p class="mt-2 text-sm text-text-secondary">奖项/事件：<%= Array(person["awards"]).join("、") %></p><% end %>
+            <% contacts = Array(person["contact_methods"]).filter_map { |contact| EventResearch::Intelligence.contact_label(contact) } %>
+            <% if contacts.any? %><p class="mt-2 text-sm text-text-primary">联系方式：<%= contacts.join(" ｜ ") %></p><% end %>
+            <%= render "event_weekly_digests/evidence", item: person %>
+          </div>
+        <% end %>
+      </div>
+    <% else %>
+      <p class="text-text-secondary text-sm">本次暂未提取到新增重点人脉。</p>
+    <% end %>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="card">
+      <h2 class="text-lg font-semibold text-text-primary mb-4">新增项目</h2>
+      <% projects = Array(highlights["projects"]) %>
+      <% if projects.any? %>
+        <div class="space-y-3">
+          <% projects.each do |project| %>
+            <div class="border-b border-border-primary pb-3 last:border-0 last:pb-0">
+              <div class="font-medium text-text-primary"><%= [ project["name"], project["company"] ].filter_map(&:presence).join("｜") %></div>
+              <% if project["stage_or_context"].present? || project["description"].present? %>
+                <p class="mt-1 text-sm text-text-secondary"><%= [ project["stage_or_context"], project["description"] ].filter_map(&:presence).join("；") %></p>
+              <% end %>
+              <%= render "event_weekly_digests/evidence", item: project %>
+            </div>
+          <% end %>
+        </div>
+      <% else %>
+        <p class="text-text-secondary text-sm">本次暂无新增项目。</p>
+      <% end %>
+    </div>
+
+    <div class="card">
+      <h2 class="text-lg font-semibold text-text-primary mb-4">新增公司/机构</h2>
+      <% companies = Array(highlights["companies"]) %>
+      <% if companies.any? %>
+        <div class="space-y-3">
+          <% companies.each do |company| %>
+            <div class="border-b border-border-primary pb-3 last:border-0 last:pb-0">
+              <div class="font-medium text-text-primary"><%= [ company["name"], company["industry"] ].filter_map(&:presence).join("｜") %></div>
+              <% if company["project"].present? || company["description"].present? %>
+                <p class="mt-1 text-sm text-text-secondary"><%= [ company["project"], company["description"] ].filter_map(&:presence).join("；") %></p>
+              <% end %>
+              <%= render "event_weekly_digests/evidence", item: company %>
+            </div>
+          <% end %>
+        </div>
+      <% else %>
+        <p class="text-text-secondary text-sm">本次暂无新增公司/机构。</p>
+      <% end %>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="card">
+      <h2 class="text-lg font-semibold text-text-primary mb-4">奖项/入选/路演</h2>
+      <% awards = Array(highlights["awards"]) %>
+      <% if awards.any? %>
+        <ul class="space-y-3 text-sm">
+          <% awards.each do |award| %>
+            <li class="border-b border-border-primary pb-3 last:border-0 last:pb-0">
+              <div class="font-medium text-text-primary"><%= award["name"] %></div>
+              <div class="mt-1 text-text-secondary"><%= [ award["recipient_person"].presence || award["recipient_company_or_project"], award["event_name"], award["date"] ].filter_map(&:presence).join("；") %></div>
+              <%= render "event_weekly_digests/evidence", item: award %>
+            </li>
+          <% end %>
+        </ul>
+      <% else %>
+        <p class="text-text-secondary text-sm">本次暂无新增奖项/入选信息。</p>
+      <% end %>
+    </div>
+
+    <div class="card">
+      <h2 class="text-lg font-semibold text-text-primary mb-4">可跟进联系方式</h2>
+      <% contacts = Array(highlights["contacts"]) %>
+      <% if contacts.any? %>
+        <ul class="space-y-3 text-sm">
+          <% contacts.each do |contact| %>
+            <li class="border-b border-border-primary pb-3 last:border-0 last:pb-0">
+              <div class="font-medium text-text-primary"><%= EventResearch::Intelligence.contact_label(contact) %></div>
+              <div class="mt-1 text-text-secondary"><%= [ contact["belongs_to"], contact["context"] ].filter_map(&:presence).join("；") %></div>
+              <%= render "event_weekly_digests/evidence", item: contact %>
+            </li>
+          <% end %>
+        </ul>
+      <% else %>
+        <p class="text-text-secondary text-sm">本次暂无可跟进联系方式。</p>
+      <% end %>
+    </div>
+  </div>
+
+  <% if events.any? %>
+    <div class="space-y-4">
+      <h2 class="text-lg font-semibold text-text-primary">按活动查看</h2>
+      <% events.each do |event| %>
+        <div class="card">
+          <div class="flex items-center justify-between gap-3 mb-3">
+            <h3 class="text-base font-semibold text-text-primary"><%= event["nickname"] %></h3>
+            <% if event["run_id"].present? && event["account_id"].present? %>
+              <%= link_to "查看调研", event_account_path(event["account_id"], run_id: event["run_id"]), class: "text-primary hover:underline text-sm" %>
+            <% end %>
+          </div>
+
+          <% if event["note"].present? %>
+            <div class="rounded-lg bg-amber-50 border border-amber-100 px-4 py-3 text-sm text-amber-700"><%= event["note"] %></div>
+          <% else %>
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
+              <div><span class="text-text-muted">新增人脉</span><div class="font-semibold text-text-primary"><%= event["new_people_total"].to_i %></div></div>
+              <div><span class="text-text-muted">项目</span><div class="font-semibold text-text-primary"><%= event["projects_total"].to_i %></div></div>
+              <div><span class="text-text-muted">公司</span><div class="font-semibold text-text-primary"><%= event["companies_total"].to_i %></div></div>
+              <div><span class="text-text-muted">奖项</span><div class="font-semibold text-text-primary"><%= event["awards_total"].to_i %></div></div>
+              <div><span class="text-text-muted">联系方式</span><div class="font-semibold text-text-primary"><%= event["contacts_total"].to_i %></div></div>
+            </div>
+
+            <% if Array(event["new_people"]).any? %>
+              <div class="mt-4 pt-3 border-t border-border-primary">
+                <h4 class="text-sm font-semibold text-text-primary mb-2">本活动新增人脉</h4>
+                <ul class="text-sm text-text-secondary space-y-1">
+                  <% Array(event["new_people"]).each do |person| %>
+                    <li>· <%= [ person["name"], person["role_or_title"], person["company"], person["project"] ].filter_map(&:presence).join("｜") %></li>
+                  <% end %>
+                </ul>
+              </div>
+            <% end %>
+
+            <% updates = Array(event["updates"]) %>
+            <% if updates.any? %>
+              <div class="mt-4 pt-3 border-t border-border-primary">
+                <h4 class="text-sm font-semibold text-text-primary mb-1.5">信息补充</h4>
+                <ul class="text-sm text-text-secondary space-y-1">
+                  <% updates.each do |update| %><li>· <%= update %></li><% end %>
+                </ul>
+              </div>
+            <% end %>
+
+            <% totals = event["totals"].is_a?(Hash) ? event["totals"] : {} %>
+            <p class="mt-4 pt-3 border-t border-border-primary text-xs text-text-muted">
+              调研结果总量：获奖 <%= totals["awards"].to_i %> · 人物 <%= totals["people"].to_i %> · 公司 <%= totals["companies"].to_i %> · 项目 <%= totals["projects"].to_i %> · 联系方式 <%= totals["contacts"].to_i %>
+              <% if event["completed_at"].present? %>（run#<%= event["run_id"] %> · <%= Time.zone.parse(event["completed_at"]).strftime('%m-%d %H:%M') %>）<% end %>
+            </p>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  <% else %>
+    <div class="card text-center py-10">
+      <p class="text-text-secondary text-sm">本次任务没有活动数据。请确认已选择活动，或先在活动列表启动调研。</p>
+    </div>
+  <% end %>
+
+  <div class="card">
+    <h2 class="text-lg font-semibold text-text-primary mb-3">实际推送的消息</h2>
+    <% if @digest.payload_text.present? %>
+      <pre class="whitespace-pre-wrap rounded-lg bg-bg-secondary border border-border-primary p-4 text-sm text-text-primary overflow-x-auto"><%= @digest.payload_text %></pre>
+    <% else %>
+      <p class="text-text-secondary text-sm">还没有生成推送正文。</p>
+    <% end %>
+  </div>
+</div>

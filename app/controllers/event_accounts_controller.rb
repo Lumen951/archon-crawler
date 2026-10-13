@@ -5,7 +5,7 @@
 # 调研的执行在 EventResearchJob（独立于抓取管线）；本控制器只做轻量的
 # 任务编排与结果展示，不做任何网络调用。
 class EventAccountsController < ApplicationController
-  before_action :require_admin, only: [ :start_research, :fail_run, :generate_notification, :resend_notification ]
+  before_action :require_admin, only: [ :start_research, :fail_run ]
 
   def show
     @account = EventAccount.find(params[:id])
@@ -24,9 +24,9 @@ class EventAccountsController < ApplicationController
       redirect_to event_account_path(@account), flash: { error: "未配置 #{search_provider_name} API 密钥，请先在管理设置中配置 #{search_option_key}" } and return
     end
 
-    run = EventResearchRun.start_for!(@account, refresh_cache: params[:refresh_cache] == "1")
-    flash[:success] = "已启动调研（run##{run.id}）#{run.refresh_cache? ? "，本次忽略缓存" : ""}"
-    redirect_to event_account_path(@account, run_id: run.id)
+    task = EventResearchTask.create_for!([ @account ], source: :manual_single, refresh_cache: params[:refresh_cache] == "1")
+    EventResearchTaskJob.perform_later(task.id)
+    redirect_to event_research_task_path(task), flash: { success: "已为 #{@account.nickname} 创建研究任务" }
   rescue EventResearchRun::ConcurrentRunError => e
     redirect_to event_account_path(@account), flash: { warning: e.message }
   rescue ActiveRecord::RecordNotFound
@@ -61,39 +61,6 @@ class EventAccountsController < ApplicationController
     @logs = scope.page(params[:page]).per(100)
   end
 
-  def generate_notification
-    @account = EventAccount.find(params[:id])
-    run = @account.event_research_runs.find(params[:run_id])
-
-    unless run.completed?
-      redirect_to event_account_path(@account, run_id: run.id), flash: { error: "只能为已完成的研究生成通知" } and return
-    end
-
-    if @account.event_research_notifications.exists?(event_research_run: run)
-      redirect_to event_account_path(@account, run_id: run.id), flash: { warning: "这轮研究已经有通知记录" } and return
-    end
-
-    EventResearchNotificationJob.perform_later(run.id)
-    redirect_to event_account_path(@account, run_id: run.id), flash: { success: "已加入通知生成队列" }
-  rescue ActiveRecord::RecordNotFound
-    redirect_to event_account_path(@account), flash: { error: "研究记录不存在" }
-  end
-
-  def resend_notification
-    @account = EventAccount.find(params[:id])
-    notification = @account.event_research_notifications.find(params[:notification_id])
-    run = notification.event_research_run
-
-    unless run.completed?
-      redirect_to weekly_reports_event_account_path(@account), flash: { error: "只能重新推送已完成研究的通知" } and return
-    end
-
-    EventResearchNotificationJob.perform_later(run.id, notification_id: notification.id, force: true)
-    redirect_to weekly_reports_event_account_path(@account), flash: { success: "已加入重新推送队列" }
-  rescue ActiveRecord::RecordNotFound
-    redirect_to weekly_reports_event_account_path(@account), flash: { error: "通知记录不存在" }
-  end
-
   def poll
     @account = EventAccount.find(params[:id])
     load_runs
@@ -112,29 +79,10 @@ class EventAccountsController < ApplicationController
     redirect_to event_account_path(@account), flash: { error: "调研记录不存在" }
   end
 
-  def weekly_reports
-    @account = EventAccount.find(params[:id])
-    @notifications = @account.event_research_notifications
-      .includes(:event_research_run, :baseline_run)
-      .recent
-      .limit(50)
-  end
-
-  def weekly_report
-    @account = EventAccount.find(params[:id])
-    @notification = @account.event_research_notifications
-      .includes(:event_research_run, :baseline_run)
-      .find(params[:notification_id])
-  rescue ActiveRecord::RecordNotFound
-    redirect_to weekly_reports_event_account_path(@account), flash: { error: "周报记录不存在" }
-  end
-
   private
 
   def load_runs
     @runs = @account.event_research_runs.recent.limit(20)
-    @notifications = @account.event_research_notifications.includes(:event_research_run, :baseline_run).recent.limit(20)
-    @notification_run_ids = @notifications.map(&:event_research_run_id).to_set
     @active_run = @account.event_research_runs.active.recent.first
     @run = selected_run
     @recent_logs = @run ? @run.crawl_logs.recent.where.not(level: :debug).limit(50) : CrawlLog.none

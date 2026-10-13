@@ -47,13 +47,13 @@ class EventResearchRun < ApplicationRecord
   class << self
     # 创建一行新调研并投递 job。唯一的部分索引（account_id WHERE status IN (0,1)）
     # 在数据库层兜底并发点击；RecordNotUnique 也归一成 ConcurrentRunError。
-    def start_for!(account, refresh_cache: false)
+    def start_for!(account, refresh_cache: false, enqueue: true)
       if account.event_research_runs.active.exists?
         raise ConcurrentRunError, "该活动已有进行中的调研，请等它结束后再重新启动"
       end
 
       create!(account: account, status: :pending, refresh_cache: refresh_cache).tap do |run|
-        EventResearchJob.perform_later(run.id)
+        EventResearchJob.perform_later(run.id) if enqueue
       end
     rescue ActiveRecord::RecordNotUnique
       raise ConcurrentRunError, "该活动已有进行中的调研，请等它结束后再重新启动"
@@ -79,7 +79,7 @@ class EventResearchRun < ApplicationRecord
   # 存调研结果。退化结果（没抽到任何获奖/人物）也如实保留数据供检查，
   # 但状态标 failed —— 对外它不是一次成功的研究。
   def store_result!(result)
-    result = result.is_a?(Hash) ? result : {}
+    result = EventResearch::Intelligence.normalize_result(result)
     degenerate = EventResearch.degenerate_result?(result)
 
     update!(
@@ -87,8 +87,8 @@ class EventResearchRun < ApplicationRecord
       status: degenerate ? :failed : :completed,
       completed_at: Time.current,
       people_count: people_found_count(result),
-      award_count: result["awards"].to_a.length,
-      company_count: result["companies"].to_a.length,
+      award_count: award_found_count(result),
+      company_count: company_found_count(result),
       error_message: degenerate ? "调研跑完了但没有提取到有效数据（获奖名单和人物均为空），请检查运行日志后重试" : nil
     )
   end
@@ -123,10 +123,23 @@ class EventResearchRun < ApplicationRecord
     found = result.dig("metadata", "people_found")
     return found.to_i if found
 
+    intelligence_count = result.dig("intelligence", "people").to_a.length
+    return intelligence_count if intelligence_count.positive?
+
     result["awards"].to_a
                     .flat_map { |award| award["people"].to_a }
                     .select { |person| person.is_a?(Hash) && person["name"].present? }
                     .uniq { |person| person["name"] }
                     .length
+  end
+
+  def award_found_count(result)
+    count = result["awards"].to_a.length
+    count.positive? ? count : result.dig("intelligence", "awards").to_a.length
+  end
+
+  def company_found_count(result)
+    count = result["companies"].to_a.length
+    count.positive? ? count : result.dig("intelligence", "companies").to_a.length
   end
 end

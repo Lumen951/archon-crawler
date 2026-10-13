@@ -31,7 +31,7 @@ class EventResearchJobTest < ActiveSupport::TestCase
 
     @run.reload
     assert_equal "completed", @run.status
-    assert_equal result, @run.result
+    assert_equal EventResearch::Intelligence.normalize_result(result), @run.result
     assert_equal 1, @run.award_count
     assert_equal 1, @run.people_count
     assert_equal 2, @run.company_count
@@ -63,6 +63,31 @@ class EventResearchJobTest < ActiveSupport::TestCase
     assert_equal "failed", @run.status
     assert_match(/没有提取到有效数据/, @run.error_message)
     assert @run.result.is_a?(Hash), "退化结果也要留档供检查"
+    assert_equal %w[people companies projects awards contacts].sort, @run.result["intelligence"].keys.sort
+  end
+
+  test "只有 intelligence 的结果也算有效并写入计数" do
+    with_preflight_ok do
+      with_researcher_returning({
+        "event" => { "name" => "测试大会" },
+        "awards" => [],
+        "companies" => [],
+        "intelligence" => {
+          "people" => [ { "name" => "张三", "evidence" => [ { "quote" => "张三参赛" } ] } ],
+          "projects" => [ { "name" => "E2E项目" } ],
+          "companies" => [ { "name" => "甲公司" } ],
+          "awards" => [ { "name" => "Demo Day 优胜奖" } ]
+        }
+      }) do
+        EventResearchJob.perform_now(@run.id)
+      end
+    end
+
+    @run.reload
+    assert_equal "completed", @run.status
+    assert_equal 1, @run.people_count
+    assert_equal 1, @run.award_count
+    assert_equal 1, @run.company_count
   end
 
   test "前置检查：未配置 LLM 密钥时 fail-fast，不进调研流程" do
@@ -125,7 +150,7 @@ class EventResearchJobTest < ActiveSupport::TestCase
     assert_equal [ "路演" ], captured[:keywords]
     assert_equal "找创始人", captured[:purpose]
     assert_equal "https://a.com/official", captured[:seed_url]
-    assert_equal successful_result, @run.reload.result
+    assert_equal EventResearch::Intelligence.normalize_result(successful_result), @run.reload.result
   end
 
   private

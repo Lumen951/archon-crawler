@@ -801,7 +801,7 @@
           <p class="text-sm text-text-secondary mt-1">
             每天定时提醒扫码登录：微信读书（无条件推送，用于扩充账号池）与微信公众号平台（仅在会话失效时推送）。
             推送方式可选单二维码（推一张码）或交互卡片（成员各自点击后私聊二维码）。
-            活动调研通知（首发/周报）使用下方独立的「活动调研默认推送目标」，与扫码登录提醒互不影响。
+            活动调研报告仅在定时任务完成后自动推送，使用下方独立的「活动调研默认推送目标」，与扫码登录提醒互不影响。
           </p>
         </div>
         <div class="panel-body">
@@ -875,7 +875,7 @@
             <div class="form-row">
               <div>
                 <label class="form-label">活动调研默认推送目标</label>
-                <p class="form-hint">活动调研的首发/周报通知，在活动账号未单独配置飞书目标时发到这里；留空则该类活动不推送。</p>
+                <p class="form-hint">活动调研的定时研究报告会推送到这里；留空则仅保留站内报告。</p>
               </div>
               <div>
                 <input type="text" name="event_feishu_receive_id" value="<%= @event_feishu_receive_id %>" class="form-input"

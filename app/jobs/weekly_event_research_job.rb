@@ -2,13 +2,18 @@ class WeeklyEventResearchJob < ApplicationJob
   queue_as :default
 
   def perform
-    # 停用（inactive）的活动账号暂停每周自动调研；控制台手动调研不受影响
-    EventAccount.weekly_research_enabled.active.find_each do |account|
-      EventResearchRun.start_for!(account, refresh_cache: true)
-    rescue EventResearchRun::ConcurrentRunError => e
-      Rails.logger.info("[WeeklyEventResearchJob] 跳过 #{account.nickname}: #{e.message}")
-    rescue StandardError => e
-      Rails.logger.error("[WeeklyEventResearchJob] #{account.nickname} 失败: #{e.class}: #{e.message}")
-    end
+    accounts = EventAccount.weekly_research_enabled.active
+    return if accounts.empty?
+
+    schedule_key = Date.current.beginning_of_week.iso8601
+    task = EventResearchTask.create_for!(
+      accounts,
+      source: :scheduled,
+      refresh_cache: true,
+      schedule_key: schedule_key
+    )
+    EventResearchTaskJob.perform_later(task.id)
+  rescue ActiveRecord::RecordNotUnique
+    Rails.logger.info("[WeeklyEventResearchJob] 本周定时研究任务已存在，跳过重复投递")
   end
 end

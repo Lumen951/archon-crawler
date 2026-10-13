@@ -66,6 +66,10 @@ class Option < ApplicationRecord
       (get('default_account_concurrency') || 3).to_i
     end
 
+    def default_event_research_account_concurrency
+      (get('default_event_research_account_concurrency') || 2).to_i
+    end
+
     def max_crawl_pages
       (get('max_crawl_pages') || 1).to_i
     end

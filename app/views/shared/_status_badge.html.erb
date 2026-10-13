@@ -1,6 +1,6 @@
 <%
   badge_class = case status.to_s
-                when 'completed', 'active'
+                when 'completed', 'active', 'sent'
                   'success'
                 when 'running', 'pending'
                   'info'
@@ -8,7 +8,7 @@
                   'warning'
                 when 'failed', 'inactive'
                   'error'
-                when 'stale'
+                when 'stale', 'skipped'
                   'secondary'
                 else
                   'secondary'
@@ -30,6 +30,10 @@
                    '停用'
                  when 'stale'
                    '已过期'
+                 when 'sent'
+                   '已发送'
+                 when 'skipped'
+                   '已跳过'
                  else
                    status.to_s.humanize
                  end

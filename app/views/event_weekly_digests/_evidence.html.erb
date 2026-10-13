@@ -1,0 +1,13 @@
+<% evidence = EventResearch::Intelligence.primary_evidence(item) %>
+<% if evidence.present? %>
+  <div class="mt-1 text-xs text-text-muted">
+    <% if evidence["quote"].present? %>
+      <span>证据：<%= evidence["quote"] %></span>
+    <% end %>
+    <% if evidence["source_url"].present? %>
+      <%= link_to(evidence["source_title"].presence || "来源", evidence["source_url"], target: "_blank", rel: "noopener", class: "ml-2 text-primary hover:underline") %>
+    <% elsif evidence["source_title"].present? %>
+      <span class="ml-2"><%= evidence["source_title"] %></span>
+    <% end %>
+  </div>
+<% end %>

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_10_000002) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_13_000003) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -145,25 +145,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_10_000002) do
     t.index ["user_id"], name: "index_device_codes_on_user_id"
   end
 
-  create_table "event_research_notifications", force: :cascade do |t|
-    t.bigint "account_id", null: false
-    t.bigint "baseline_run_id"
-    t.datetime "created_at", null: false
-    t.text "error_message"
-    t.bigint "event_research_run_id", null: false
-    t.integer "kind", default: 0, null: false
-    t.string "payload_digest"
-    t.text "payload_text"
-    t.datetime "sent_at"
-    t.integer "status", default: 0, null: false
-    t.datetime "updated_at", null: false
-    t.index ["account_id", "kind", "status"], name: "index_event_research_notifications_on_account_kind_status"
-    t.index ["account_id"], name: "index_event_research_notifications_on_account_id"
-    t.index ["baseline_run_id"], name: "index_event_research_notifications_on_baseline_run_id"
-    t.index ["event_research_run_id", "kind"], name: "index_event_research_notifications_on_run_and_kind", unique: true
-    t.index ["event_research_run_id"], name: "index_event_research_notifications_on_event_research_run_id"
-  end
-
   create_table "event_research_runs", force: :cascade do |t|
     t.bigint "account_id", null: false
     t.integer "award_count"
@@ -181,6 +162,54 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_10_000002) do
     t.index ["account_id"], name: "index_event_research_runs_on_account_id"
     t.index ["account_id"], name: "index_event_research_runs_on_account_id_active", unique: true, where: "(status = ANY (ARRAY[0, 1]))"
     t.index ["status"], name: "index_event_research_runs_on_status"
+  end
+
+  create_table "event_research_task_accounts", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.datetime "completed_at"
+    t.datetime "created_at", null: false
+    t.text "error_message"
+    t.bigint "event_research_run_id"
+    t.bigint "event_research_task_id", null: false
+    t.datetime "started_at"
+    t.integer "status", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id"], name: "index_event_research_task_accounts_on_account_id"
+    t.index ["event_research_run_id"], name: "index_event_research_task_accounts_on_event_research_run_id"
+    t.index ["event_research_task_id", "account_id"], name: "idx_event_research_task_accounts_unique", unique: true
+    t.index ["event_research_task_id", "status"], name: "idx_event_research_task_accounts_status"
+    t.index ["event_research_task_id"], name: "index_event_research_task_accounts_on_event_research_task_id"
+  end
+
+  create_table "event_research_tasks", force: :cascade do |t|
+    t.integer "account_concurrency"
+    t.datetime "completed_at"
+    t.datetime "created_at", null: false
+    t.integer "error_count", default: 0, null: false
+    t.text "error_message"
+    t.integer "progress", default: 0, null: false
+    t.boolean "refresh_cache", default: false, null: false
+    t.string "schedule_key"
+    t.integer "source", default: 0, null: false
+    t.datetime "started_at"
+    t.integer "status", default: 0, null: false
+    t.integer "total", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.index ["source", "schedule_key"], name: "idx_event_research_tasks_scheduled_key", unique: true, where: "((source = 3) AND (schedule_key IS NOT NULL))"
+    t.index ["status"], name: "index_event_research_tasks_on_status"
+  end
+
+  create_table "event_weekly_digests", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.text "error_message"
+    t.bigint "event_research_task_id"
+    t.text "payload_text"
+    t.jsonb "sections", default: {}, null: false
+    t.datetime "sent_at"
+    t.integer "status", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.date "week_start", null: false
+    t.index ["event_research_task_id"], name: "index_event_weekly_digests_on_event_research_task_id", unique: true
   end
 
   create_table "group_accounts", force: :cascade do |t|
@@ -456,10 +485,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_10_000002) do
   add_foreign_key "crawl_task_accounts", "accounts"
   add_foreign_key "crawl_task_accounts", "crawl_tasks"
   add_foreign_key "device_codes", "users"
-  add_foreign_key "event_research_notifications", "accounts"
-  add_foreign_key "event_research_notifications", "event_research_runs"
-  add_foreign_key "event_research_notifications", "event_research_runs", column: "baseline_run_id"
   add_foreign_key "event_research_runs", "accounts"
+  add_foreign_key "event_research_task_accounts", "accounts"
+  add_foreign_key "event_research_task_accounts", "event_research_runs"
+  add_foreign_key "event_research_task_accounts", "event_research_tasks"
+  add_foreign_key "event_weekly_digests", "event_research_tasks"
   add_foreign_key "group_accounts", "accounts"
   add_foreign_key "group_accounts", "groups"
   add_foreign_key "groups", "users"

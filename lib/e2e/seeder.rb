@@ -68,6 +68,9 @@ module E2e
       Option.set("feishu_app_secret", "e2e-mock-app-secret")
       Option.set("feishu_receive_id", "oc_e2e_weekly")
       Option.set("feishu_receive_id_type", "chat_id")
+      # 聚合周报的独立目标（与扫码登录提醒分开）
+      Option.set("event_feishu_receive_id", "oc_e2e_event")
+      Option.set("event_feishu_receive_id_type", "chat_id")
       # 调研断点缓存在磁盘上（tmp/event_research），而 run id 会被
       # reset_db 的 TRUNCATE 重置复用——不清掉的话第二轮 e2e 会全程命中
       # 旧缓存，测不到真实管线。

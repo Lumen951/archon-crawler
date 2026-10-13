@@ -1,0 +1,51 @@
+<div class="space-y-6">
+  <div>
+    <h1 class="text-2xl font-bold text-text-primary">活动研究任务日志</h1>
+    <p class="mt-1 text-sm text-text-secondary"><%= link_to "← 返回任务详情", event_research_task_path(@task), class: "text-primary hover:underline" %></p>
+  </div>
+
+  <div class="card flex items-center justify-between gap-4">
+    <div>
+      <h2 class="text-xl font-semibold text-text-primary"><%= @task.total %> 个活动</h2>
+      <p class="mt-1 text-sm text-text-secondary">开始于 <%= @task.started_at&.strftime('%Y-%m-%d %H:%M:%S') || '未开始' %></p>
+    </div>
+    <div class="flex items-center gap-3">
+      <%= render "shared/status_badge", status: @task.status %>
+      <span class="text-sm text-text-secondary"><%= @logs.total_count %> 条日志</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <%= form_with url: logs_event_research_task_path(@task), method: :get, class: "flex flex-wrap items-end gap-3" do |f| %>
+      <div class="flex-1 min-w-[200px]">
+        <%= f.label :q, "搜索日志内容", class: "block text-sm font-medium text-text-primary mb-1" %>
+        <%= f.text_field :q, value: params[:q], placeholder: "输入关键词...", class: "form-input" %>
+      </div>
+      <div>
+        <%= f.label :level, "日志级别", class: "block text-sm font-medium text-text-primary mb-1" %>
+        <%= f.select :level, options_for_select([["全部级别", ""], ["DEBUG", "debug"], ["INFO", "info"], ["WARN", "warn"], ["ERROR", "error"]], params[:level]), {}, class: "form-input" %>
+      </div>
+      <div class="flex gap-2">
+        <%= f.submit "筛选", class: "btn btn-primary text-sm" %>
+        <%= link_to "重置", logs_event_research_task_path(@task), class: "btn btn-secondary text-sm" %>
+      </div>
+    <% end %>
+  </div>
+
+  <div class="card">
+    <% if @logs.any? %>
+      <div class="space-y-2 font-mono text-sm">
+        <% @logs.each do |log| %>
+          <div class="flex items-start gap-3 py-2 border-b border-border-primary last:border-0">
+            <span class="text-xs text-text-secondary whitespace-nowrap"><%= log.logged_at.strftime('%H:%M:%S.%L') %></span>
+            <span class="px-2 py-0.5 rounded text-xs font-medium <%= case log.level when 'error' then 'bg-red-100 text-red-800' when 'warn' then 'bg-yellow-100 text-yellow-800' when 'info' then 'bg-blue-100 text-blue-800' else 'bg-bg-secondary text-text-primary' end %>"><%= log.level.upcase %></span>
+            <span class="flex-1 <%= log.level == 'error' ? 'text-red-700' : 'text-text-primary' %>"><%= log.message %></span>
+          </div>
+        <% end %>
+      </div>
+      <div class="mt-6"><%= paginate @logs %></div>
+    <% else %>
+      <p class="py-8 text-center text-text-secondary">暂无日志</p>
+    <% end %>
+  </div>
+</div>

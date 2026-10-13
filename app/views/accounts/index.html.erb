@@ -19,12 +19,26 @@
       <% end %>
     </div>
     <% if @event_scope %>
-      <%= link_to import_event_page_accounts_path, class: "btn btn-primary" do %>
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-        </svg>
-        新建活动调研
-      <% end %>
+      <div class="flex gap-2">
+        <%= link_to event_research_tasks_path, class: "btn btn-secondary", data: { turbo_prefetch: false } do %>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+          </svg>
+          研究任务
+        <% end %>
+        <%= link_to event_weekly_digests_path, class: "btn btn-secondary", data: { turbo_prefetch: false } do %>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+          </svg>
+          研究报告
+        <% end %>
+        <%= link_to import_event_page_accounts_path, class: "btn btn-primary" do %>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+          </svg>
+          新建活动调研
+        <% end %>
+      </div>
     <% else %>
       <%= link_to import_accounts_path, class: "btn btn-primary" do %>
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

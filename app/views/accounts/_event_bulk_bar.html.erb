@@ -27,6 +27,15 @@
 
       <div class="flex-1 flex flex-col sm:flex-row items-start sm:items-center gap-3">
         <% if current_user_is_admin? %>
+          <form data-action="submit->bulk-selector#prepareSubmit"
+                action="<%= event_research_tasks_path %>" method="post"
+                class="flex items-center">
+            <%= hidden_field_tag :authenticity_token, form_authenticity_token %>
+            <%= hidden_field_tag :scope, "event" %>
+            <button type="submit" class="h-9 px-4 rounded-lg bg-brand text-white hover:bg-brand-dark text-sm font-semibold transition whitespace-nowrap inline-flex items-center gap-1.5">
+              开始调研
+            </button>
+          </form>
           <!-- 周调研开关：活动账号的核心批量操作 -->
           <form data-action="submit->bulk-selector#prepareSubmit"
                 action="<%= bulk_enable_weekly_research_accounts_path %>" method="post"

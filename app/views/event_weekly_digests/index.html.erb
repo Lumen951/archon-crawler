@@ -1,0 +1,17 @@
+<div class="space-y-6">
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-bold text-text-primary">活动研究报告</h1>
+      <p class="mt-1 text-sm text-text-secondary">每个活动研究任务结束后生成一份独立报告；仅定时任务会自动推送到飞书。</p>
+    </div>
+    <%= link_to "研究任务", event_research_tasks_path, class: "btn btn-primary" %>
+  </div>
+
+  <% if @digests.any? %>
+    <div class="bg-bg-card border border-border-primary rounded-lg overflow-hidden">
+      <table class="min-w-full divide-y divide-border-primary"><thead class="bg-bg-secondary"><tr><th class="px-4 py-3 text-left text-xs font-semibold text-text-secondary">任务</th><th class="px-4 py-3 text-left text-xs font-semibold text-text-secondary">状态</th><th class="px-4 py-3 text-left text-xs font-semibold text-text-secondary">覆盖活动</th><th class="px-4 py-3 text-left text-xs font-semibold text-text-secondary">重点人脉</th><th class="px-4 py-3 text-left text-xs font-semibold text-text-secondary">发送时间</th><th class="px-4 py-3 text-right text-xs font-semibold text-text-secondary">操作</th></tr></thead><tbody class="divide-y divide-border-primary"><% @digests.each do |digest| %><tr><td class="px-4 py-3 text-sm"><%= link_to digest.title, event_weekly_digest_path(digest), class: "text-primary hover:underline" %><div class="text-xs text-text-muted"><%= digest.period_label %></div></td><td class="px-4 py-3"><%= render "shared/status_badge", status: digest.status %></td><td class="px-4 py-3 text-sm"><%= digest.covered_events_count %></td><td class="px-4 py-3 text-sm"><%= digest.new_people_count %></td><td class="px-4 py-3 text-sm"><%= digest.sent_at&.strftime("%Y-%m-%d %H:%M") || "—" %></td><td class="px-4 py-3 text-right"><%= link_to "查看", event_weekly_digest_path(digest), class: "text-primary hover:underline text-sm" %></td></tr><% end %></tbody></table>
+    </div>
+  <% else %>
+    <div class="card text-center py-12"><p class="text-text-secondary">还没有研究报告。</p><p class="mt-1 text-sm text-text-muted">从活动列表启动单个、多选或筛选全选研究后，会在这里看到任务报告。</p></div>
+  <% end %>
+</div>
