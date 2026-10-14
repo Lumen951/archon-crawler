@@ -29,6 +29,15 @@
       <div><p class="text-sm text-text-secondary">跳过</p><p class="text-2xl font-bold text-text-primary"><%= task.skipped_account_count %></p></div>
       <div><p class="text-sm text-text-secondary">开始时间</p><p class="text-lg font-semibold text-text-primary"><%= task.started_at&.strftime("%Y-%m-%d %H:%M") || "—" %></p></div>
     </div>
+    <div class="mt-6 border-t border-border-primary pt-5">
+      <div class="flex flex-wrap items-baseline justify-between gap-2"><h3 class="text-sm font-semibold text-text-primary">调用与缓存统计</h3><p class="text-xs text-text-secondary">缓存命中不计入 API 调用</p></div>
+      <div class="mt-3 grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div><p class="text-sm text-text-secondary">搜索 API 调用</p><p class="text-2xl font-bold text-text-primary"><%= api_usage.dig("search", "api_calls").to_i %></p></div>
+        <div><p class="text-sm text-text-secondary">搜索缓存命中</p><p class="text-2xl font-bold text-text-primary"><%= api_usage.dig("search", "cache_hits").to_i %></p></div>
+        <div><p class="text-sm text-text-secondary">天眼查 API 调用</p><p class="text-2xl font-bold text-text-primary"><%= api_usage.dig("tianyancha", "api_calls").to_i %></p></div>
+        <div><p class="text-sm text-text-secondary">天眼查缓存命中</p><p class="text-2xl font-bold text-text-primary"><%= api_usage.dig("tianyancha", "cache_hits").to_i %></p></div>
+      </div>
+    </div>
     <% if task.error_message.present? %><div class="mt-5 rounded-lg bg-red-50 border border-red-100 p-3 text-sm text-red-700"><%= task.error_message %></div><% end %>
   </div>
 

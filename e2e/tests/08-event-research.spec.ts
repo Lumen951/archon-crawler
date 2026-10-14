@@ -42,8 +42,11 @@ test("启动调研：后台跑完后展示结果数据与过程日志", async ({
 
   // 启动调研并等它完成（外部依赖全部由本地 mock 回放，全程不触网）
   await page.getByRole("button", { name: "开始调研" }).click();
-  await expect(page).toHaveURL(/run_id=\d+/);
+  await expect(page).toHaveURL(/\/event_research_tasks\/\d+$/);
   await expect(page.locator('[data-task-status="completed"]')).toBeVisible({ timeout: 90_000 });
+  await expect(page.getByRole("heading", { name: "调用与缓存统计" })).toBeVisible();
+  await page.getByRole("link", { name: "查看调研", exact: true }).click();
+  await expect(page).toHaveURL(/run_id=\d+/);
 
   // 结果数据：获奖名单 / 人物（含联系方式）/ 公司工商档案（天眼查交叉任职）
   await expect(page.getByText("获奖名单（1 条）")).toBeVisible();
@@ -83,8 +86,11 @@ test("重新启动调研（忽略缓存）产生新一轮运行", async ({ page,
 
   await page.getByRole("checkbox", { name: "忽略缓存重新计算" }).check();
   await page.getByRole("button", { name: "重新启动调研" }).click();
-  await expect(page).toHaveURL(/run_id=\d+/);
+  await expect(page).toHaveURL(/\/event_research_tasks\/\d+$/);
   await expect(page.locator('[data-task-status="completed"]')).toBeVisible({ timeout: 90_000 });
+  await expect(page.getByRole("heading", { name: "调用与缓存统计" })).toBeVisible();
+  await page.getByRole("link", { name: "查看调研", exact: true }).click();
+  await expect(page).toHaveURL(/run_id=\d+/);
 
   // 调研记录出现第二轮，且带「忽略缓存」备注
   await expect(page.getByRole("cell", { name: "忽略缓存" })).toBeVisible();
@@ -92,23 +98,17 @@ test("重新启动调研（忽略缓存）产生新一轮运行", async ({ page,
   await shot("83-重启调研");
 });
 
-test("聚合周报：全部活动合并，人脉优先", async ({ page, shot }) => {
+test("任务研究报告：保存人脉情报并支持重新生成和推送", async ({ page, shot }) => {
   await login(page);
-
-  // 从活动调研 tab 的「周报」入口进入
   await gotoEventAccounts(page);
-  await page.getByRole("link", { name: "周报" }).click();
+  await page.getByRole("link", { name: "研究报告", exact: true }).click();
   await expect(page).toHaveURL(/event_weekly_digests/);
-  await expect(page.getByRole("heading", { name: "创业人脉情报报告" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "活动研究报告", exact: true })).toBeVisible();
 
-  // 生成（本周调研已完成，立即出稿；飞书推送在 e2e 中 mock 成功）
-  await page.getByRole("button", { name: "生成本周周报" }).click();
-  await expect(page.getByText("已开始生成本周周报")).toBeVisible();
-
-  // 打开本期周报：创业人脉情报优先 —— 人物、项目、联系方式和证据先于活动明细
-  await page.getByRole("link", { name: /\d{2}-\d{2} ~ \d{2}-\d{2}/ }).first().click();
+  await page.getByRole("link", { name: /活动研究报告 #/ }).last().click();
   await expect(page).toHaveURL(/event_weekly_digests\/\d+/);
-  await expect(page.getByRole("heading", { name: /创业人脉情报报告/ })).toBeVisible();
+  const reportUrl = page.url();
+  await expect(page.getByRole("heading", { name: /活动研究报告 #/ })).toBeVisible();
   await expect(page.getByRole("heading", { name: "重点人脉" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "新增项目" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "可跟进联系方式" })).toBeVisible();
@@ -119,7 +119,11 @@ test("聚合周报：全部活动合并，人脉优先", async ({ page, shot }) 
   await expect(page.getByText(/证据：一等奖由E2E示例科技有限公司张三获得|证据：联系张三/).first()).toBeVisible();
   await expect(page.getByRole("link", { name: "获奖名单" }).first()).toBeVisible();
   await expect(page.locator('[data-testid="resend-digest"]')).toBeVisible();
-  await shot("90-聚合周报");
+  await expect(page.getByRole("heading", { name: "调用与缓存统计" })).toBeVisible();
+  await page.getByRole("button", { name: "重新生成内容" }).click();
+  await expect(page).toHaveURL(reportUrl);
+  await expect(page.getByText("研究报告内容已重新生成，未自动推送")).toBeVisible();
+  await shot("90-任务研究报告");
 
   // 重发走已保存正文
   await page.locator('[data-testid="resend-digest"]').click();

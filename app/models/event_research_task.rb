@@ -112,6 +112,33 @@ class EventResearchTask < ApplicationRecord
     ((progress.to_f / total) * 100).round(1)
   end
 
+  def api_usage(items = event_research_task_accounts.includes(:event_research_run))
+    usage = {
+      "search" => { "api_calls" => 0, "cache_hits" => 0 },
+      "tianyancha" => { "api_calls" => 0, "cache_hits" => 0 }
+    }
+
+    items.each do |item|
+      result = item.event_research_run&.result
+      next unless result.is_a?(Hash)
+
+      metadata = result["metadata"]
+      next unless metadata.is_a?(Hash)
+
+      cache = metadata["cache"]
+      search_cache = cache.is_a?(Hash) ? cache["search"] : nil
+      tianyancha_cache = cache.is_a?(Hash) ? cache["tianyancha"] : nil
+      companies = metadata["companies"]
+
+      usage["search"]["api_calls"] += search_cache.is_a?(Hash) ? search_cache["miss"].to_i : 0
+      usage["search"]["cache_hits"] += search_cache.is_a?(Hash) ? search_cache["hit"].to_i : 0
+      usage["tianyancha"]["api_calls"] += companies.is_a?(Hash) ? companies["api_calls"].to_i : 0
+      usage["tianyancha"]["cache_hits"] += tianyancha_cache.is_a?(Hash) ? tianyancha_cache["hit"].to_i : 0
+    end
+
+    usage
+  end
+
   def log(level, message, context: nil, force: false)
     CrawlLog.log(self, level, message, context: context, force: force)
   end

@@ -22,6 +22,7 @@ class EventResearch::WeeklyDigestBuilder
       "source" => @task.source,
       "created_at" => @task.created_at.iso8601,
       "summary" => summary(events),
+      "api_usage" => @task.api_usage(@items),
       "highlights" => highlights,
       "events" => events
     }

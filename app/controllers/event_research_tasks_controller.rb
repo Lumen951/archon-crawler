@@ -80,6 +80,7 @@ class EventResearchTasksController < ApplicationController
 
   def load_task_details
     @items = @task.event_research_task_accounts.includes(:account, :event_research_run).order(:id)
+    @api_usage = @task.api_usage(@items)
     @recent_logs = @task.crawl_logs.recent.where.not(level: :debug).limit(50)
   end
 

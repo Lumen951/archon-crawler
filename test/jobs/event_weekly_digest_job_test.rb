@@ -22,7 +22,7 @@ class EventWeeklyDigestJobTest < ActiveSupport::TestCase
     task = completed_task(source: :scheduled)
     sent = []
 
-    stub_class_methods(FeishuNotifier, send_text: ->(text, **kwargs) { sent << [ text, kwargs ] }) do
+    stub_class_methods(FeishuNotifier, send_card: ->(card, **kwargs) { sent << [ card, kwargs ] }) do
       EventWeeklyDigestJob.perform_now(task.id, auto_send: true)
     end
 
@@ -30,6 +30,8 @@ class EventWeeklyDigestJobTest < ActiveSupport::TestCase
     assert report.sent?
     assert_match "活动研究报告", report.payload_text
     assert_equal "oc_digest", sent.sole.last.fetch(:receive_id)
+    assert_equal "blue", sent.sole.first.dig(:header, :template)
+    assert_match "**", sent.sole.first.dig(:elements, 0, :text, :content)
   end
 
   test "失败与跳过成员会保留在任务报告内" do

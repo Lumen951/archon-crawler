@@ -13,7 +13,7 @@ class EventWeeklyDigestResendJob < ApplicationJob
       return
     end
 
-    FeishuNotifier.send_text(digest.payload_text, **target)
+    FeishuNotifier.send_card(EventResearch::WeeklyDigestCard.call(digest, receive_id: target[:receive_id]), **target)
     digest.update!(status: :sent, sent_at: Time.current, error_message: nil)
   rescue FeishuNotifier::Error, Faraday::Error => e
     digest&.update(status: :failed, error_message: e.message.to_s.truncate(2000))

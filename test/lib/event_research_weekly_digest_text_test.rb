@@ -11,6 +11,7 @@ class EventResearchWeeklyDigestTextTest < ActiveSupport::TestCase
 
     assert_match "活动研究报告（2026-10-05）", text
     assert_match "覆盖 1 个活动 · 重点人脉 1 位 · 项目 1 个 · 奖项/入选 1 条 · 联系方式 1 条", text
+    assert_match "调用统计：搜索 API 2 / 缓存命中 3；天眼查 API 4 / 缓存命中 5", text
     assert_match "重点人脉", text
     assert_match "1. 张三｜创始人｜甲公司", text
     assert_match "项目：E2E项目", text
@@ -70,6 +71,7 @@ class EventResearchWeeklyDigestTextTest < ActiveSupport::TestCase
     {
       "week_start" => "2026-10-05",
       "summary" => { "events" => 1, "people" => 1, "companies" => 1, "projects" => 1, "awards" => 1, "contacts" => 1 },
+      "api_usage" => { "search" => { "api_calls" => 2, "cache_hits" => 3 }, "tianyancha" => { "api_calls" => 4, "cache_hits" => 5 } },
       "highlights" => {
         "people" => [ person ],
         "projects" => [ { "name" => "E2E项目", "company" => "甲公司", "description" => "AI 创业项目", "stage_or_context" => "Demo Day", "evidence" => evidence } ],

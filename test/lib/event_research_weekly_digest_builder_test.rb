@@ -89,6 +89,22 @@ class EventResearchWeeklyDigestBuilderTest < ActiveSupport::TestCase
     assert_includes idle_event["note"], "本次调研未完成"
   end
 
+  test "报告固化任务成员当前关联运行的 API 用量" do
+    linked = EventResearchRun.create!(account: @account, status: :completed, completed_at: Time.current,
+      result: intelligence_result.merge("metadata" => usage_metadata(search_calls: 2, search_hits: 3, tianyancha_calls: 4, tianyancha_hits: 5)))
+    EventResearchRun.create!(account: @account, status: :completed, completed_at: Time.current + 1.minute,
+      result: intelligence_result.merge("metadata" => usage_metadata(search_calls: 99, search_hits: 99, tianyancha_calls: 99, tianyancha_hits: 99)))
+    task = EventResearchTask.create_for!([ @account ], source: :manual_selected)
+    task.event_research_task_accounts.sole.update!(event_research_run: linked, status: :completed)
+
+    sections = EventResearch::WeeklyDigestBuilder.call(task)
+
+    assert_equal({
+      "search" => { "api_calls" => 2, "cache_hits" => 3 },
+      "tianyancha" => { "api_calls" => 4, "cache_hits" => 5 }
+    }, sections["api_usage"])
+  end
+
   private
 
   def build_sections(accounts = [ @account ])
@@ -102,6 +118,16 @@ class EventResearchWeeklyDigestBuilderTest < ActiveSupport::TestCase
       )
     end
     EventResearch::WeeklyDigestBuilder.call(task)
+  end
+
+  def usage_metadata(search_calls:, search_hits:, tianyancha_calls:, tianyancha_hits:)
+    {
+      "cache" => {
+        "search" => { "miss" => search_calls, "hit" => search_hits },
+        "tianyancha" => { "hit" => tianyancha_hits }
+      },
+      "companies" => { "api_calls" => tianyancha_calls }
+    }
   end
 
   def intelligence_result(contact: "zhangsan@x.dev")

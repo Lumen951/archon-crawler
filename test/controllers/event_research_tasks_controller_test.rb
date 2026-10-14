@@ -77,6 +77,35 @@ class EventResearchTasksControllerTest < ActionDispatch::IntegrationTest
     assert_match dom_id(task, :show_body), response.body
   end
 
+  test "任务详情和轮询展示 API 调用及缓存命中统计" do
+    task = EventResearchTask.create_for!([ @first ], source: :manual_single)
+    run = EventResearchRun.create!(account: @first, status: :completed, result: {
+      "metadata" => {
+        "cache" => {
+          "search" => { "miss" => 3, "hit" => 4 },
+          "tianyancha" => { "hit" => 6 }
+        },
+        "companies" => { "api_calls" => 2 }
+      }
+    })
+    task.event_research_task_accounts.sole.update!(event_research_run: run, status: :completed)
+    sign_in_as(@user)
+
+    get event_research_task_path(task)
+
+    assert_response :success
+    assert_match "搜索 API 调用", response.body
+    assert_match "天眼查缓存命中", response.body
+    assert_match ">3<", response.body
+    assert_match ">6<", response.body
+
+    get poll_event_research_task_path(task), headers: { Accept: "text/vnd.turbo-stream.html" }
+
+    assert_response :success
+    assert_match "搜索缓存命中", response.body
+    assert_match ">2<", response.body
+  end
+
   private
 
   def sign_in_as(user)

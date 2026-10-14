@@ -26,7 +26,14 @@ class EventResearch::WeeklyDigestText
     "📋 活动研究报告（#{@digest.period_label}）\n" \
       "覆盖 #{summary['events'].to_i} 个活动 · 重点人脉 #{summary['people'].to_i} 位 · " \
       "项目 #{summary['projects'].to_i} 个 · 奖项/入选 #{summary['awards'].to_i} 条 · " \
-      "联系方式 #{summary['contacts'].to_i} 条\n\n"
+      "联系方式 #{summary['contacts'].to_i} 条\n" \
+      "调用统计：搜索 API #{api_usage.dig('search', 'api_calls').to_i} / 缓存命中 #{api_usage.dig('search', 'cache_hits').to_i}；" \
+      "天眼查 API #{api_usage.dig('tianyancha', 'api_calls').to_i} / 缓存命中 #{api_usage.dig('tianyancha', 'cache_hits').to_i}\n\n"
+  end
+
+  def api_usage
+    usage = @sections["api_usage"]
+    usage.is_a?(Hash) ? usage : {}
   end
 
   def highlights_text

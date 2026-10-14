@@ -1,6 +1,7 @@
 <% sections = @digest.sections.is_a?(Hash) ? @digest.sections : {} %>
 <% summary = sections["summary"].is_a?(Hash) ? sections["summary"] : {} %>
 <% highlights = sections["highlights"].is_a?(Hash) ? sections["highlights"] : {} %>
+<% api_usage = sections["api_usage"].is_a?(Hash) ? sections["api_usage"] : {} %>
 <% events = Array(sections["events"]) %>
 
 <div class="space-y-6">
@@ -8,6 +9,7 @@
     <div>
       <h1 class="text-2xl font-bold text-text-primary"><%= @digest.title %></h1>
       <p class="mt-1 flex items-center gap-3 text-sm">
+        <span class="text-text-secondary">最近一次推送状态</span>
         <%= render 'shared/status_badge', status: @digest.status %>
         <% if @digest.sent_at.present? %>
           <span class="text-text-secondary">发送于 <%= @digest.sent_at.strftime('%Y-%m-%d %H:%M') %></span>
@@ -16,7 +18,16 @@
       </p>
     </div>
     <% if current_user_is_admin? %>
-      <%= button_to "重新推送", resend_event_weekly_digest_path(@digest), method: :post, class: "btn btn-secondary text-sm", data: { testid: "resend-digest" } %>
+      <div class="space-y-2 sm:text-right">
+        <div class="flex flex-wrap gap-2">
+          <% task = @digest.event_research_task %>
+          <% if !task || task.completed? || task.failed? %>
+            <%= button_to "重新生成内容", regenerate_event_weekly_digest_path(@digest), method: :post, class: "btn btn-secondary text-sm", data: { testid: "regenerate-digest" } %>
+          <% end %>
+          <%= button_to "重新推送", resend_event_weekly_digest_path(@digest), method: :post, class: "btn btn-secondary text-sm", data: { testid: "resend-digest" } %>
+        </div>
+        <p class="text-xs text-text-secondary">重新生成仅使用保存的研究结果，不重新研究或自动推送。<%= "旧报告仅重新排版保存内容。" unless task %></p>
+      </div>
     <% end %>
   </div>
 
@@ -30,6 +41,16 @@
     <div class="card py-4"><div class="text-xs text-text-muted">项目</div><div class="mt-1 text-2xl font-semibold text-text-primary"><%= summary["projects"].to_i %></div></div>
     <div class="card py-4"><div class="text-xs text-text-muted">奖项/入选</div><div class="mt-1 text-2xl font-semibold text-text-primary"><%= summary["awards"].to_i %></div></div>
     <div class="card py-4"><div class="text-xs text-text-muted">联系方式</div><div class="mt-1 text-2xl font-semibold text-text-primary"><%= summary["contacts"].to_i %></div></div>
+  </div>
+
+  <div class="card">
+    <div class="flex flex-wrap items-baseline justify-between gap-2"><h2 class="text-lg font-semibold text-text-primary">调用与缓存统计</h2><p class="text-xs text-text-secondary">缓存命中不计入 API 调用</p></div>
+    <div class="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div><p class="text-sm text-text-secondary">搜索 API 调用</p><p class="text-2xl font-bold text-text-primary"><%= api_usage.dig("search", "api_calls").to_i %></p></div>
+      <div><p class="text-sm text-text-secondary">搜索缓存命中</p><p class="text-2xl font-bold text-text-primary"><%= api_usage.dig("search", "cache_hits").to_i %></p></div>
+      <div><p class="text-sm text-text-secondary">天眼查 API 调用</p><p class="text-2xl font-bold text-text-primary"><%= api_usage.dig("tianyancha", "api_calls").to_i %></p></div>
+      <div><p class="text-sm text-text-secondary">天眼查缓存命中</p><p class="text-2xl font-bold text-text-primary"><%= api_usage.dig("tianyancha", "cache_hits").to_i %></p></div>
+    </div>
   </div>
 
   <div class="card">
@@ -201,7 +222,7 @@
   <% end %>
 
   <div class="card">
-    <h2 class="text-lg font-semibold text-text-primary mb-3">实际推送的消息</h2>
+    <h2 class="text-lg font-semibold text-text-primary mb-3">当前报告纯文本预览</h2>
     <% if @digest.payload_text.present? %>
       <pre class="whitespace-pre-wrap rounded-lg bg-bg-secondary border border-border-primary p-4 text-sm text-text-primary overflow-x-auto"><%= @digest.payload_text %></pre>
     <% else %>

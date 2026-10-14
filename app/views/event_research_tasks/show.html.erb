@@ -7,5 +7,5 @@
     <h1 class="text-2xl font-bold text-text-primary">活动研究任务</h1>
     <p class="mt-1 text-sm text-text-secondary"><%= link_to "← 返回任务列表", event_research_tasks_path, class: "text-primary hover:underline" %></p>
   </div>
-  <%= render "show_body", task: @task, items: @items, recent_logs: @recent_logs %>
+  <%= render "show_body", task: @task, items: @items, api_usage: @api_usage, recent_logs: @recent_logs %>
 </div>

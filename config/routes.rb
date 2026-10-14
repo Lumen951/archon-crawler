@@ -97,6 +97,7 @@ Rails.application.routes.draw do
   resources :event_weekly_digests, only: [ :index, :show ] do
     member do
       post :resend
+      post :regenerate
     end
   end
 

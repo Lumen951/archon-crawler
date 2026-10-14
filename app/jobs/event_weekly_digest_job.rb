@@ -30,7 +30,7 @@ class EventWeeklyDigestJob < ApplicationJob
       return
     end
 
-    FeishuNotifier.send_text(report.payload_text, **target)
+    FeishuNotifier.send_card(EventResearch::WeeklyDigestCard.call(report, receive_id: target[:receive_id]), **target)
     report.update!(status: :sent, sent_at: Time.current, error_message: nil)
   end
 end

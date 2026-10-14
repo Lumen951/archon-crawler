@@ -68,6 +68,27 @@ class EventWeeklyDigest < ApplicationRecord
     week_start.strftime("%Y-%m-%d")
   end
 
+  class RegenerationUnavailable < StandardError; end
+
+  def regenerate!
+    self.class.transaction do
+      task = event_research_task
+      if task
+        task.with_lock do
+          raise RegenerationUnavailable, "研究任务尚未结束，暂不能重新生成报告" unless task.completed? || task.failed?
+
+          with_lock do
+            self.sections = EventResearch::WeeklyDigestBuilder.call(task)
+            self.payload_text = EventResearch::WeeklyDigestText.call(self)
+            save!
+          end
+        end
+      else
+        with_lock { update!(payload_text: EventResearch::WeeklyDigestText.call(self)) }
+      end
+    end
+  end
+
   private
 
   def sections_hash

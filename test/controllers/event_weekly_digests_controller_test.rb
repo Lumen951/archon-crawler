@@ -41,7 +41,9 @@ class EventWeeklyDigestsControllerTest < ActionDispatch::IntegrationTest
     assert_match "zs@x.dev", response.body
     assert_match "获 Demo Day 优胜奖", response.body
     assert_match "https://example.com/event", response.body
-    assert_match "实际推送的消息", response.body
+    assert_match "当前报告纯文本预览", response.body
+    assert_match "重新生成内容", response.body
+    assert_match "最近一次推送状态", response.body
   end
 
   test "resend enqueues delivery with saved payload" do
@@ -52,6 +54,38 @@ class EventWeeklyDigestsControllerTest < ActionDispatch::IntegrationTest
     end
 
     assert_redirected_to event_weekly_digest_path(digest)
+  end
+
+  test "重新生成更新内容但不改变投递记录" do
+    account = EventAccount.create!(nickname: "重新生成活动", fakeid: "event:regenerate")
+    task = EventResearchTask.create_for!([ account ], source: :manual_single)
+    run = EventResearchRun.create!(account: account, status: :completed, completed_at: Time.current, result: { "event" => { "name" => "重新生成活动" }, "awards" => [], "companies" => [], "intelligence" => { "people" => [], "projects" => [], "companies" => [], "awards" => [], "contacts" => [] } })
+    task.event_research_task_accounts.sole.update!(event_research_run: run, status: :completed)
+    task.update!(status: :completed, progress: 1, completed_at: Time.current)
+    sent_at = 1.hour.ago
+    digest = EventWeeklyDigest.create!(event_research_task: task, week_start: Date.current.beginning_of_week, status: :sent, sent_at: sent_at, error_message: nil, payload_text: "旧正文", sections: {})
+
+    assert_no_enqueued_jobs do
+      post regenerate_event_weekly_digest_path(digest)
+    end
+
+    assert_redirected_to event_weekly_digest_path(digest)
+    digest.reload
+    assert digest.sent?
+    assert_equal sent_at.to_i, digest.sent_at.to_i
+    assert_match "活动研究报告", digest.payload_text
+    assert_equal digest.id, EventWeeklyDigest.find_by!(event_research_task: task).id
+  end
+
+  test "重新生成需要管理员" do
+    delete session_path
+    user = User.create!(email_address: "digest-regenerate-member@example.com", password: "password123", password_confirmation: "password123", role: :user, email_confirmed_at: Time.current)
+    post session_path, params: { email_address: user.email_address, password: "password123" }
+    digest = EventWeeklyDigest.create!(week_start: Date.current.beginning_of_week, payload_text: "正文")
+
+    post regenerate_event_weekly_digest_path(digest)
+
+    assert_redirected_to root_path
   end
 
   test "resend requires admin" do
