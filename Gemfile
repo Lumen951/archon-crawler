@@ -82,7 +82,7 @@ gem "faraday-retry", "~> 2.4"
 gem "faraday-multipart", "~> 1.0"
 
 gem "kaminari", "~> 1.2"
-gem "ransack", "~> 4.3"
+gem "ransack", "~> 6.0"
 gem "mission_control-jobs"
 gem "roo", "~> 3.0"
 gem "oauth2", "~> 2.0"
