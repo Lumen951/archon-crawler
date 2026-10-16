@@ -83,12 +83,10 @@ GEM
     anonymous_loader (0.1.2)
       version_gem (~> 1.1, >= 1.1.13)
     ast (2.4.3)
-    async (2.41.0)
+    async (2.46.0)
       console (~> 1.29)
       fiber-annotation
-      io-event (~> 1.11)
-      metrics (~> 0.12)
-      traces (~> 0.18)
+      io-event (~> 1.21)
     auth-sanitizer (0.2.2)
       version_gem (~> 1.1, >= 1.1.10)
     base64 (0.3.0)
@@ -118,7 +116,7 @@ GEM
     chunky_png (1.4.0)
     concurrent-ruby (1.3.7)
     connection_pool (3.0.2)
-    console (1.36.0)
+    console (1.38.0)
       fiber-annotation
       fiber-local (~> 1.1)
       json
@@ -188,7 +186,7 @@ GEM
       activesupport (>= 6.0.0)
       railties (>= 6.0.0)
     io-console (0.8.2)
-    io-event (1.19.1)
+    io-event (1.22.1)
     irb (1.18.0)
       pp (>= 0.6.0)
       prism (>= 1.3.0)
@@ -197,7 +195,7 @@ GEM
     jbuilder (2.15.1)
       actionview (>= 7.0.0)
       activesupport (>= 7.0.0)
-    json (2.20.0)
+    json (2.21.2)
     json_schemer (2.5.0)
       bigdecimal
       hana (~> 1.3)
@@ -244,7 +242,6 @@ GEM
     matrix (0.4.3)
     mcp (1.3.0)
       json_schemer (>= 2.4)
-    metrics (0.15.0)
     mini_magick (5.3.1)
       logger
     mini_mime (1.1.5)
@@ -483,7 +480,6 @@ GEM
     thruster (0.1.22-x86_64-darwin)
     thruster (0.1.22-x86_64-linux)
     timeout (0.6.1)
-    traces (0.18.2)
     tsort (0.2.0)
     turbo-rails (2.0.23)
       actionpack (>= 7.1.0)
@@ -527,7 +523,7 @@ PLATFORMS
 
 DEPENDENCIES
   annotaterb (~> 4.22)
-  async (~> 2.41)
+  async (~> 2.46)
   bcrypt (~> 3.1.7)
   bootsnap
   brakeman
