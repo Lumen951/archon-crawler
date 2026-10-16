@@ -1,54 +1,67 @@
-<div class="flex justify-center min-h-screen bg-bg-secondary">
-  <div class="w-full max-w-md">
-    <div class="bg-bg-card rounded-lg border border-border-primary shadow-sm p-8">
-      <h3 class="text-xl font-bold text-text-primary mb-6">登录</h3>
+<% content_for :title, "登录源策未来 · ARCHON" %>
+<% content_for :main_class, "auth-main" %>
 
-      <%= link_to oauth_login_path(provider: 'mp'), class: "flex items-center justify-center gap-2 w-full py-2.5 mb-6 bg-bg-card border border-border-primary text-text-primary font-semibold rounded-lg text-sm hover:bg-bg-secondary transition-colors" do %>
-        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M13.8 12H3"/>
-        </svg>
-        使用 MiraclePlus 账号登录
-      <% end %>
+<div class="auth-shell">
+  <section class="auth-story" aria-labelledby="auth-story-title">
+    <p class="auth-eyebrow"><span aria-hidden="true"></span> ARCHON / 源策未来</p>
+    <div class="auth-story-copy">
+      <p class="auth-kicker">FROM ORIGIN, TOWARD THE FUTURE.</p>
+      <h1 id="auth-story-title">从信息中，<br>看见<span>下一步。</span></h1>
+      <p class="auth-description">连接分散的内容，持续追踪值得关注的变化。<br>让每一次探索，都有迹可循。</p>
+    </div>
+    <div class="auth-index" aria-label="工作台功能">
+      <div><span>01 / COLLECT</span><p>汇集多源内容</p></div>
+      <div><span>02 / FOLLOW</span><p>追踪网站动态</p></div>
+      <div><span>03 / CONNECT</span><p>连接你的工具</p></div>
+    </div>
+    <div class="auth-story-footer">
+      <p>以源为始 · 以策为径 · 通向未来</p>
+      <a href="https://www.archon.tech/" target="_blank" rel="noopener noreferrer">了解源策未来 <span aria-hidden="true">↗</span><span class="sr-only">（在新标签页打开）</span></a>
+    </div>
+  </section>
 
-      <div class="relative mb-6">
-        <hr class="border-border-primary">
-        <span class="absolute left-1/2 -translate-x-1/2 -top-2.5 bg-bg-card px-2 text-xs text-text-muted">或</span>
+  <section class="auth-access" aria-labelledby="auth-login-title">
+    <div class="auth-form-panel">
+      <div class="auth-form-heading">
+        <p class="auth-kicker">YOUR WORKSPACE</p>
+        <h2 id="auth-login-title">登录源策未来</h2>
+        <p>欢迎回来，继续你的探索。</p>
       </div>
 
-      <%= form_with url: session_path do |form| %>
+      <%= form_with url: session_path, id: "password-login" do |form| %>
         <div class="mb-4">
-          <%= form.label :email_address, "邮箱", class: "block text-sm font-medium text-text-primary mb-1" %>
-          <%= form.email_field :email_address, required: true, autofocus: true, autocomplete: "username", placeholder: "请输入邮箱", value: params[:email_address], class: "form-input" %>
+          <%= form.label :email_address, "邮箱地址", for: "password-email", class: "form-label mb-2" %>
+          <%= form.email_field :email_address, id: "password-email", required: true, autocomplete: "username", placeholder: "name@example.com", value: params[:email_address], class: "form-input" %>
         </div>
         <div class="mb-5">
-          <%= form.label :password, "密码", class: "block text-sm font-medium text-text-primary mb-1" %>
-          <%= form.password_field :password, required: true, autocomplete: "current-password", placeholder: "请输入密码", maxlength: 72, class: "form-input" %>
+          <%= form.label :password, "密码", for: "login-password", class: "form-label mb-2" %>
+          <%= form.password_field :password, id: "login-password", required: true, autocomplete: "current-password", placeholder: "请输入密码", maxlength: 72, class: "form-input" %>
         </div>
-        <%= form.submit "登录", class: "btn btn-primary w-full cursor-pointer" %>
+        <%= form.submit "进入工作台", class: "btn btn-primary auth-submit w-full cursor-pointer" %>
       <% end %>
 
-      <hr class="my-6 border-border-primary">
+      <details class="auth-email-link">
+        <summary>邮箱快捷登录 <span aria-hidden="true">+</span></summary>
+        <div class="auth-email-content">
+          <p id="magic-link-hint" class="text-sm text-text-secondary mb-4">无需输入密码。输入已验证的邮箱，获取 15 分钟内有效的登录链接。</p>
+          <%= form_with url: magic_link_session_path, method: :post, id: "email-link-login" do |form| %>
+            <div class="mb-4">
+              <%= form.label :email_address, "邮箱地址", for: "magic-link-email", class: "form-label mb-2" %>
+              <%= form.email_field :email_address, id: "magic-link-email", required: true, autocomplete: "email", placeholder: "name@example.com", value: params[:email_address], class: "form-input", aria: { describedby: "magic-link-hint" } %>
+            </div>
+            <%= form.submit "发送登录链接", class: "btn btn-default auth-submit w-full cursor-pointer" %>
+          <% end %>
+        </div>
+      </details>
 
-      <div>
-        <h4 class="text-sm font-semibold text-text-primary mb-1">使用魔法链接登录</h4>
-        <p class="text-xs text-text-secondary mb-4">输入邮箱，我们会发送一个 15 分钟内有效的登录链接。</p>
-
-        <%= form_with url: magic_link_session_path, method: :post do |form| %>
-          <div class="mb-4">
-            <%= form.label :email_address, "邮箱", class: "block text-sm font-medium text-text-primary mb-1" %>
-            <%= form.email_field :email_address, required: true, autocomplete: "username", placeholder: "请输入邮箱", value: params[:email_address], class: "form-input" %>
-          </div>
-          <%= form.submit "发送魔法登录链接", class: "w-full py-2.5 bg-bg-card text-text-primary font-semibold rounded-lg text-sm border border-border-primary hover:border-blue-400 hover:text-brand transition-colors cursor-pointer" %>
-        <% end %>
-      </div>
+      <p class="auth-help">需要开通账户？请联系管理员。</p>
 
       <% if Rails.env.development? || Rails.env.test? %>
-        <hr class="my-6 border-border-primary">
-        <div>
-          <%= button_to "🚀 开发者快速登录", dev_login_session_path, method: :post, class: "w-full py-2.5 bg-emerald-600 text-white font-semibold rounded-lg text-sm hover:bg-emerald-700 transition-colors cursor-pointer" %>
-          <p class="text-xs text-text-muted mt-2 text-center">dev@example.com · 仅开发环境可见</p>
+        <div class="auth-dev">
+          <%= button_to "以 Archon Developer 身份进入", dev_login_session_path, method: :post, class: "btn btn-default w-full" %>
+          <p>仅开发与测试环境可见</p>
         </div>
       <% end %>
     </div>
-  </div>
+  </section>
 </div>

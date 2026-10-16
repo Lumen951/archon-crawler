@@ -1,7 +1,7 @@
 <div class="space-y-8" data-controller="bulk-selector" data-bulk-selector-total-value="<%= @total_filtered_count %>" data-bulk-selector-scope-value="<%= @event_scope ? 'event' : 'accounts' %>">
   <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
     <div>
-      <h1 class="text-2xl font-bold text-text-primary">帐号管理</h1>
+      <h1 class="text-2xl font-bold text-text-primary">内容源</h1>
       <% if @event_scope %>
         <p class="mt-1 text-sm text-text-secondary">
           <%= @total_filtered_count %> 个活动
@@ -11,7 +11,7 @@
         </p>
       <% else %>
         <p class="mt-1 text-sm text-text-secondary">
-          <%= @total_filtered_count %> 个帐号
+          <%= @total_filtered_count %> 个内容源
           <% if @due_for_crawl_count > 0 %>
             · <span class="text-brand font-semibold"><%= @due_for_crawl_count %> 个待抓取</span>
           <% end %>

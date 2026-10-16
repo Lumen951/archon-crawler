@@ -9,13 +9,9 @@
           </svg>
         </button>
       <% end %>
-      <%= link_to root_path, class: "flex items-center gap-2.5 hover:opacity-80 transition" do %>
-        <div class="w-7 h-7 rounded-md bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
-          <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-          </svg>
-        </div>
-        <span class="text-sm font-bold text-text-primary hidden sm:block">MP-Crawler</span>
+      <%= link_to root_path, class: "archon-brand", aria: { label: "源策未来工作台" } do %>
+        <span class="archon-wordmark">ARCHON<span aria-hidden="true">.</span></span>
+        <span class="archon-brand-name">源策未来</span>
       <% end %>
     </div>
 
@@ -23,7 +19,7 @@
       <div class="flex items-center gap-1">
         <div class="relative" data-controller="dropdown">
           <button data-action="click->dropdown#toggle" class="h-9 flex items-center gap-2 px-2 sm:px-3 rounded-md hover:bg-bg-secondary transition">
-            <div class="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold">
+            <div class="w-7 h-7 rounded-full bg-brand-soft flex items-center justify-center text-brand text-xs font-bold">
               <%= current_user.email_address[0].upcase %>
             </div>
             <span class="text-sm font-medium hidden sm:block"><%= current_user.name.presence || current_user.email_address.split('@').first %></span>
@@ -34,7 +30,7 @@
 
           <div data-dropdown-target="panel" class="hidden absolute right-0 top-12 w-64 max-h-[calc(100vh-4rem)] overflow-y-auto bg-bg-card rounded-lg border border-border-primary shadow-lg z-50">
             <div class="flex items-center gap-3 px-4 py-3 border-b border-border-primary">
-              <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold">
+              <div class="w-10 h-10 rounded-full bg-brand-soft flex items-center justify-center text-brand font-bold">
                 <%= current_user.email_address[0].upcase %>
               </div>
               <div class="min-w-0 flex-1">

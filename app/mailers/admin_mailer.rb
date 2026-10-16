@@ -5,7 +5,7 @@ class AdminMailer < ApplicationMailer
 
     mail(
       to: user.email_address,
-      subject: "欢迎登录 MP-Crawler"
+      subject: "欢迎登录源策未来"
     )
   end
 
@@ -15,7 +15,7 @@ class AdminMailer < ApplicationMailer
 
     mail(
       to: user.email_address,
-      subject: "您的 MP-Crawler 登录链接"
+      subject: "您的源策未来登录链接"
     )
   end
 
@@ -25,7 +25,7 @@ class AdminMailer < ApplicationMailer
 
     mail(
       to: user.email_address,
-      subject: "您的 MP-Crawler 账户登录信息"
+      subject: "您的源策未来账户登录信息"
     )
   end
 
@@ -35,7 +35,7 @@ class AdminMailer < ApplicationMailer
 
     mail(
       to: user.email_address,
-      subject: "【MP-Crawler】API Key 已过期"
+      subject: "【源策未来】API Key 已过期"
     )
   end
 end

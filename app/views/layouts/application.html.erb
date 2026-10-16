@@ -1,10 +1,12 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
   <head>
-    <title><%= content_for(:title) || "Mp Crawler" %></title>
+    <meta charset="utf-8">
+    <title><%= content_for(:title) || "源策未来 · ARCHON" %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="application-name" content="Mp Crawler">
+    <meta name="application-name" content="源策未来">
+    <meta name="theme-color" content="#1769d2">
     <meta name="mobile-web-app-capable" content="yes">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
@@ -26,7 +28,7 @@
 
   <body class="min-h-screen flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased">
     <% if current_user %>
-      <%# GitLab 式外壳：通栏顶栏在最上方，下方为深色侧边栏（钉住不随内容滚动，移动端抽屉）+ 内容区 %>
+      <%# 桌面端常驻侧栏，移动端保留抽屉导航。 %>
       <div class="flex min-h-screen flex-1 flex-col" data-controller="sidebar">
         <%= render 'shared/header' %>
 
@@ -46,7 +48,7 @@
       </div>
     <% else %>
       <%= render 'shared/header' %>
-      <main class="flex-1 w-full px-4 sm:px-6 lg:px-8 py-6">
+      <main class="<%= content_for?(:main_class) ? yield(:main_class) : 'flex-1 w-full px-4 sm:px-6 lg:px-8 py-6' %>">
         <%= render 'shared/toasts' %>
         <%= yield %>
       </main>

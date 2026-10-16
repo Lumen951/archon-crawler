@@ -8,5 +8,4 @@
 #     MovieGenre.find_or_create_by!(name: genre_name)
 #   end
 
-user = User.create!(name: "Shaokun Wu", email_address: "shaokun.wu@gmail.com", password: "12345678", password_confirmation: "12345678", role: "admin")
-user.confirm_email!
+User.developer_account! if Rails.env.development? || Rails.env.test?

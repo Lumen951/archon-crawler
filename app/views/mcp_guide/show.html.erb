@@ -1,8 +1,8 @@
-<% content_for :title, "MCP Server - MP-Crawler" %>
+<% content_for :title, "MCP Server - 源策未来" %>
 
 <div class="max-w-4xl mx-auto px-4 py-8">
   <div class="mb-8">
-    <h1 class="text-2xl font-bold text-text-primary">MP-Crawler MCP Server</h1>
+    <h1 class="text-2xl font-bold text-text-primary">源策未来 MCP Server</h1>
     <p class="mt-1 text-sm text-text-secondary">让 AI 助手直接查询和管理您的公众号、小红书、Twitter 账号</p>
   </div>
 
@@ -57,18 +57,18 @@
       <ol class="mb-4 space-y-2 text-sm text-text-primary list-decimal list-inside">
         <li>
           终端执行：
-          <% claude_cmd = "claude mcp add --transport http mp-crawler #{@mcp_endpoint_url}" %>
+          <% claude_cmd = "claude mcp add --transport http archon-crawler #{@mcp_endpoint_url}" %>
           <div class="mt-1 flex items-start gap-2 rounded-md border border-border-primary bg-bg-card px-3 py-2">
             <code class="flex-1 overflow-x-auto text-xs font-mono text-text-primary break-all"><%= claude_cmd %></code>
             <button type="button" onclick="mcpCopy(this, <%= claude_cmd.to_json %>)" class="shrink-0 text-xs text-text-muted hover:text-brand">复制</button>
           </div>
         </li>
-        <li>进入 <code class="text-xs bg-bg-card border px-1 rounded font-mono">claude</code>，输入 <code class="text-xs bg-bg-card border px-1 rounded font-mono">/mcp</code>，选择 <code class="text-xs bg-bg-card border px-1 rounded font-mono">mp-crawler</code> → <code class="text-xs bg-bg-card border px-1 rounded font-mono">Authenticate</code></li>
+        <li>进入 <code class="text-xs bg-bg-card border px-1 rounded font-mono">claude</code>，输入 <code class="text-xs bg-bg-card border px-1 rounded font-mono">/mcp</code>，选择 <code class="text-xs bg-bg-card border px-1 rounded font-mono">archon-crawler</code> → <code class="text-xs bg-bg-card border px-1 rounded font-mono">Authenticate</code></li>
         <li>浏览器会自动打开授权页，登录并确认后即可使用</li>
       </ol>
 
       <p class="text-sm font-medium text-text-primary mb-2">Codex</p>
-      <% codex_cmd = "codex mcp add mp-crawler --url #{@mcp_endpoint_url}\ncodex mcp login mp-crawler" %>
+      <% codex_cmd = "codex mcp add archon-crawler --url #{@mcp_endpoint_url}\ncodex mcp login archon-crawler" %>
       <div class="flex items-start gap-2 rounded-md border border-border-primary bg-bg-card px-3 py-2">
         <pre class="flex-1 overflow-x-auto text-xs font-mono text-text-primary leading-relaxed"><%= codex_cmd %></pre>
         <button type="button" onclick="mcpCopy(this, <%= codex_cmd.to_json %>)" class="shrink-0 text-xs text-text-muted hover:text-brand">复制</button>
@@ -134,7 +134,7 @@
           <% end %>
 
           <p class="text-sm text-text-secondary mb-3">把下面这句话发给你的 AI 客户端，它会自动帮你完成配置：</p>
-          <% install_prompt = "请用 CLI 命令帮我添加一个 MCP Server，参数如下：name: mp-crawler，url: #{@mcp_endpoint_url}，type: http，authorization: Bearer #{@new_token || 'YOUR_TOKEN'}，scope: project。请用 CLI 完成操作，不要直接创建或者修改 json，如果 Bearer Token 没有提供，或者是 placeholder，请提示用户输入。" %>
+          <% install_prompt = "请用 CLI 命令帮我添加一个 MCP Server，参数如下：name: archon-crawler，url: #{@mcp_endpoint_url}，type: http，authorization: Bearer #{@new_token || 'YOUR_TOKEN'}，scope: project。请用 CLI 完成操作，不要直接创建或者修改 json，如果 Bearer Token 没有提供，或者是 placeholder，请提示用户输入。" %>
           <div class="group/p relative flex items-start gap-2 p-4 rounded-lg border border-border-primary bg-bg-secondary hover:bg-bg-card hover:border-border-primary hover:shadow-sm transition-all cursor-pointer"
                onclick="copyPrompt(this, <%= install_prompt.to_json %>)">
             <p class="flex-1 text-sm text-text-primary leading-relaxed font-mono"><%= install_prompt %></p>
@@ -148,7 +148,7 @@
             <% json_token = @new_token.presence || "YOUR_API_KEY" %>
             <% mcp_config_json = JSON.pretty_generate(
                  "mcpServers" => {
-                   "mp-crawler" => {
+                   "archon-crawler" => {
                      "type" => "http",
                      "url" => @mcp_endpoint_url,
                      "headers" => { "Authorization" => "Bearer #{json_token}" }
@@ -166,7 +166,7 @@
                       class="absolute top-2 right-2 px-2 py-1 text-xs text-gray-300 bg-bg-card/10 border border-white/20 rounded opacity-0 group-hover/j:opacity-100 transition-all hover:bg-bg-card/20">复制</button>
             </div>
             <ul class="mt-2 text-xs text-text-muted space-y-0.5">
-              <li>根键是 <code class="bg-bg-secondary px-1 rounded">mcpServers</code>；若客户端的配置文件用别的根键（如 VS Code 的 <code class="bg-bg-secondary px-1 rounded">servers</code>），保留内层 <code class="bg-bg-secondary px-1 rounded">mp-crawler</code> 那段即可。</li>
+              <li>根键是 <code class="bg-bg-secondary px-1 rounded">mcpServers</code>；若客户端的配置文件用别的根键（如 VS Code 的 <code class="bg-bg-secondary px-1 rounded">servers</code>），保留内层 <code class="bg-bg-secondary px-1 rounded">archon-crawler</code> 那段即可。</li>
               <% if @new_token.present? %>
                 <li>配置里已填入刚创建的 Token，请立即保存。</li>
               <% else %>

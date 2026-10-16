@@ -13,7 +13,7 @@ class AdminMailerTest < ActionMailer::TestCase
     email = AdminMailer.magic_login_link(user, link)
 
     assert_equal [user.email_address], email.to
-    assert_equal "您的 MP-Crawler 登录链接", email.subject
+    assert_equal "您的源策未来登录链接", email.subject
     assert_includes email.html_part.body.to_s, link
     assert_includes email.text_part.body.to_s, link
     assert_includes email.html_part.body.to_s, "15 分钟后过期"

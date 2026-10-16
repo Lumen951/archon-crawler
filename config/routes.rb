@@ -2,11 +2,9 @@ Rails.application.routes.draw do
   # Authentication routes
   resource :session, only: [:new, :create, :destroy] do
     post :magic_link
-    post :dev_login
+    post :dev_login if Rails.env.development? || Rails.env.test?
   end
   get '/magic_link/:token', to: 'sessions#magic_link_login', as: :magic_link
-  get '/auth/:provider', to: 'sessions#oauth_login', as: :oauth_login
-  get '/oauth/:provider/callback', to: 'sessions#oauth_callback', as: :oauth_callback
 
   # Feishu message-card callback (public, verified by signature)
   post '/feishu/card_callback', to: 'feishu_callbacks#card', as: :feishu_callback

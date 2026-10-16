@@ -1,10 +1,10 @@
-# MP-Crawler
+# archon-crawler
 
 微信公众号、小红书和 Twitter 文章爬虫 & RSS 订阅服务
 
 ## 项目简介
 
-MP-Crawler 是一个基于 Ruby on Rails 的应用，用于自动抓取微信公众号、小红书和 Twitter 文章，并提供 RSS 订阅服务。主要面向高校帐号，支持多平台、进度保存、断点续传、并发控制等功能。
+archon-crawler 是源策未来（ARCHON）的多源内容与研究追踪平台，基于 Ruby on Rails 构建，用于采集微信公众号、小红书、Twitter 和网站内容，并提供 RSS 订阅服务。平台支持多源、进度保存、断点续传和并发控制。
 
 ## 技术栈
 
@@ -16,7 +16,7 @@ MP-Crawler 是一个基于 Ruby on Rails 的应用，用于自动抓取微信公
 - **HTTP Client**: Faraday with faraday-retry
 - **Pagination**: Kaminari
 - **Search**: Ransack
-- **Authentication**: has_secure_password + magic link login + MiraclePlus OAuth
+- **Authentication**: has_secure_password + magic link login
 
 ## 核心功能
 
@@ -76,10 +76,9 @@ MP-Crawler 是一个基于 Ruby on Rails 的应用，用于自动抓取微信公
 
 ### 7. 用户认证与权限
 - 基于 `has_secure_password` 的密码认证
-- **MiraclePlus OAuth 登录**（推荐）
 - Magic Link 邮箱登录（免密码）
-- 开发环境 dev_login 快捷登录
-- 角色系统：admin / user（首个 OAuth 用户自动成为 admin）
+- 开发环境 dev_login 快捷登录：Archon Developer（`developer@archon.test`）
+- 角色系统：admin / user；生产环境不提供开发者快捷登录或默认管理员密码
 - 邮箱验证机制
 - `AdminMailer`：邀请邮件、登录链接邮件、新用户凭据邮件
 
@@ -500,7 +499,7 @@ MCP 客户端（Claude Code、Codex 等）内置了 OAuth 发现能力，服务�
 - **`McpOauth`** (`app/services/mcp_oauth.rb`)：资源服务器侧的共享常量与工具——scope 定义、写操作工具清单、
   RFC 8707 canonical URI 归一化、`WWW-Authenticate` 挑战串构造、redirect_uri 白名单规则
 - **Doorkeeper** (`config/initializers/doorkeeper.rb`)：授权服务器。`base_controller` 设为 `ApplicationController`，
-  匿名访客先被应用自身的 `require_authentication` 引导去登录（MiraclePlus OAuth / magic link），再回到同意页
+  匿名访客先被应用自身的 `require_authentication` 引导去登录（密码 / magic link），再回到同意页
 - **`Oauth::AuthorizationsController`**：Doorkeeper 授权端点 + RFC 8707 `resource` 校验（不匹配返回 `invalid_target`）
 - **`Oauth::TokensController`**：`< Doorkeeper::TokensController`，按 `grant_type` 分流——设备码走原有逻辑签发 `ApiKey`，
   其余交给 Doorkeeper
@@ -520,7 +519,7 @@ MCP 客户端（Claude Code、Codex 等）内置了 OAuth 发现能力，服务�
 - `WechatContentDownloadTasksController`：正文下载任务列表/详情、手动触发、查看日志
 - `ArticlesController`：文章详情、重新下载正文（`download_content`）
 - `DashboardController`：仪表盘首页
-- `SessionsController`：登录/登出、magic link、dev_login、OAuth 登录
+- `SessionsController`：登录/登出、magic link、dev_login（仅开发与测试环境）
 - `ProfilesController`：用户密码管理、关注标签、API Key 管理
 - `RssController`：RSS feed 输出
 - `Admin::UsersController`：用户管理（admin only）、管理用户关注标签
@@ -543,7 +542,7 @@ MCP 客户端（Claude Code、Codex 等）内置了 OAuth 发现能力，服务�
 
 ```
 # 认证
-resource :session + magic_link + dev_login + OAuth (GET /auth/:provider, /oauth/:provider/callback)
+resource :session + magic_link + dev_login (development/test only)
 GET /magic_link/:token -> sessions#magic_link_login
 
 # 文章
@@ -655,12 +654,10 @@ GET /up                               # health check
 bundle install
 rails db:create db:migrate
 
-# 配置 MiraclePlus OAuth（推荐）
-# 编辑加密凭据文件，添加以下内容：
-EDITOR="code --wait" rails credentials:edit
-# mp_oauth:
-#   client_id: your_client_id
-#   client_secret: your_client_secret
+# 本地开发账号（也可在登录页点击「以 Archon Developer 身份进入」）
+rails db:seed
+# 仅开发与测试环境创建 developer@archon.test；使用随机密码，无固定默认密码。
+# 生产环境不会创建默认账号，需要单独配置管理员。
 
 # 命令行导入帐号
 rails import:accounts
@@ -886,7 +883,7 @@ mp-crawler/
 │   │   ├── tag.rb / tag_account.rb / user_tag.rb
 │   │   ├── group.rb / group_account.rb
 │   │   ├── crawl_task.rb / crawl_task_account.rb / crawl_log.rb
-│   │   ├── option.rb / api_key.rb / oauth2_client.rb
+│   │   ├── option.rb / api_key.rb
 │   │   ├── user.rb / session.rb
 │   ├── services/
 │   │   ├── account_resolver.rb

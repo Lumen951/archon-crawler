@@ -93,25 +93,15 @@ class User < ApplicationRecord
     last_login_at.present?
   end
 
-  # Find or create user from OAuth response
-  def self.from_oauth(user_hash)
-    if user_hash[:mp_id].blank?
-      raise ArgumentError, "No mp_id in OAuth response: #{user_hash.inspect}"
-    end
+  def self.developer_account!
+    raise "Developer account is only available locally" unless Rails.env.development? || Rails.env.test?
 
-    find_or_initialize_by(mp_id: user_hash[:mp_id]).tap do |user|
-      is_new = user.new_record?
-      user.email_address = user_hash[:email].to_s.strip.presence || "user-#{user_hash[:mp_id]}@miracleplus.com"
-      user.name = user_hash[:name].to_s.strip.presence
-      user.password = SecureRandom.hex(32) if is_new
-      user.role = :admin if is_new && !User.exists? # First user becomes admin
-      user.save!
+    find_or_create_by!(email_address: "developer@archon.test") do |user|
+      user.name = "Archon Developer"
+      user.password = generate_random_password(32)
+      user.role = :admin
+      user.email_confirmed_at = Time.current
     end
-  end
-
-  # Check if user is OAuth-only (no password set)
-  def oauth_only?
-    password_digest.blank? && mp_id.present?
   end
 
   def self.ransackable_attributes(auth_object = nil)

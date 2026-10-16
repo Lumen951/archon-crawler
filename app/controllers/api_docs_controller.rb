@@ -10,7 +10,7 @@ class ApiDocsController < ApplicationController
     spec = {
       openapi: "3.1.0",
       info: {
-        title: "MP-Crawler API",
+        title: "源策未来 API",
         version: "1.0.0",
         description: "微信公众号、小红书和 Twitter 文章爬虫 & RSS 订阅服务 API"
       },

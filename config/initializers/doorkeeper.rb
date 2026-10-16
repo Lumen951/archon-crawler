@@ -9,7 +9,7 @@ Doorkeeper.configure do
 
   # Running the authorization endpoint on ApplicationController means anonymous
   # visitors hit the app's normal `require_authentication` gate first, which
-  # bounces them through MiraclePlus OAuth / magic link and returns them here.
+  # bounces them through password / magic link login and returns them here.
   base_controller "ApplicationController"
 
   resource_owner_authenticator do

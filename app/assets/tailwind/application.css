@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: system-ui, -apple-system, sans-serif;
+  --font-sans: "Outfit", "Bahnschrift", "Noto Sans SC", "Microsoft YaHei", sans-serif;
 
   --color-bg-primary:   var(--bg-primary);
   --color-bg-secondary: var(--bg-secondary);
@@ -28,30 +28,29 @@
 
 @layer base {
   :root {
-    /* GitLab(Pajamas) 风格中性色：浅灰页面底 + 纯白卡片 + 细边框，扁平低阴影 */
-    --brand: #2563eb;
-    --brand-dark: #1d4ed8;
-    --brand-soft: #eff6ff;
+    --brand: #1769d2;
+    --brand-dark: #1053ab;
+    --brand-soft: #edf4fc;
 
-    --bg-page: #fafafa;
+    --bg-page: #f7f9fb;
     --bg-surface: #ffffff;
-    --bg-muted: #f1f2f4;
+    --bg-muted: #eef2f6;
     --bg-primary: var(--bg-page);
     --bg-secondary: var(--bg-muted);
     --bg-card: var(--bg-surface);
     --bg-header: rgba(255, 255, 255, 0.92);
 
-    --border: #dcdcde;
-    --border-strong: #bfbfc3;
+    --border: #dce2e9;
+    --border-strong: #b5bfcc;
     --border-primary: var(--border);
     --border-secondary: var(--border-strong);
 
-    --text-main: #1f1e24;
+    --text-main: #18212c;
     --text-primary: var(--text-main);
-    --text-secondary: #737278;
-    --text-muted: #8c9196;
+    --text-secondary: #526174;
+    --text-muted: #637186;
 
-    --color-primary: #2563eb;
+    --color-primary: #1769d2;
     --color-success: #108548;
     --color-warning: #c17d10;
     --color-error: #d64545;
@@ -74,12 +73,6 @@
   ::selection { background: var(--brand); color: white; }
 
   :focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
-}
-
-/* 顶栏：扁平，仅底边框，去投影 */
-header {
-  background-color: var(--bg-header) !important;
-  border-color: var(--border-primary) !important;
 }
 
 @layer components {
@@ -107,7 +100,7 @@ header {
     @apply bg-gray-100 text-gray-800;
   }
 
-  /* 紧凑按钮（GitLab default/confirm 风格） */
+  /* 工作台保留紧凑控件，登录表单单独使用较大的触控尺寸。 */
   .btn {
     @apply inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-md text-sm font-semibold transition-colors duration-150;
   }
@@ -116,7 +109,7 @@ header {
     @apply bg-primary text-white border border-transparent hover:bg-brand-dark;
   }
 
-  /* GitLab default：白底描边 */
+  /* 次要操作使用白底描边。 */
   .btn-default {
     @apply bg-bg-card text-text-primary border border-border-secondary hover:bg-bg-secondary hover:border-border-strong;
   }
@@ -146,7 +139,7 @@ header {
     @apply bg-bg-card border border-border-primary rounded-lg p-5;
   }
 
-  /* GitLab 设置卡片：header / body / footer 三段式 */
+  /* 设置卡片：header / body / footer 三段式 */
   .panel {
     @apply bg-bg-card border border-border-primary rounded-lg;
   }
@@ -222,6 +215,7 @@ header {
 
   .sidebar-link.active {
     @apply bg-brand-soft text-brand font-semibold;
+    box-shadow: inset 2px 0 0 var(--brand);
   }
 
   .sidebar-section-title {
@@ -257,4 +251,69 @@ header {
   .settings-nav-link.active .status-dot {
     box-shadow: 0 0 0 2px rgb(255 255 255 / 85%);
   }
+}
+
+.archon-brand { display: inline-flex; align-items: center; gap: 14px; color: var(--text-primary); }
+.archon-wordmark { font-size: 20px; font-weight: 800; letter-spacing: -0.06em; }
+.archon-wordmark > span { color: var(--brand); }
+.archon-brand-name { padding-left: 14px; border-left: 1px solid var(--border); font-size: 12px; font-weight: 600; letter-spacing: 0.12em; }
+.auth-main { display: flex; flex: 1; width: 100%; background: var(--bg-surface); }
+.auth-shell { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(360px, 1fr); width: 100%; min-height: calc(100svh - 3rem); }
+.auth-story { position: relative; display: flex; flex-direction: column; justify-content: space-between; gap: 48px; padding: clamp(32px, 5vw, 80px); overflow: hidden; border-right: 1px solid var(--border); background: radial-gradient(ellipse at 5% 70%, #dbeafb 0, transparent 65%), linear-gradient(135deg, #f8fbff, #edf2f7); }
+.auth-story::before { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0.5; background-image: linear-gradient(#b8cadb33 1px, transparent 1px), linear-gradient(90deg, #b8cadb33 1px, transparent 1px); background-size: 64px 64px; mask-image: linear-gradient(transparent, black); }
+.auth-story > * { position: relative; }
+.auth-eyebrow { display: flex; align-items: center; gap: 10px; color: var(--text-secondary); font-size: 12px; font-weight: 600; letter-spacing: 0.1em; }
+.auth-eyebrow > span { width: 7px; height: 7px; background: var(--brand); }
+.auth-kicker { margin-bottom: 20px; font-size: 10px; font-weight: 600; letter-spacing: 0.16em; color: var(--text-secondary); }
+.auth-story-copy h1 { margin: 0; font-size: clamp(38px, 4.4vw, 72px); font-weight: 600; line-height: 1.3; letter-spacing: -0.055em; }
+.auth-story-copy h1 span { color: var(--brand); }
+.auth-description { margin-top: 26px; color: var(--text-secondary); font-size: 14px; line-height: 2; }
+.auth-index { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+.auth-index > div { padding-top: 14px; border-top: 1px solid var(--border-strong); }
+.auth-index span { color: var(--text-secondary); font-size: 9px; letter-spacing: 0.06em; }
+.auth-index p { margin-top: 10px; font-size: 13px; font-weight: 500; }
+.auth-story-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; color: var(--text-secondary); font-size: 11px; line-height: 1.8; }
+.auth-story-footer a { text-decoration: underline; text-underline-offset: 5px; }
+.auth-story-footer a:hover { color: var(--brand); }
+.auth-access { display: flex; align-items: center; justify-content: center; padding: 48px clamp(24px, 5vw, 80px); }
+.auth-form-panel { width: 100%; max-width: 380px; }
+.auth-form-heading { margin-bottom: 32px; }
+.auth-form-heading .auth-kicker { color: var(--brand); margin-bottom: 14px; }
+.auth-form-heading h2 { font-size: 28px; font-weight: 600; letter-spacing: -0.035em; }
+.auth-form-heading > p:last-child { margin-top: 10px; color: var(--text-secondary); font-size: 14px; }
+.auth-access .form-input { height: 48px; border-radius: 4px; font-size: 16px; }
+.auth-access .form-label { font-size: 13px; }
+.auth-submit { min-height: 48px; height: auto; padding: 12px 16px; border-radius: 4px; }
+.auth-email-link { margin-top: 22px; border-bottom: 1px solid var(--border); }
+.auth-email-link summary { display: flex; justify-content: space-between; align-items: center; min-height: 48px; gap: 12px; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--brand); list-style: none; }
+.auth-email-link summary::-webkit-details-marker { display: none; }
+.auth-email-link summary > span { font-size: 20px; font-weight: 400; }
+.auth-email-link[open] summary > span { transform: rotate(45deg); }
+.auth-email-content { padding: 12px 0 24px; }
+.auth-help { margin-top: 28px; color: var(--text-secondary); font-size: 12px; }
+.auth-dev { margin-top: 24px; padding-top: 18px; border-top: 1px dashed var(--border); }
+.auth-dev p { margin-top: 8px; color: var(--text-secondary); font-size: 10px; text-align: center; }
+
+@keyframes archon-enter {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .auth-story-copy { animation: archon-enter 500ms ease-out both; }
+  .auth-form-panel { animation: archon-enter 500ms 100ms ease-out both; }
+}
+
+@media (max-width: 800px) {
+  .auth-shell { grid-template-columns: minmax(0, 1fr); }
+  .auth-story { padding: 32px 24px; gap: 28px; border-right: 0; border-bottom: 1px solid var(--border); }
+  .auth-story-copy h1 { font-size: clamp(32px, 7vw, 48px); }
+  .auth-description { margin-top: 16px; }
+  .auth-story-copy .auth-kicker, .auth-index { display: none; }
+  .auth-story-footer { gap: 8px; }
+  .auth-access { padding: 36px 24px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
 }

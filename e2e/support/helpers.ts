@@ -28,28 +28,28 @@ function slug(name: string): string {
   return name.replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "").slice(0, 60);
 }
 
-// 登录：优先走现成会话，否则点「开发者快速登录」（development 专属，
-// 自动创建 dev@example.com 管理员）。根路径即控制台（dashboard#index）。
+// 登录：优先走现成会话，否则点「以 Archon Developer 身份进入」（development 专属，
+// 自动创建 developer@archon.test 管理员）。根路径即控制台（dashboard#index）。
 export async function login(page: Page): Promise<void> {
   await page.goto("/dashboard");
   if (!page.url().includes("session/new")) {
     return; // 已登录
   }
-  await page.getByRole("button", { name: /开发者快速登录/ }).click();
+  await page.getByRole("button", { name: /以 Archon Developer 身份进入/ }).click();
   await expect(page).not.toHaveURL(/session\/new/);
-  await expect(page.getByRole("heading", { name: "控制台" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "工作台" })).toBeVisible();
 }
 
 // 帐号列表页：accounts#index 开启了 QueryPersistenceConcern（按用户在服务端
 // 记住上次的筛选条件，跨浏览器会话生效），reset=1 先清掉记忆，避免用例互相污染。
 export async function gotoAccounts(page: Page): Promise<void> {
   await page.goto("/accounts?reset=1");
-  await expect(page.getByRole("heading", { name: "帐号管理" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "内容源", exact: true })).toBeVisible();
 }
 
 // 活动调研 tab：活动账号（EventAccount）在独立 tab，不与文章账号混排
 export async function gotoEventAccounts(page: Page): Promise<void> {
   await page.goto("/accounts?reset=1&scope=event");
-  await expect(page.getByRole("heading", { name: "帐号管理" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "内容源", exact: true })).toBeVisible();
   await expect(page.getByText("全部活动")).toBeVisible();
 }
