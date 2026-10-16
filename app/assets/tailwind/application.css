@@ -254,8 +254,7 @@
 }
 
 .archon-brand { display: inline-flex; align-items: center; gap: 14px; color: var(--text-primary); }
-.archon-wordmark { font-size: 20px; font-weight: 800; letter-spacing: -0.06em; }
-.archon-wordmark > span { color: var(--brand); }
+.archon-logo { display: block; width: auto; height: 32px; flex-shrink: 0; object-fit: contain; }
 .archon-brand-name { padding-left: 14px; border-left: 1px solid var(--border); font-size: 12px; font-weight: 600; letter-spacing: 0.12em; }
 .auth-main { display: flex; flex: 1; width: 100%; background: var(--bg-surface); }
 .auth-shell { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(360px, 1fr); width: 100%; min-height: calc(100svh - 3rem); }
