@@ -13,12 +13,12 @@ jobs:
       RAILS_MASTER_KEY: ${{ secrets.RAILS_MASTER_KEY }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           submodules: false
 
       - name: Checkout submodule
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: MiraclePlus/twitter-api-client
           ref: f936e5832cdf830742cf23cc4d5566193d9f88b5
