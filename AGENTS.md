@@ -1,162 +1,66 @@
 # AGENTS.md
 
-Guidance for Codex and other AI coding agents working in this repository.
+本文件是 Agent 进入本仓库的入口地图（只导航，不堆叠细节）。先阅读本文件，再按任务进入 [docs/](docs/) 和代码入口。
 
-## Repository Context
+## 项目定位
 
-MP-Crawler is a Ruby on Rails 8.1 application for collecting articles from
-WeChat official accounts, Rednote, Twitter/X, and websites, then exposing the
-data through the web UI, RSS feeds, REST APIs, and an MCP server. It uses
-PostgreSQL, Solid Queue, Solid Cache, Solid Cable, Turbo/Stimulus, and Kamal.
+MP-Crawler（Archon）是 Ruby on Rails 8.1 多源内容与研究平台，采集微信公众号、小红书、Twitter/X 和官网内容，并提供网页、RSS、REST API 与 MCP 接入。生产环境使用 PostgreSQL、Solid Queue、Solid Cache、Solid Cable 和 Kamal。
 
-`Account` is an STI base model. The supported account types are
-`WechatAccount`, `RednoteAccount`, `TwitterAccount`, and `WebsiteAccount`.
-Platform crawlers live primarily in `lib/`; `CrawlOrchestrator` dispatches an
-account to its type's crawler through `Account.crawler_class`.
+## 文档地图
 
-Crawler runs make network calls and write durable data. Treat crawler logic,
-job scheduling, persisted crawl state, account credentials, and OAuth/MCP
-authorization as high-risk surfaces.
+- 要了解当前业务边界：先读 [docs/specs/README.md](docs/specs/README.md)，再进入对应领域文档。
+- 要了解代码如何协作：读 [docs/architecture/README.md](docs/architecture/README.md)。
+- 要开发、验证或排错：读 [docs/runbook/README.md](docs/runbook/README.md)。
+- 要追溯文档治理与重要变化：读 [docs/changelog/README.md](docs/changelog/README.md)。
+- MCP 接入细节：[docs/mcp.md](docs/mcp.md)；天眼查接口资料：[docs/tianyancha_api.md](docs/tianyancha_api.md)。
+- 浏览器回归：[e2e/README.md](e2e/README.md)；现有 Agent 技能：[.agents/skills/](.agents/skills/)。
 
-## Default Rules
+## 仓库地图
 
-- Read the existing controller, model, job, service, and crawler path before
-  changing it. Prefer the repository's established patterns.
-- Keep changes narrowly scoped to the requested behavior. Do not overwrite or
-  revert unrelated working-tree changes.
-- Preserve `Article.url` uniqueness and the crawler's duplicate-safe behavior.
-  Retries, resumed tasks, and duplicate job delivery must not create duplicate
-  articles or corrupt account statistics.
-- Keep task state transitions and progress evidence intact: `CrawlTask`,
-  `CrawlTaskAccount`, `CrawlLog`, and `WechatContentDownloadTask` are
-  operational records, not disposable UI state.
-- Enqueue work only after required database records are committed. Jobs must be
-  safe when delivered late or more than once.
-- Do not move long-running crawler work into an HTTP request. UI actions should
-  create a task and enqueue a job; the job owns network crawling.
-- Preserve platform-specific rate limits, error thresholds, pause/resume
-  checks, pagination behavior, and configured daily budgets.
-- `MonitorPage`, `MonitorPageVersion`, and `MonitorChange` belong to website
-  monitoring. Do not apply their semantics to other account types without a
-  deliberate product and migration change.
-- Store raw upstream payloads only where the existing model contract expects
-  them. Preserve enough provenance to distinguish missing upstream values from
-  parser-derived values.
+- [app/models](app/models)：持久化、校验、关联和任务状态转换。
+- [app/jobs](app/jobs)：抓取、正文下载、活动研究、定时检查等异步边界。
+- [app/services](app/services)：导入、账号解析、二维码登录、MCP OAuth 等应用服务。
+- [lib/](lib/)：`BaseCrawler`、平台爬虫、API 客户端、重试与限流、活动研究编排。
+- [app/controllers](app/controllers)：网页、管理端、REST API、MCP/OAuth 入口；控制器不承载长时间网络抓取。
+- [config/recurring.yml](config/recurring.yml)、[config/deploy.yml](config/deploy.yml)、[Dockerfile](Dockerfile)：生产调度与部署，修改前必须核对运行影响。
 
-## Credentials, Authentication, and External Services
+## 关键约定
 
-- Never commit, print, or place into fixtures real cookies, API keys, QR login
-  sessions, OAuth tokens, database URLs, Feishu secrets, or `master.key`.
-- Runtime crawler configuration is generally stored in `Option`; deployment
-  secrets are injected from `.kamal/secrets`. Treat both as sensitive.
-- WeChat MP sessions, WeRead account pools, Rednote/TikHub keys, Twitter `ct0`
-  and `auth_token` cookies, proxies, and third-party API responses must not be
-  exposed in logs, error messages, docs, or test output.
-- MCP supports OAuth 2.1 and bearer API-key access. Keep authorization scopes,
-  resource/audience validation, PKCE, token hashing, and write-tool access
-  checks intact. Do not authorize writes from client-supplied identities alone.
-- External API failures must leave a truthful, reviewable task or account
-  failure state. Do not report success when the provider response is unknown.
+- `Account` 是 STI 基类；常规抓取平台通过 `.crawler_class` 接入 `CrawlOrchestrator`。`EventAccount` 是活动研究配置，不进入常规抓取管线。
+- `Account#crawl!` 只创建 `CrawlTask` 并入队 `CrawlJob`；网络抓取由 Job/编排器执行，不得放回 HTTP 请求。
+- `CrawlJob` 委托 `CrawlOrchestrator`，文章列表获取与 `WechatContentDownloadJob` 正文下载保持分离。
+- 保持 `Article.url` 唯一性、重复投递安全、分页/限流/错误阈值、暂停恢复和任务日志证据。
+- 网站监测的 `MonitorPage`、`MonitorPageVersion`、`MonitorChange` 只用于官网监测，不要套用到其它账号类型。
+- 外部失败必须留下真实的任务或账号失败状态；未知的供应商结果不得报告为成功。
+- 解析时间必须先校验；缺失或非法时间保持 `nil` 或显式失败，不得静默变成 Unix epoch。
+- 不得提交或打印 Cookie、API Key、OAuth token、数据库 URL、`master.key`、生产样本或飞书密钥。
+- 记录提交后才能入队；不得因重试、重复或晚到 Job 破坏账号统计、任务成员和正文下载的审计记录。
+- 保留 OAuth scope、resource/audience、PKCE、token 摘要及写工具授权；不得只凭客户端身份授权写入。
+- 原始上游数据只存入既有模型约定的位置，保留缺失值与解析衍生值的来源差别；禁止无界并发。
+- 修改配置、调度、认证、爬虫、Job 或 MCP 授权时，先读相关实现与测试，并补充成功和失败路径验证。
 
-## Architecture Boundaries
+## 常用验证
 
-- `app/models`: persistence, validations, associations, and durable state
-  transitions.
-- `app/jobs`: asynchronous boundaries such as crawl execution, article-content
-  downloads, periodic checks, and cleanup. Production uses Solid Queue.
-- `lib/base_crawler.rb` and `lib/*_crawler.rb`: platform crawling behavior.
-  API clients and shared retry/rate-limit behavior also live in `lib/`.
-- `app/services`: imports, QR login orchestration, account resolution, and MCP
-  OAuth services. Keep controllers thin.
-- `app/controllers/admin`: authenticated administration. `app/controllers/api`:
-  API-key protected endpoints. `app/controllers/mcp_controller.rb` and
-  `app/mcp_server`: MCP transport and tools.
-- `config/recurring.yml`: scheduled job definitions. Changes here need special
-  care because they affect production crawling volume and external API usage.
-- `config/deploy.yml` and `Dockerfile`: Kamal single-server deployment. The
-  production image installs the `twitter-api-client` Python package under
-  `/rails/vendor/python`; keep its dependency compatibility explicit.
+```text
+bin/rails test test/models/account_test.rb
+bin/rails test test/lib/article_synchronizer_test.rb
+bin/rails zeitwerk:check
+bin/rubocop
+bin/brakeman
+bundle exec bundle-audit check
+```
 
-## Data and Platform Invariants
+按需运行 `bin/rails test`；浏览器 E2E 只在用户要求或完成影响用户流程的改动后征得同意再运行。测试外部服务必须使用 stub/mock，不依赖真实凭据。
 
-- `Account#crawl!` creates a `CrawlTask` and enqueues `CrawlJob`; it must not
-  synchronously perform the crawl in the request path.
-- `CrawlJob` delegates to `CrawlOrchestrator` and subsequently enqueues
-  `WechatContentDownloadJob`. Maintain this separation: WeChat article-list
-  acquisition and article-body download have different rate-limit and failure
-  behavior.
-- A new account platform needs an STI subclass implementing `.crawler_class`,
-  a crawler derived from `BaseCrawler`, importer/API integration as applicable,
-  and tests covering dispatch and failure behavior.
-- Website discovery depends on sitemap/robots behavior and monitored URLs;
-  website fetch errors should be represented accurately rather than silently
-  treated as an empty feed.
-- Validate parsed timestamps before persistence. Missing or invalid source time
-  values must remain `nil` or be handled explicitly, never silently become the
-  Unix epoch.
-- Do not introduce unbounded concurrency. Respect configured account/article
-  concurrency and platform-specific rate limits.
+## 修改与提交流程
 
-## Tests and Validation
+1. 先确认数据结构、目录归属和业务意图；不确定时停止并询问。
+2. 先读将要修改的文件，保持改动小而可回溯；不要覆盖工作区中与本任务无关的修改。
+3. 代码改变行为时同步检查对应 [docs/specs/](docs/specs/) 与 [docs/architecture/](docs/architecture/)；需求与实现不一致时列出差异，不擅自把规格改成代码。
+4. 提交前检查 `git diff`、敏感信息、文档链接和验证结果；生产部署由合并到 `main` 的流程负责。
+5. 创建文件/目录前列出清单征得同意；多步骤任务按阶段验收，除非用户明确授权连续完成。
+6. 临时分析与入门材料放 `tmp/doc/`，调查脚本和运行产物放 [tmp/](tmp/) 的其它位置；不自动提交临时文件。
 
-This project uses Rails' Minitest suite under `test/` rather than RSpec.
-Choose the smallest meaningful validation first, then broaden as needed.
+## 审查重点
 
-- Focused test: `bin/rails test test/models/account_test.rb`
-- Focused library test: `bin/rails test test/lib/article_synchronizer_test.rb`
-- Full test suite: `bin/rails test`
-- Autoloading: `bin/rails zeitwerk:check`
-- Lint: `bin/rubocop`
-- Security checks: `bin/brakeman` and `bundle exec bundle-audit check`
-- Prepare a disposable test database when schema changes: `RAILS_ENV=test bin/rails db:prepare`
-
-For crawler, API-client, job, authentication, OAuth, or configuration changes,
-add tests that prove both the successful path and the relevant failure or retry
-invariant. Stub external HTTP/Python-provider calls; do not depend on live
-credentials or external services in the test suite.
-
-### Browser E2E regression (offline closed loop)
-
-`bin/e2e` runs a Playwright suite against development with a dedicated database
-(`E2E_DB_NAME`, default `mp_crawler_e2e`) and every external dependency mocked
-(`E2E_MOCKS=1` → WebMock replays `e2e/fixtures/`; Twitter/Ferrum stubbed at the
-Ruby layer; never network). It produces an HTML report with screenshots and
-videos (`npx playwright show-report`). Do not run it proactively: run it only
-when the user asks, or — after finishing changes to controllers, views,
-crawlers, jobs, or routes that affect user-facing flows — ask the user at the
-end whether to run it (full or targeted spec). Independently of running the
-suite, when adding a new external endpoint add a mock handler +
-fixture (`lib/e2e_mock/handlers.rb`) so the suite stays offline. Details:
-`e2e/README.md` and the `e2e-regression` / `prod-sample` skills.
-
-## Local Development and Deployment
-
-- Install Ruby dependencies with `bundle install` using the Ruby version in
-  `.ruby-version`.
-- Start development services with `bin/dev`; it runs Rails and Tailwind watch.
-- Use `bin/rails console` for local inspection, but remember development's
-  Active Job adapter may execute async jobs in-process. Do not infer production
-  Solid Queue behavior solely from console output.
-- Deploy with Kamal configuration in `config/deploy.yml`. Do not edit or expose
-  `.kamal/secrets`; validate deployment changes separately from application
-  behavior.
-- `tmp/` is for local investigative scripts and generated notes. Put generated
-  analysis and onboarding documents in `tmp/doc/`; keep scripts and runtime
-  artifacts outside that directory. Do not add temporary artifacts to version
-  control unless the user explicitly requests a durable document elsewhere.
-
-## Review Priorities
-
-Prioritize concrete operational and security risks:
-
-1. leaked credentials, weakened authentication, or MCP/API authorization gaps
-2. duplicate or unbounded external crawling and rate-limit violations
-3. incorrect article association, URL deduplication, timestamp, or task-state
-   persistence
-4. lost pause/resume, retry, error, or audit evidence during job processing
-5. production scheduler, queue, Docker, or deployment changes that alter the
-   runtime execution model
-6. tests that do not establish the changed crawler or authorization invariant
-
-De-prioritize formatting and subjective style feedback unless it hides a real
-maintenance or correctness issue.
+依次检查凭据/授权、重复或过量抓取、文章归属/去重/时间/状态、暂停恢复与审计、生产队列调度部署、测试是否证明不变量。不要把主观格式意见置于具体风险之前。完整工程约束见 [运行手册](docs/runbook/README.md)。
