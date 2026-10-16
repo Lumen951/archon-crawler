@@ -65,7 +65,7 @@ group :development do
   gem "web-console"
 
   # Adds model schema comments for local development.
-  gem "annotaterb", "~> 4.22"
+  gem "annotaterb", "~> 4.25"
 end
 
 gem "ferrum"
