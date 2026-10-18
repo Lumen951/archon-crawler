@@ -49,3 +49,6 @@
 # Ignore Docker-related files
 /.dockerignore
 /Dockerfile*
+
+# Never include local server credentials in build context.
+/docs/server-access.local.md

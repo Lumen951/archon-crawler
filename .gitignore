@@ -62,3 +62,6 @@ __pycache__
 /.grok
 .zcodeignore
 skills-lock.json
+
+# Local server credentials.
+/docs/server-access.local.md
