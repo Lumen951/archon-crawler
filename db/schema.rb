@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_13_000003) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_18_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -375,6 +375,83 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_13_000003) do
     t.index ["opt_key"], name: "index_options_on_opt_key", unique: true
   end
 
+  create_table "paper_authors", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "display_name", null: false
+    t.string "external_id"
+    t.string "normalized_name", null: false
+    t.string "provider"
+    t.datetime "updated_at", null: false
+    t.index ["normalized_name"], name: "index_paper_authors_on_normalized_name"
+    t.index ["provider", "external_id"], name: "index_paper_authors_on_provider_and_external_id"
+  end
+
+  create_table "paper_authorships", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "display_name", null: false
+    t.bigint "paper_author_id", null: false
+    t.bigint "paper_id", null: false
+    t.integer "position", null: false
+    t.datetime "updated_at", null: false
+    t.index ["paper_author_id"], name: "index_paper_authorships_on_paper_author_id"
+    t.index ["paper_id", "position"], name: "index_paper_authorships_on_paper_id_and_position", unique: true
+    t.index ["paper_id"], name: "index_paper_authorships_on_paper_id"
+  end
+
+  create_table "paper_import_items", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.text "error_message"
+    t.bigint "paper_id"
+    t.bigint "paper_import_task_id", null: false
+    t.datetime "processed_at"
+    t.string "provider"
+    t.integer "status", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.string "url", null: false
+    t.index ["paper_id"], name: "index_paper_import_items_on_paper_id"
+    t.index ["paper_import_task_id", "url"], name: "index_paper_import_items_on_paper_import_task_id_and_url", unique: true
+    t.index ["paper_import_task_id"], name: "index_paper_import_items_on_paper_import_task_id"
+    t.index ["status"], name: "index_paper_import_items_on_status"
+  end
+
+  create_table "paper_import_tasks", force: :cascade do |t|
+    t.datetime "completed_at"
+    t.datetime "created_at", null: false
+    t.text "error_message"
+    t.integer "failed_count", default: 0, null: false
+    t.integer "imported_count", default: 0, null: false
+    t.integer "processed_count", default: 0, null: false
+    t.datetime "started_at"
+    t.integer "status", default: 0, null: false
+    t.integer "total_count", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["status"], name: "index_paper_import_tasks_on_status"
+    t.index ["user_id"], name: "index_paper_import_tasks_on_user_id"
+  end
+
+  create_table "paper_sources", force: :cascade do |t|
+    t.string "canonical_url", null: false
+    t.datetime "created_at", null: false
+    t.string "external_id", null: false
+    t.datetime "last_seen_at"
+    t.bigint "paper_id", null: false
+    t.string "provider", null: false
+    t.json "raw_metadata", default: {}, null: false
+    t.datetime "updated_at", null: false
+    t.index ["paper_id"], name: "index_paper_sources_on_paper_id"
+    t.index ["provider", "external_id"], name: "index_paper_sources_on_provider_and_external_id", unique: true
+  end
+
+  create_table "papers", force: :cascade do |t|
+    t.text "abstract"
+    t.datetime "created_at", null: false
+    t.datetime "published_at"
+    t.string "title", null: false
+    t.datetime "updated_at", null: false
+    t.datetime "updated_at_source"
+  end
+
   create_table "sessions", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "ip_address"
@@ -505,6 +582,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_13_000003) do
   add_foreign_key "oauth_access_grants", "users", column: "resource_owner_id"
   add_foreign_key "oauth_access_tokens", "oauth_applications", column: "application_id"
   add_foreign_key "oauth_access_tokens", "users", column: "resource_owner_id"
+  add_foreign_key "paper_authorships", "paper_authors"
+  add_foreign_key "paper_authorships", "papers"
+  add_foreign_key "paper_import_items", "paper_import_tasks"
+  add_foreign_key "paper_import_items", "papers"
+  add_foreign_key "paper_import_tasks", "users"
+  add_foreign_key "paper_sources", "papers"
   add_foreign_key "sessions", "users"
   add_foreign_key "tag_accounts", "accounts"
   add_foreign_key "tag_accounts", "tags"

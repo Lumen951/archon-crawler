@@ -16,6 +16,10 @@ Sitemap 路径：`WebsiteAccount` → `WebsiteCrawler::Discovery` → Fetcher �
 
 `EventAccount` → 创建 `EventResearchTask` → `EventResearchTaskJob` → `EventResearchTaskOrchestrator` 并发处理成员 → `EventResearchRun` 调用 [lib/event_research/](../../lib/event_research/) → `EventWeeklyDigestJob` 生成站内报告，定时任务按目标选择性推送飞书。
 
+### 论文导入
+
+`PapersController` 在事务中创建当前用户的 `PaperImportTask/Item`，提交后投递 `PaperImportJob`；Job 用数据库执行锁防止同任务重叠，逐项调用 `PaperImporter`。来源请求只到固定 arXiv/OpenReview API，解析后在事务中按来源 ID 写入共享 Paper、PaperSource 与有序署名；任务页面与轮询限定当前用户。arXiv 请求在串行锁内等待三秒，仍会占用连接，后续批量发现前须改为可调度的限流。当前没有作者订阅、版本历史或定期同步；OpenReview 真实读取仍受 403 阻塞。详见 [论文规格](../specs/paper-tracking.md)。
+
 ### 访问与授权
 
 网页 Session / API Key / Doorkeeper OAuth 分别进入对应控制器；MCP 在 `McpController` 中分流 OAuth 与 API Key，只有 OAuth 路径校验 scope 和 resource，再调用 [app/mcp_server/tools/](../../app/mcp_server/tools/)。具体兼容行为见访问领域文档。

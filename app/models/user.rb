@@ -26,6 +26,7 @@ class User < ApplicationRecord
   has_many :api_keys, dependent: :destroy
   has_many :groups, dependent: :destroy
   has_many :user_tags, dependent: :destroy
+  has_many :paper_import_tasks, dependent: :destroy
   has_many :followed_tags, through: :user_tags, source: :tag
 
   normalizes :email_address, with: ->(e) { e.strip.downcase }

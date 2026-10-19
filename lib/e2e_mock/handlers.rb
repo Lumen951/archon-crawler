@@ -2,6 +2,35 @@ require "rqrcode"
 
 module E2eMock
   module Handlers
+    # Synthetic metadata keeps the browser import flow independent of upstreams.
+    module Papers
+      def self.handle(request)
+        query = request.uri.query_values || {}
+        if request.uri.host == "export.arxiv.org" && request.uri.path == "/api/query"
+          id = query["id_list"]
+          return unless id == "2401.00001"
+
+          body = <<~XML
+            <feed xmlns="http://www.w3.org/2005/Atom"><entry>
+              <id>http://arxiv.org/abs/2401.00001v1</id>
+              <title>E2E Continual Learning</title><summary>Synthetic paper abstract.</summary>
+              <published>2024-01-01T12:00:00Z</published><updated>2024-01-02T12:00:00Z</updated>
+              <author><name>Example Author</name></author>
+            </entry></feed>
+          XML
+          { status: 200, body: body, headers: { "Content-Type" => "application/atom+xml" } }
+        elsif request.uri.host == "api2.openreview.net" && request.uri.path == "/notes"
+          return { status: 403, body: "{}" } if query["id"] == "denied"
+          return unless query["id"] == "e2e-paper"
+
+          body = { notes: [ { id: "e2e-paper", forum: "e2e-paper", tmdate: 1_700_000_000_000,
+            content: { title: { value: "E2E Robot Learning" }, abstract: { value: "Synthetic robot abstract." },
+              authors: { value: [ "Example Author" ] }, authorids: { value: [ "~Example_Author1" ] } } } ] }
+          { status: 200, body: body.to_json, headers: { "Content-Type" => "application/json" } }
+        end
+      end
+    end
+
     # 通用兜底：按 fixture 目录约定找文件，找不到就返回 nil（Registry 会
     # 回 599 并在报错信息里说明缺哪个 fixture）。文件名规则：
     #   <prefix><path>.json  — 任意 JSON 端点

@@ -4,6 +4,8 @@ module E2eMock
   # NetConnectNotAllowedError），让新引入的外部依赖在 E2E 里立刻暴露。
   module Registry
     HOSTS = {
+      "export.arxiv.org" => Handlers::Papers,
+      "api2.openreview.net" => Handlers::Papers,
       "mp.weixin.qq.com" => Handlers::WechatMp,
       "www.dajiala.com"  => Handlers::Dajiala,
       "api.tikhub.io"    => Handlers::TikHub,

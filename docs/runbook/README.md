@@ -20,7 +20,7 @@ Ruby 版本遵循 [.ruby-version](../../.ruby-version)；[bin/dev](../../bin/dev
 
 2026-10-18 本地核验中，WSL 的代表性文件在忽略行尾差异后没有内容变化，临时统一上述参数后的完整状态与 Windows 一致。后续该 checkout 的提交优先由 Windows Git 执行；本次没有修改持久 Git 配置。
 
-Docker 验证先用 `docker version` 确认客户端和服务端均可用。2026-10-18 本机客户端可用，但 Docker Desktop Linux 引擎管道不存在，尚未启动容器或验证应用运行。
+Docker 验证先用 `docker version` 确认客户端和服务端均可用。2026-10-18 最初检查时引擎未启动；2026-10-19 已在独立容器数据库中验证论文导入迁移、Minitest 和离线浏览器流程。该验证复用本地容器依赖及源码副本，不等于生产镜像完整构建通过。
 
 现有 [Dockerfile](../../Dockerfile) 面向生产，默认 production；[启动脚本](../../bin/docker-entrypoint) 在启动 Rails server 时会执行 `db:prepare`。本地验证应先准备隔离的 PostgreSQL 数据库和明确的开发/测试配置，避免直接挂接生产配置。开发环境还需核对依赖分组、源码脚本换行符和执行权限。建议后续使用独立的本地 Compose 配置承载应用与数据库，新增配置前另列文件清单，不改生产部署配置来适配本机。
 

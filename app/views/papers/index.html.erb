@@ -1,0 +1,35 @@
+<div class="space-y-6">
+  <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div>
+      <h1 class="text-2xl font-bold text-text-primary">论文追踪</h1>
+      <p class="mt-1 text-sm text-text-secondary">统一管理 arXiv 与 OpenReview 论文来源。</p>
+    </div>
+    <%= link_to "论文导入", import_papers_path, class: "btn btn-primary" %>
+  </div>
+
+  <% if @papers.empty? %>
+    <div class="rounded-lg border border-dashed border-border-primary bg-bg-card p-10 text-center">
+      <p class="font-semibold text-text-primary">还没有导入论文</p>
+      <p class="mt-2 text-sm text-text-secondary">粘贴 arXiv 或 OpenReview 链接，系统会读取标题和作者。</p>
+      <%= link_to "开始导入", import_papers_path, class: "btn btn-primary mt-5" %>
+    </div>
+  <% else %>
+    <div class="grid gap-4">
+      <% @papers.each do |paper| %>
+        <article class="rounded-lg border border-border-primary bg-bg-card p-5">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div class="min-w-0">
+              <h2 class="font-semibold text-text-primary"><%= link_to paper.title, paper_path(paper), class: "hover:text-brand" %></h2>
+              <p class="mt-2 text-sm text-text-secondary"><%= paper.authors.map(&:display_name).join("、") %></p>
+            </div>
+            <div class="flex shrink-0 gap-2">
+              <% paper.source_labels.each do |label| %><span class="rounded-full bg-brand-soft px-2 py-1 text-xs text-brand"><%= label %></span><% end %>
+            </div>
+          </div>
+          <p class="mt-3 line-clamp-2 text-sm leading-6 text-text-secondary"><%= paper.abstract.presence || "暂无摘要" %></p>
+        </article>
+      <% end %>
+    </div>
+    <%= paginate @papers if @papers.respond_to?(:total_pages) && @papers.total_pages > 1 %>
+  <% end %>
+</div>

@@ -1,0 +1,18 @@
+<div class="mx-auto max-w-3xl space-y-6">
+  <div>
+    <h1 class="text-2xl font-bold text-text-primary">论文导入</h1>
+    <p class="mt-1 text-sm text-text-secondary">一个入口支持 arXiv 和 OpenReview，每行粘贴一个论文链接。</p>
+  </div>
+
+  <%= form_with scope: :paper_import, url: create_import_papers_path, method: :post, class: "space-y-5 rounded-lg border border-border-primary bg-bg-card p-5" do |form| %>
+    <div>
+      <%= form.label :urls, "论文链接", class: "mb-2 block text-sm font-semibold text-text-primary" %>
+      <%= form.text_area :urls, rows: 7, autofocus: true, placeholder: "https://arxiv.org/abs/1706.03762\nhttps://openreview.net/forum?id=...", class: "w-full rounded-md border border-border-primary bg-bg-primary px-3 py-3 text-sm text-text-primary outline-none focus:border-brand" %>
+      <p class="mt-2 text-xs text-text-muted">仅请求官方公开元数据，不下载 PDF；重复来源会更新已有论文。</p>
+    </div>
+    <div class="flex items-center justify-between gap-3">
+      <%= link_to "返回论文库", papers_path, class: "text-sm text-text-secondary hover:text-brand" %>
+      <%= form.submit "提交导入", class: "btn btn-primary" %>
+    </div>
+  <% end %>
+</div>

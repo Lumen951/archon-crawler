@@ -21,6 +21,18 @@ Rails.application.routes.draw do
     end
   end
 
+  resources :papers, only: [:index, :show] do
+    collection do
+      get :import
+      post :create_import
+    end
+  end
+  resources :paper_import_tasks, only: [:show] do
+    member do
+      get :poll
+    end
+  end
+
   resources :accounts, only: [:index, :show, :update, :destroy] do
     collection do
       post :bulk_tag

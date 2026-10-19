@@ -23,3 +23,37 @@ test("官网导入表单创建 WebsiteAccount（纯本地，无外部依赖）",
   await expect(page.getByText("E2E Mock Blog").first()).toBeVisible();
   await shot("22-官网导入结果");
 });
+
+test("论文统一导入展示两种来源和失败结果，重复链接保持同一论文", async ({ page, shot }) => {
+  await login(page);
+  await page.goto("/papers/import");
+  await page.getByLabel("论文链接").fill([
+    "https://arxiv.org/abs/2401.00001",
+    "https://openreview.net/forum?id=e2e-paper",
+    "https://openreview.net/forum?id=denied"
+  ].join("\n"));
+  await page.getByRole("button", { name: "提交导入" }).click();
+  await expect(page.locator('[data-task-status="failed"]')).toBeVisible();
+  await expect(page.getByText("OpenReview 返回 HTTP 403", { exact: false })).toBeVisible();
+  const paperLink = page.getByRole("link", { name: "E2E Continual Learning" });
+  const firstPath = await paperLink.getAttribute("href");
+  await expect(page.getByRole("link", { name: "E2E Robot Learning" })).toBeVisible();
+  await shot("23-论文导入结果");
+  await paperLink.click();
+  await expect(page.getByRole("heading", { name: "E2E Continual Learning" })).toBeVisible();
+  await expect(page.getByText("Example Author", { exact: true })).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect.poll(async () => page.locator('[data-sidebar-target="panel"]').evaluate(
+    (element) => element.getBoundingClientRect().right
+  )).toBeLessThanOrEqual(0);
+  await expect.poll(async () => page.evaluate(
+    () => document.documentElement.scrollWidth <= window.innerWidth
+  )).toBe(true);
+  await shot("24-论文详情移动端");
+  await page.goto("/papers/import");
+  await page.getByLabel("论文链接").fill("https://arxiv.org/pdf/2401.00001v1.pdf");
+  await page.getByRole("button", { name: "提交导入" }).click();
+  await expect(page.locator('[data-task-status="completed"]')).toBeVisible();
+  await expect(page.getByRole("link", { name: "E2E Continual Learning" })).toHaveAttribute("href", firstPath!);
+  await shot("25-重复论文导入");
+});

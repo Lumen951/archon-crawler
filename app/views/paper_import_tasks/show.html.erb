@@ -1,0 +1,27 @@
+<% content_for :head do %><meta name="turbo-cache-control" content="no-cache"><% end %>
+<div id="paper_import_task" class="space-y-6" <% if @task.pending? || @task.running? %>data-controller="task-poller" data-task-poller-url-value="<%= poll_paper_import_task_path(@task) %>" data-task-poller-interval-value="3000"<% end %>>
+  <div>
+    <h1 class="text-2xl font-bold text-text-primary">论文导入任务</h1>
+    <p class="mt-1"><%= link_to "← 返回论文库", papers_path, class: "text-sm text-primary hover:underline" %></p>
+  </div>
+  <div id="paper_import_task_progress" data-task-status="<%= @task.status %>" class="rounded-lg border border-border-primary bg-bg-card p-5">
+    <p class="text-sm text-text-secondary">状态：<span class="font-semibold text-text-primary"><%= @task.status %></span></p>
+    <p class="mt-2 text-sm text-text-secondary"><%= @task.processed_count %> / <%= @task.total_count %> 个链接已处理（<%= @task.progress_percentage %>%）</p>
+    <% if @task.error_message.present? %><p class="mt-3 text-sm text-error"><%= @task.error_message %></p><% end %>
+  </div>
+  <div class="space-y-2">
+    <% @task.items.order(:id).each do |item| %>
+      <div class="rounded-md border border-border-primary bg-bg-card p-4 text-sm">
+        <p class="truncate text-text-primary"><%= item.url %></p>
+        <p class="mt-1 text-text-secondary">
+          <% if item.imported? %>
+            已导入：<%= link_to item.paper.title, paper_path(item.paper), class: "text-primary hover:underline" %>
+          <% else %>
+            <%= item.failed? ? "失败：#{item.error_message}" : "等待处理" %>
+          <% end %>
+        </p>
+      </div>
+    <% end %>
+  </div>
+  <%= link_to "重新导入", import_papers_path, class: "btn btn-primary" if @task.failed? %>
+</div>

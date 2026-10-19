@@ -15,7 +15,7 @@
 
 | 领域 | 文档 | 状态 |
 |---|---|---|
-| 论文导入与追踪 | [paper-tracking.md](paper-tracking.md) | 设计方向已批准：统一 arXiv/OpenReview 导入、作者与会议追踪；接口与环境验证中，尚未实现 |
+| 论文导入与追踪 | [paper-tracking.md](paper-tracking.md) | 单篇导入通过本地回归与 arXiv 联调；OpenReview 403 待解决。第 10 节记录阶段 0/1 结果及首末位作者筛选设计；阶段 2 待评审 |
 
 ## 规格生命周期
 
