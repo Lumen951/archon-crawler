@@ -26,7 +26,12 @@ test("官网导入表单创建 WebsiteAccount（纯本地，无外部依赖）",
 
 test("论文统一导入展示两种来源和失败结果，重复链接保持同一论文", async ({ page, shot }) => {
   await login(page);
-  await page.goto("/papers/import");
+  await page.goto("/accounts/import");
+  await expect(page.locator("aside").getByRole("link", { name: /论文/ })).toHaveCount(0);
+  await shot("22-论文跟踪导入入口");
+  await page.getByRole("link", { name: /论文跟踪/ }).click();
+  await expect(page).toHaveURL(/\/papers\/import$/);
+  await expect(page.getByRole("link", { name: "← 返回导入选择" })).toHaveAttribute("href", "/accounts/import");
   await page.getByLabel("论文链接").fill([
     "https://arxiv.org/abs/2401.00001",
     "https://openreview.net/forum?id=e2e-paper",

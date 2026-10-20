@@ -54,7 +54,7 @@ Google Scholar、第三方 Scholar 服务、跨网站个人动态、引用计数
 
 ## 2. 前端：一个入口，三类对象
 
-沿用现有 ERB、Turbo、Stimulus、Tailwind 和 Archon 视觉样式，不引入 React、独立前端工程或新的构建服务。建议导航新增“论文”，主操作统一叫“论文导入”。
+沿用现有 ERB、Turbo、Stimulus、Tailwind 和 Archon 视觉样式，不引入 React、独立前端工程或新的构建服务。按 2026-10-19 用户纠正，入口放在 `/accounts/import` 导入类型卡片区，名称为“论文跟踪”；侧栏不设独立论文入口。点击卡片进入现有 `/papers/import`，该页可返回导入选择或查看论文库；论文相关页面归属侧栏“内容源”。
 
 ### 页面草图
 

@@ -107,6 +107,26 @@
         </div>
       <% end %>
     <% end %>
+    <%= link_to import_papers_path, class: "card hover:shadow-lg transition-shadow cursor-pointer group" do %>
+      <div class="flex items-center gap-4 mb-4">
+        <div class="w-12 h-12 bg-sky-100 rounded-lg flex items-center justify-center text-2xl group-hover:bg-sky-200 transition-colors">
+          <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5S19.832 5.477 21 6.253v13C19.832 18.477 18.246 18 16.5 18s-3.332.477-4.5 1.253" />
+          </svg>
+        </div>
+        <div>
+          <h2 class="text-xl font-semibold text-text-primary">论文跟踪</h2>
+          <p class="text-sm text-text-secondary">arXiv / OpenReview</p>
+        </div>
+      </div>
+      <p class="text-text-secondary text-sm">通过论文链接导入标题、摘要与作者，统一管理论文来源</p>
+      <div class="mt-4 flex items-center text-sky-600 text-sm font-medium">
+        开始导入
+        <svg class="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+        </svg>
+      </div>
+    <% end %>
   </div>
 
   <div class="card bg-bg-secondary border-border-primary">
