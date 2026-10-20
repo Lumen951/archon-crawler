@@ -22,6 +22,12 @@ Ruby 版本遵循 [.ruby-version](../../.ruby-version)；[bin/dev](../../bin/dev
 
 Docker 验证先用 `docker version` 确认客户端和服务端均可用。2026-10-18 最初检查时引擎未启动；2026-10-19 已在独立容器数据库中验证论文导入迁移、Minitest 和离线浏览器流程。该验证复用本地容器依赖及源码副本，不等于生产镜像完整构建通过。
 
+2026-10-20 本地可用 `docker build --build-arg INSTALL_TWITTER_CLIENT=false -t mp-crawler-preview:paper-import-ui .` 构建不含 Twitter Python 客户端的镜像；默认仍为 `true`，缺少私有子模块时默认构建继续报错，不会静默省略依赖。该开关不隐藏 Twitter 入口，不支持在此镜像中执行 Twitter 抓取。构建过程仅在镜像内规范化 `bin/` 的 CRLF 与执行权限。
+
+本次关闭 Twitter 的镜像构建、隔离数据库准备、论文相关测试（21 项、105 条断言）和定向浏览器回归通过；自动加载检查保留 `app/mcp_server` 未纳入 eager load 的既有提示。真实 arXiv 请求发生读取超时，不能把离线回归视为上游连通性验证。浏览器测试护栏按配置的 baseURL 限制请求来源，支持隔离端口；真实预览必须关闭 `E2E_MOCKS` 并使用不同数据库。
+
+部署前明确指定 GitHub 仓库核查工作流与 secrets 名称，避免多 remote 时把 upstream 的部署状态当成 origin。2026-10-20 当前 origin 未列出部署工作流或仓库 secrets，本机也缺少 Kamal 配置指定的 SSH 密钥；本地存在部署 YAML 不代表远端部署已可用。
+
 现有 [Dockerfile](../../Dockerfile) 面向生产，默认 production；[启动脚本](../../bin/docker-entrypoint) 在启动 Rails server 时会执行 `db:prepare`。本地验证应先准备隔离的 PostgreSQL 数据库和明确的开发/测试配置，避免直接挂接生产配置。开发环境还需核对依赖分组、源码脚本换行符和执行权限。建议后续使用独立的本地 Compose 配置承载应用与数据库，新增配置前另列文件清单，不改生产部署配置来适配本机。
 
 ## 最小验证顺序

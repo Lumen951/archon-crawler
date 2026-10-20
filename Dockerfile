@@ -48,13 +48,22 @@ RUN bundle install && \
 # Copy application code
 COPY . .
 
+# Windows checkouts may contain CRLF in Linux entrypoint scripts.
+RUN find bin -type f -exec sed -i 's/\r$//' {} + && chmod +x bin/*
+
 # Precompile bootsnap code for faster boot times.
 # -j 1 disable parallel compilation to avoid a QEMU bug: https://github.com/rails/bootsnap/issues/495
 RUN bundle exec bootsnap precompile -j 1 app/ lib/
 
 # Install Python dependencies for twitter-api-client, pinning httpx<0.28
-RUN pip3 install --target=/rails/vendor/python --break-system-packages --no-cache-dir \
-    ./twitter-api-client "httpx<0.28"
+# Keep production builds complete; local paper previews can opt out.
+ARG INSTALL_TWITTER_CLIENT=true
+RUN case "$INSTALL_TWITTER_CLIENT" in \
+      true) pip3 install --target=/rails/vendor/python --break-system-packages --no-cache-dir \
+              ./twitter-api-client "httpx<0.28" ;; \
+      false) echo "Twitter client excluded from this image" ;; \
+      *) echo "INSTALL_TWITTER_CLIENT must be true or false" >&2; exit 1 ;; \
+    esac
 
 # Precompiling assets for production without requiring secret RAILS_MASTER_KEY
 RUN SECRET_KEY_BASE_DUMMY=1 ./bin/rails assets:precompile

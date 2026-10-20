@@ -11,8 +11,12 @@ export const DEMO_ARTICLE_KEYWORD = "流式链路验证完成";
 // 另外给每个测试的浏览器上下文加离线护栏：除了 E2E 服务器自身，任何外部
 // 请求一律 abort——防止 fixture 数据里的真实外链（如 mmbiz.qpic.cn）触网。
 export const test = base.extend<{ shot: (name: string, target?: Page) => Promise<void> }>({
-  context: async ({ context }, use) => {
-    await context.route(/^(?!http:\/\/127\.0\.0\.1:3001\/)/, (route) => route.abort());
+  context: async ({ context, baseURL }, use) => {
+    if (!baseURL) throw new Error("E2E baseURL is required");
+    const origin = new URL(baseURL).origin;
+    await context.route("**/*", (route) =>
+      new URL(route.request().url()).origin === origin ? route.continue() : route.abort()
+    );
     await use(context);
   },
   shot: async ({ page }, use, testInfo) => {
