@@ -5,6 +5,7 @@ module E2eMock
   module Registry
     HOSTS = {
       "export.arxiv.org" => Handlers::Papers,
+      "arxiv.org" => Handlers::Papers,
       "api2.openreview.net" => Handlers::Papers,
       "mp.weixin.qq.com" => Handlers::WechatMp,
       "www.dajiala.com"  => Handlers::Dajiala,

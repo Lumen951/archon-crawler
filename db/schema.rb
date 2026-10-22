@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_18_000001) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_22_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -398,6 +398,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_18_000001) do
     t.index ["paper_id"], name: "index_paper_authorships_on_paper_id"
   end
 
+  create_table "paper_full_texts", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.datetime "downloaded_at"
+    t.text "error_message"
+    t.bigint "paper_source_id", null: false
+    t.json "resources", default: {}, null: false
+    t.datetime "retry_at"
+    t.string "run_token"
+    t.string "status", default: "pending", null: false
+    t.datetime "updated_at", null: false
+    t.integer "version", null: false
+    t.index ["paper_source_id", "version"], name: "index_paper_full_texts_on_paper_source_id_and_version", unique: true
+    t.index ["paper_source_id"], name: "index_paper_full_texts_on_paper_source_id"
+  end
+
   create_table "paper_import_items", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.text "error_message"
@@ -584,6 +599,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_18_000001) do
   add_foreign_key "oauth_access_tokens", "users", column: "resource_owner_id"
   add_foreign_key "paper_authorships", "paper_authors"
   add_foreign_key "paper_authorships", "papers"
+  add_foreign_key "paper_full_texts", "paper_sources"
   add_foreign_key "paper_import_items", "paper_import_tasks"
   add_foreign_key "paper_import_items", "papers"
   add_foreign_key "paper_import_tasks", "users"

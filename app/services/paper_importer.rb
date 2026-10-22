@@ -1,6 +1,14 @@
 class PaperImporter
   class UnsupportedUrl < StandardError; end
   class FetchError < StandardError; end
+  class TemporaryError < FetchError
+    attr_reader :retry_after
+
+    def initialize(message, retry_after: nil)
+      super(message)
+      @retry_after = retry_after
+    end
+  end
 
   Result = Data.define(:provider, :external_id, :canonical_url, :title, :abstract, :published_at, :updated_at_source, :authors, :raw_metadata)
 
@@ -20,8 +28,17 @@ class PaperImporter
       sleep 3 if parsed[:provider] == "arxiv"
       persist(fetch(parsed))
     end
-  rescue Faraday::Error, Nokogiri::XML::SyntaxError
-    raise FetchError, "来源请求失败或返回内容无效，请稍后重新导入"
+  rescue Faraday::TimeoutError
+    raise TemporaryError, "来源请求超时"
+  rescue Faraday::ConnectionFailed => e
+    raise TemporaryError, e.cause.is_a?(Timeout::Error) ? "来源请求超时" : "无法连接来源服务"
+  rescue Faraday::SSLError
+    raise FetchError, "来源 HTTPS 证书验证失败"
+  rescue Faraday::Error => e
+    Rails.logger.warn("Paper metadata request failed: #{e.class}")
+    raise FetchError, "来源网络请求失败"
+  rescue Nokogiri::XML::SyntaxError
+    raise FetchError, "来源返回的 XML 格式无效"
   end
 
   def parse_url
@@ -32,10 +49,10 @@ class PaperImporter
     host = uri.host.to_s.downcase
     if host == "arxiv.org" || host == "export.arxiv.org"
       path = uri.path.sub(/\.pdf\z/i, "")
-      id = path.match(%r{\A/(?:abs|pdf)/(?<id>\d{4}\.\d{4,5}(?:v\d+)?|[a-z-]+(?:\.[A-Z]{2})?/\d{7}(?:v\d+)?)\z})&.[](:id)
+      id = path.match(%r{\A/(?:abs|pdf|html)/(?<id>\d{4}\.\d{4,5}(?:v[1-9]\d*)?|[a-z-]+(?:\.[A-Z]{2})?/\d{7}(?:v[1-9]\d*)?)\z})&.[](:id)
       raise UnsupportedUrl, "无法从 arXiv 链接识别论文编号" unless id
 
-      { provider: "arxiv", external_id: id.sub(/v\d+\z/, "") }
+      { provider: "arxiv", external_id: id.sub(/v\d+\z/, ""), version: id[/v(\d+)\z/, 1]&.to_i }
     elsif host == "openreview.net"
       id = URI.decode_www_form(uri.query.to_s).to_h["id"]
       unless %w[/forum /pdf].include?(uri.path) && id.to_s.match?(/\A[\w-]{1,128}\z/)
@@ -91,7 +108,7 @@ class PaperImporter
   end
 
   def fetch(parsed)
-    parsed[:provider] == "arxiv" ? fetch_arxiv(parsed[:external_id]) : fetch_openreview(parsed[:external_id])
+    parsed[:provider] == "arxiv" ? fetch_arxiv(parsed[:external_id], version: parsed[:version]) : fetch_openreview(parsed[:external_id])
   end
 
   def connection
@@ -101,8 +118,9 @@ class PaperImporter
     end
   end
 
-  def fetch_arxiv(external_id)
-    response = get_metadata("https://export.arxiv.org/api/query", id_list: external_id, max_results: 1)
+  def fetch_arxiv(external_id, version: nil)
+    query_id = version ? "#{external_id}v#{version}" : external_id
+    response = get_metadata("https://export.arxiv.org/api/query", id_list: query_id, max_results: 1)
     raise FetchError, "arXiv 返回 HTTP #{response.status}" unless response.success?
 
     document = Nokogiri::XML(response.body) { |config| config.strict.nonet }
@@ -112,6 +130,8 @@ class PaperImporter
     unless returned_id.match?(%r{\Ahttps?://arxiv\.org/abs/#{Regexp.escape(external_id)}(?:v\d+)?\z})
       raise FetchError, "arXiv 返回的论文编号不匹配或查询失败"
     end
+    returned_version = returned_id[/v(\d+)\z/, 1]&.to_i
+    raise FetchError, "arXiv 返回的论文版本不匹配" if version && version != returned_version
 
     authors = entry.xpath("./*[local-name()='author']").map do |author|
       { name: author.at_xpath("./*[local-name()='name']")&.text.to_s.strip, external_id: nil }
@@ -121,7 +141,8 @@ class PaperImporter
       entry.at_xpath("./*[local-name()='title']")&.text.to_s.squish,
       entry.at_xpath("./*[local-name()='summary']")&.text.to_s.squish,
       parse_time(entry.at_xpath("./*[local-name()='published']")&.text),
-      parse_time(entry.at_xpath("./*[local-name()='updated']")&.text), authors, { "xml" => response.body }
+      parse_time(entry.at_xpath("./*[local-name()='updated']")&.text), authors,
+      { "xml" => response.body, "version" => returned_version }
     )
   end
 
@@ -169,7 +190,20 @@ class PaperImporter
       end
     end
     response.env.body = body
+    if [ 429, 502, 503, 504 ].include?(response.status)
+      reason = response.status == 429 ? "来源限流" : "来源暂时不可用"
+      raise TemporaryError.new("#{reason}（HTTP #{response.status}）", retry_after: retry_after(response.headers["retry-after"]))
+    end
     response
+  end
+
+  def retry_after(value)
+    return if value.blank?
+    return value.to_i if value.match?(/\A\d+\z/)
+
+    [ Time.httpdate(value) - Time.current, 0 ].max.ceil
+  rescue ArgumentError
+    nil
   end
 
   def parse_time(value)

@@ -9,7 +9,7 @@
     <div>
       <%= form.label :urls, "论文链接", class: "mb-2 block text-sm font-semibold text-text-primary" %>
       <%= form.text_area :urls, rows: 7, autofocus: true, placeholder: "https://arxiv.org/abs/1706.03762\nhttps://openreview.net/forum?id=...", class: "w-full rounded-md border border-border-primary bg-bg-primary px-3 py-3 text-sm text-text-primary outline-none focus:border-brand" %>
-      <p class="mt-2 text-xs text-text-muted">仅请求官方公开元数据，不下载 PDF；重复来源会更新已有论文。</p>
+      <p class="mt-2 text-xs text-text-muted">arXiv 支持 abs、pdf 和 html 链接，导入后自动尝试保存 HTML 全文；不下载 PDF。重复来源会更新已有论文。</p>
     </div>
     <div class="flex items-center justify-between gap-3">
       <%= link_to "返回论文库", papers_path, class: "text-sm text-text-secondary hover:text-brand" %>

@@ -18,7 +18,9 @@ Sitemap 路径：`WebsiteAccount` → `WebsiteCrawler::Discovery` → Fetcher �
 
 ### 论文导入
 
-`PapersController` 在事务中创建当前用户的 `PaperImportTask/Item`，提交后投递 `PaperImportJob`；Job 用数据库执行锁防止同任务重叠，逐项调用 `PaperImporter`。来源请求只到固定 arXiv/OpenReview API，解析后在事务中按来源 ID 写入共享 Paper、PaperSource 与有序署名；任务页面与轮询限定当前用户。arXiv 请求在串行锁内等待三秒，仍会占用连接，后续批量发现前须改为可调度的限流。当前没有作者订阅、版本历史或定期同步；OpenReview 真实读取仍受 403 阻塞。详见 [论文规格](../specs/paper-tracking.md)。
+`PapersController` 在事务中创建当前用户的 `PaperImportTask/Item`，提交后投递 `PaperImportJob`；Job 用数据库执行锁防止同任务重叠，逐项调用 `PaperImporter`。来源请求只到固定 arXiv/OpenReview API，解析后在事务中按来源 ID 写入共享 Paper、PaperSource 与有序署名；任务页面与轮询限定当前用户。arXiv 请求在串行锁内等待三秒，仍会占用连接，后续批量发现前须改为可调度的限流。当前没有作者订阅、元数据版本历史或定期同步；OpenReview 真实读取仍受 403 阻塞。详见 [论文规格](../specs/paper-tracking.md)。
+
+arXiv 元数据导入完成后，按来源与版本创建 `PaperFullText` 并投递 `PaperFullTextDownloadJob`。`PaperFullTextDownloader` 独立下载 HTML、清理内容并缓存该版本的图片，和元数据请求共享来源锁；失败不影响已导入论文。全文文件置于 `storage/paper_full_texts`，数据库记录资源清单和状态。阅读和图片由登录后的 `PapersController` 提供，不直接暴露存储目录。全文版本保留不等于元数据历史快照；目前不提供自动文件回收。
 
 ### 访问与授权
 

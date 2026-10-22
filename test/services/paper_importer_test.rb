@@ -2,6 +2,8 @@ require "test_helper"
 require "webmock/minitest"
 
 class PaperImporterTest < ActiveSupport::TestCase
+  include ActiveJob::TestHelper
+
   setup do
     @user = User.create!(email_address: "paper-service@example.test", password: "password123", email_confirmed_at: Time.current)
     @xml = <<~XML
@@ -21,12 +23,13 @@ class PaperImporterTest < ActiveSupport::TestCase
   end
 
   test "normalizes an arxiv version and persists ordered authors" do
-    stub_request(:get, "https://export.arxiv.org/api/query?id_list=1706.03762&max_results=1").to_return(status: 200, body: @xml)
+    stub_request(:get, "https://export.arxiv.org/api/query?id_list=1706.03762v7&max_results=1").to_return(status: 200, body: @xml)
 
     paper = PaperImporter.import!("https://arxiv.org/pdf/1706.03762v7.pdf")
 
     assert_equal "Attention Is All You Need", paper.title
     assert_equal "1706.03762", paper.sources.first.external_id
+    assert_equal 7, paper.sources.first.arxiv_version
     assert_equal [ "Ashish Vaswani", "Noam Shazeer" ], paper.authorships.order(:position).map(&:display_name)
   end
 
@@ -34,6 +37,27 @@ class PaperImporterTest < ActiveSupport::TestCase
     error = assert_raises(PaperImporter::UnsupportedUrl) { PaperImporter.import!("https://example.com/paper") }
 
     assert_match "仅支持", error.message
+  end
+
+  test "html links preserve the requested version and reject a mismatched response" do
+    stub_request(:get, "https://export.arxiv.org/api/query?id_list=1706.03762v7&max_results=1").to_return(body: @xml)
+    paper = PaperImporter.import!("https://arxiv.org/html/1706.03762v7")
+    assert_equal 7, paper.sources.first.arxiv_version
+    stub_request(:get, "https://export.arxiv.org/api/query?id_list=1706.03762v1&max_results=1").to_return(body: @xml)
+    assert_raises(PaperImporter::FetchError) { PaperImporter.import!("https://arxiv.org/html/1706.03762v1") }
+  end
+
+  test "import job schedules full text after metadata is saved" do
+    stub_arxiv
+    task = @user.paper_import_tasks.create!(total_count: 1)
+    task.items.create!(url: "https://arxiv.org/abs/1706.03762")
+    assert_enqueued_jobs 1, only: PaperFullTextDownloadJob do
+      PaperImportJob.perform_now(task.id)
+    end
+    assert task.reload.completed?
+    record = task.items.first.paper.sources.first.full_texts.first
+    assert record.status_queued?
+    assert_equal 7, record.version
   end
 
   test "abs pdf and version links keep one paper and stable signatures" do
@@ -163,10 +187,97 @@ class PaperImporterTest < ActiveSupport::TestCase
     assert_equal [ 1, 1, 0 ], task.reload.attributes.values_at("processed_count", "imported_count", "failed_count")
   end
 
+  test "rate limit preserves retry after seconds and dates without persisting" do
+    travel_to Time.utc(2026, 10, 22, 12) do
+      { "180" => 180, 5.minutes.from_now.httpdate => 300, "bad" => nil }.each do |header, expected|
+        stub_request(:get, "https://api2.openreview.net/notes?id=example&limit=1")
+          .to_return(status: 429, headers: { "Retry-After" => header })
+        assert_no_difference "Paper.count" do
+          error = assert_raises(PaperImporter::TemporaryError) { PaperImporter.import!("https://openreview.net/forum?id=example") }
+          expected.nil? ? assert_nil(error.retry_after) : assert_equal(expected, error.retry_after)
+        end
+      end
+    end
+  end
+
+  test "timeout has a distinct retryable error" do
+    stub_request(:get, "https://api2.openreview.net/notes?id=example&limit=1").to_timeout
+    error = assert_raises(PaperImporter::TemporaryError) { PaperImporter.import!("https://openreview.net/forum?id=example") }
+    assert_equal "来源请求超时", error.message
+  end
+
+  test "retry leaves counters pending then succeeds without duplication" do
+    task = @user.paper_import_tasks.create!(total_count: 1)
+    item = task.items.create!(url: "https://openreview.net/forum?id=example")
+    stub_request(:get, "https://api2.openreview.net/notes?id=example&limit=1")
+      .to_return(status: 429, headers: { "Retry-After" => "180" })
+    travel_to Time.utc(2026, 10, 22, 12) do
+      assert_enqueued_with(job: PaperImportJob, args: [task.id, { item.id.to_s => 1 }], at: 180.seconds.from_now) do
+        PaperImportJob.perform_now(task.id)
+      end
+    end
+    assert task.reload.running?
+    assert_equal 0, task.processed_count
+    assert item.reload.pending?
+    assert_includes task.error_message, "180"
+    stub_openreview
+    PaperImportJob.perform_now(task.id, { item.id.to_s => 1 })
+    assert task.reload.completed?
+    assert_equal 1, task.imported_count
+    assert_nil task.error_message
+    assert_no_difference "Paper.count" do
+      PaperImportJob.perform_now(task.id, { item.id.to_s => 1 })
+    end
+  end
+
+  test "exhausted retries fail once and continue remaining items" do
+    task = @user.paper_import_tasks.create!(total_count: 2)
+    item = task.items.create!(url: "https://openreview.net/forum?id=limited")
+    task.items.create!(url: "https://openreview.net/forum?id=example")
+    stub_request(:get, "https://api2.openreview.net/notes?id=limited&limit=1").to_return(status: 429)
+    stub_openreview
+    assert_no_enqueued_jobs do
+      PaperImportJob.perform_now(task.id, { item.id.to_s => 2 })
+    end
+    assert_equal [ "failed", 2, 1, 1 ], task.reload.attributes.values_at("status", "processed_count", "imported_count", "failed_count")
+    assert_includes item.reload.error_message, "自动重试已耗尽"
+  end
+
+  test "retry enqueue failure is recorded rather than left running" do
+    task = @user.paper_import_tasks.create!(total_count: 1)
+    task.items.create!(url: "https://openreview.net/forum?id=example")
+    stub_request(:get, "https://api2.openreview.net/notes?id=example&limit=1").to_return(status: 503)
+    stub_class_method(PaperImportJob, :set, ->(**) { raise ActiveJob::EnqueueError }) do
+      PaperImportJob.perform_now(task.id)
+    end
+    assert task.reload.failed?
+    assert_equal 1, task.failed_count
+    assert_includes task.items.first.error_message, "未能入队"
+  end
+
+  test "second retry backs off and excessive retry after is not shortened" do
+    task = @user.paper_import_tasks.create!(total_count: 1)
+    item = task.items.create!(url: "https://openreview.net/forum?id=example")
+    stub_request(:get, "https://api2.openreview.net/notes?id=example&limit=1").to_return(status: 503)
+    travel_to Time.utc(2026, 10, 22, 12) do
+      assert_enqueued_with(job: PaperImportJob, args: [task.id, { item.id.to_s => 2 }], at: 120.seconds.from_now) do
+        PaperImportJob.perform_now(task.id, { item.id.to_s => 1 })
+      end
+    end
+    stub_request(:get, "https://api2.openreview.net/notes?id=example&limit=1")
+      .to_return(status: 429, headers: { "Retry-After" => "7200" })
+    assert_no_enqueued_jobs do
+      PaperImportJob.perform_now(task.id, { item.id.to_s => 1 })
+    end
+    assert task.reload.failed?
+    assert_includes item.reload.error_message, "超过一小时"
+  end
+
   private
 
   def stub_arxiv(body = @xml)
     stub_request(:get, "https://export.arxiv.org/api/query?id_list=1706.03762&max_results=1").to_return(body: body)
+    stub_request(:get, "https://export.arxiv.org/api/query?id_list=1706.03762v7&max_results=1").to_return(body: body)
   end
 
   def stub_openreview

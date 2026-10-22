@@ -22,6 +22,11 @@ Rails.application.routes.draw do
   end
 
   resources :papers, only: [:index, :show] do
+    member do
+      get :read
+      get :full_text_asset
+      post :download_full_text
+    end
     collection do
       get :import
       post :create_import

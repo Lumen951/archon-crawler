@@ -1,4 +1,5 @@
 require "test_helper"
+require "tmpdir"
 
 class PapersControllerTest < ActionDispatch::IntegrationTest
   setup do
@@ -73,5 +74,56 @@ class PapersControllerTest < ActionDispatch::IntegrationTest
     assert_response :not_found
     get poll_paper_import_task_path(task), headers: { "Accept" => "text/vnd.turbo-stream.html" }
     assert_response :not_found
+  end
+
+  test "existing paper can request full text without another metadata import" do
+    paper = Paper.create!(title: "Existing paper")
+    source = paper.sources.create!(provider: :arxiv, external_id: "2401.00001",
+      canonical_url: "https://arxiv.org/abs/2401.00001", raw_metadata: { version: 1 })
+    assert_difference "PaperFullText.count", 1 do
+      post download_full_text_paper_path(paper), params: { source_id: source.id }
+    end
+    assert_redirected_to paper_path(paper)
+    assert source.full_texts.first.status_queued?
+    assert_no_difference "PaperFullText.count" do
+      post download_full_text_paper_path(paper), params: { source_id: source.id }
+    end
+    assert_response :redirect
+  end
+
+  test "full text and assets require login and cannot cross paper boundaries" do
+    paper = Paper.create!(title: "Readable paper")
+    other = Paper.create!(title: "Different paper")
+    source = paper.sources.create!(provider: :arxiv, external_id: "2401.00001",
+      canonical_url: "https://arxiv.org/abs/2401.00001", raw_metadata: { version: 1 })
+    record = source.prepare_full_text!
+    key = "a" * 64
+    record.update!(status: :ready, downloaded_at: Time.current, resources: { key => { "type" => "image/png" } })
+    Dir.mktmpdir("paper-reader-test") do |directory|
+      stub_class_method(PaperFullText, :storage_root, -> { Pathname.new(directory) }) do
+        FileUtils.mkdir_p(record.directory)
+        File.write(record.html_path, "<article><h1>Local body</h1><math><mi>x</mi></math><script>alert(1)</script></article>")
+        File.binwrite(record.directory.join(key), "PNG test bytes")
+        get read_paper_path(paper, full_text_id: record.id)
+        assert_response :success
+        assert_select "math mi", text: "x"
+        assert_includes response.headers["Content-Security-Policy"], "default-src 'none'"
+        assert_select "script", count: 0
+        get full_text_asset_paper_path(paper, full_text_id: record.id, resource: key)
+        assert_response :success
+        assert_equal "image/png", response.media_type
+        get full_text_asset_paper_path(paper, full_text_id: record.id, resource: "../article.html")
+        assert_response :not_found
+        get read_paper_path(other, full_text_id: record.id)
+        assert_response :not_found
+        post download_full_text_paper_path(other), params: { source_id: source.id }
+        assert_response :not_found
+        delete session_path
+        get read_paper_path(paper, full_text_id: record.id)
+        assert_redirected_to new_session_path
+        get full_text_asset_paper_path(paper, full_text_id: record.id, resource: key)
+        assert_redirected_to new_session_path
+      end
+    end
   end
 end

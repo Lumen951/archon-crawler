@@ -8,7 +8,7 @@ module E2eMock
         query = request.uri.query_values || {}
         if request.uri.host == "export.arxiv.org" && request.uri.path == "/api/query"
           id = query["id_list"]
-          return unless id == "2401.00001"
+          return unless %w[2401.00001 2401.00001v1].include?(id)
 
           body = <<~XML
             <feed xmlns="http://www.w3.org/2005/Atom"><entry>
@@ -19,6 +19,11 @@ module E2eMock
             </entry></feed>
           XML
           { status: 200, body: body, headers: { "Content-Type" => "application/atom+xml" } }
+        elsif request.uri.host == "arxiv.org" && request.uri.path == "/html/2401.00001v1"
+          { status: 200, body: E2eMock.fixture("paper_full_text.html"), headers: { "Content-Type" => "text/html" } }
+        elsif request.uri.host == "arxiv.org" && request.uri.path == "/html/2401.00001v1/x1.png"
+          png = Base64.strict_decode64("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aD1sAAAAASUVORK5CYII=")
+          { status: 200, body: png, headers: { "Content-Type" => "image/png" } }
         elsif request.uri.host == "api2.openreview.net" && request.uri.path == "/notes"
           return { status: 403, body: "{}" } if query["id"] == "denied"
           return unless query["id"] == "e2e-paper"
