@@ -32,6 +32,13 @@ Rails.application.routes.draw do
       post :create_import
     end
   end
+  resources :paper_subscriptions, only: [:index, :show, :create, :update] do
+    member do
+      post :sync
+      post :resume
+      post :review
+    end
+  end
   resources :paper_import_tasks, only: [:show] do
     member do
       get :poll

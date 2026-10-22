@@ -4,7 +4,10 @@
       <h1 class="text-2xl font-bold text-text-primary">论文追踪</h1>
       <p class="mt-1 text-sm text-text-secondary">统一管理 arXiv 与 OpenReview 论文来源。</p>
     </div>
-    <%= link_to "论文导入", import_papers_path, class: "btn btn-primary" %>
+    <div class="flex gap-3">
+      <%= link_to "关注作者", paper_subscriptions_path, class: "btn btn-secondary" %>
+      <%= link_to "论文导入", import_papers_path, class: "btn btn-primary" %>
+    </div>
   </div>
 
   <% if @papers.empty? %>

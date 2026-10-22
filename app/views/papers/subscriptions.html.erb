@@ -1,0 +1,15 @@
+<div class="space-y-6">
+  <p><%= link_to "← 返回论文库", papers_path, class: "text-sm text-primary hover:underline" %></p>
+  <h1 class="text-2xl font-bold text-text-primary">关注作者</h1>
+  <p class="text-sm text-text-secondary">从论文详情选择作者，回溯历史论文并确认候选归属。每日自动追踪将在下一阶段提供。</p>
+  <% if @subscriptions.empty? %>
+    <p class="text-text-secondary">暂无关注作者，请先打开一篇 arXiv 论文。</p>
+  <% end %>
+  <% @subscriptions.each do |subscription| %>
+    <div class="rounded-lg border border-border-primary bg-bg-card p-5">
+      <%= link_to subscription.display_name, paper_subscription_path(subscription), class: "font-semibold text-primary hover:underline" %>
+      <p class="mt-2 text-sm text-text-secondary"><%= subscription.enabled? ? "关注中" : "已暂停" %> · 种子论文：<%= subscription.seed_paper.title %></p>
+    </div>
+  <% end %>
+  <%= paginate @subscriptions %>
+</div>

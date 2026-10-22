@@ -3,7 +3,26 @@
     <p><%= link_to "← 返回论文库", papers_path, class: "text-sm text-primary hover:underline" %></p>
     <h1 class="mt-3 text-2xl font-bold text-text-primary"><%= @paper.title %></h1>
     <p class="mt-2 text-sm text-text-secondary"><%= @paper.authorships.order(:position).map(&:display_name).join("、") %></p>
+    <p class="mt-3"><%= link_to "我的关注作者", paper_subscriptions_path, class: "text-sm text-primary hover:underline" %></p>
   </div>
+  <% if @paper.sources.any?(&:arxiv?) %>
+    <div class="rounded-lg border border-border-primary bg-bg-card p-5">
+      <h2 class="font-semibold text-text-primary">关注作者</h2>
+      <p class="mt-2 text-sm text-text-secondary">关注后自动回溯 arXiv 历史论文。姓名命中先列为候选，需要确认归属。</p>
+      <div class="mt-4 flex flex-wrap gap-4">
+        <% @paper.authorships.each do |authorship| %>
+          <div class="space-y-2 text-sm">
+            <p><%= authorship.display_name %></p>
+            <% if (subscription = @subscriptions_by_author[authorship.paper_author_id]) %>
+              <%= link_to subscription.enabled? ? "查看关注与历史论文" : "查看已暂停的关注", paper_subscription_path(subscription), class: "btn btn-secondary" %>
+            <% else %>
+              <%= button_to "关注并回溯", paper_subscriptions_path, params: { authorship_id: authorship.id }, class: "btn btn-primary" %>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
   <% @paper.sources.select(&:arxiv?).each do |source| %>
     <% full_texts = source.full_texts.order(version: :desc).to_a %>
     <div class="rounded-lg border border-border-primary bg-bg-card p-5">

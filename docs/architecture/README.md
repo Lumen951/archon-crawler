@@ -22,6 +22,8 @@ Sitemap 路径：`WebsiteAccount` → `WebsiteCrawler::Discovery` → Fetcher �
 
 arXiv 元数据导入完成后，按来源与版本创建 `PaperFullText` 并投递 `PaperFullTextDownloadJob`。`PaperFullTextDownloader` 独立下载 HTML、清理内容并缓存该版本的图片，和元数据请求共享来源锁；失败不影响已导入论文。全文文件置于 `storage/paper_full_texts`，数据库记录资源清单和状态。阅读和图片由登录后的 `PapersController` 提供，不直接暴露存储目录。全文版本保留不等于元数据历史快照；目前不提供自动文件回收。
 
+作者关注从论文署名创建当前用户的 `PaperSubscription`；`PaperAuthorSyncJob` 按 arXiv `au:` 查询和 `start/max_results` 分页保存检查点。每页先在事务中导入共享论文和待确认匹配，再推进 `PaperSyncRun.next_offset`；失败不推进检查点。姓名命中证据和人工确认保存在 `PaperSubscriptionMatch`，确认后才安排全文下载。旧任务令牌会失效，用户只能访问自己的关注记录。
+
 ### 访问与授权
 
 网页 Session / API Key / Doorkeeper OAuth 分别进入对应控制器；MCP 在 `McpController` 中分流 OAuth 与 API Key，只有 OAuth 路径校验 scope 和 resource，再调用 [app/mcp_server/tools/](../../app/mcp_server/tools/)。具体兼容行为见访问领域文档。

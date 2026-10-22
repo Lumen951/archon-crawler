@@ -7,6 +7,19 @@ module E2eMock
       def self.handle(request)
         query = request.uri.query_values || {}
         if request.uri.host == "export.arxiv.org" && request.uri.path == "/api/query"
+          if query["search_query"].to_s.include?('au:"Example Author"')
+            start = query["start"].to_i
+            entry = start.zero? ? <<~XML : ""
+              <entry><id>http://arxiv.org/abs/2401.00001v1</id><title>E2E Continual Learning</title>
+              <summary>Synthetic author result.</summary><published>2024-01-01T12:00:00Z</published>
+              <updated>2024-01-02T12:00:00Z</updated><author><name>Example Author</name></author></entry>
+            XML
+            body = <<~XML
+              <feed xmlns="http://www.w3.org/2005/Atom" xmlns:os="http://a9.com/-/spec/opensearch/1.1/">
+              <os:totalResults>1</os:totalResults><os:startIndex>#{start}</os:startIndex>#{entry}</feed>
+            XML
+            return { status: 200, body: body, headers: { "Content-Type" => "application/atom+xml" } }
+          end
           id = query["id_list"]
           return unless %w[2401.00001 2401.00001v1].include?(id)
 

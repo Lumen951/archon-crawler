@@ -73,6 +73,10 @@ class PaperImporter
     raise FetchError, "来源没有提供论文标题" if result.title.blank?
 
     source = PaperSource.find_or_initialize_by(provider: result.provider, external_id: result.external_id)
+    if source.persisted? && source.arxiv? &&
+        source.arxiv_version.to_i > result.raw_metadata["version"].to_i
+      return source.paper
+    end
     source.paper ||= Paper.new
     source.paper.assign_attributes(
         title: result.title,
@@ -85,6 +89,8 @@ class PaperImporter
     source.save!
 
     result.authors.each_with_index do |author, position|
+      next if author[:name].blank?
+
       authorship = source.paper.authorships.find_or_initialize_by(position: position)
       identity = if author[:external_id].present?
                    PaperAuthor.find_or_create_by!(provider: result.provider, external_id: author[:external_id]) do |record|
@@ -102,7 +108,8 @@ class PaperImporter
       identity.update!(display_name: author[:name]) if identity.display_name != author[:name]
       authorship.update!(paper_author: identity, display_name: author[:name])
     end
-    source.paper.authorships.where("position >= ?", result.authors.length).destroy_all
+    positions = result.authors.each_index.reject { |index| result.authors[index][:name].blank? }
+    source.paper.authorships.where.not(position: positions).destroy_all
 
     source.paper
   end
@@ -126,23 +133,29 @@ class PaperImporter
     document = Nokogiri::XML(response.body) { |config| config.strict.nonet }
     entry = document.at_xpath("//*[local-name()='entry']")
     raise FetchError, "arXiv 未找到该论文" unless entry
+    parse_arxiv_entry(entry, expected_id: external_id, expected_version: version, raw_xml: response.body)
+  end
+
+  def parse_arxiv_entry(entry, expected_id: nil, expected_version: nil, raw_xml:)
     returned_id = entry.at_xpath("./*[local-name()='id']")&.text.to_s
-    unless returned_id.match?(%r{\Ahttps?://arxiv\.org/abs/#{Regexp.escape(external_id)}(?:v\d+)?\z})
+    identifier = returned_id.match(%r{\Ahttps?://arxiv\.org/abs/(?<id>\d{4}\.\d{4,5}|[a-z-]+(?:\.[A-Z]{2})?/\d{7})(?:v(?<version>[1-9]\d*))?\z})
+    unless identifier && (!expected_id || identifier[:id] == expected_id)
       raise FetchError, "arXiv 返回的论文编号不匹配或查询失败"
     end
-    returned_version = returned_id[/v(\d+)\z/, 1]&.to_i
-    raise FetchError, "arXiv 返回的论文版本不匹配" if version && version != returned_version
+    external_id = identifier[:id]
+    returned_version = identifier[:version]&.to_i
+    raise FetchError, "arXiv 返回的论文版本不匹配" if expected_version && expected_version != returned_version
 
     authors = entry.xpath("./*[local-name()='author']").map do |author|
       { name: author.at_xpath("./*[local-name()='name']")&.text.to_s.strip, external_id: nil }
-    end.reject { |author| author[:name].blank? }
+    end
     Result.new(
       "arxiv", external_id, "https://arxiv.org/abs/#{external_id}",
       entry.at_xpath("./*[local-name()='title']")&.text.to_s.squish,
       entry.at_xpath("./*[local-name()='summary']")&.text.to_s.squish,
       parse_time(entry.at_xpath("./*[local-name()='published']")&.text),
       parse_time(entry.at_xpath("./*[local-name()='updated']")&.text), authors,
-      { "xml" => response.body, "version" => returned_version }
+      { "xml" => raw_xml, "version" => returned_version }
     )
   end
 

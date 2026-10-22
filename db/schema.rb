@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_22_000001) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_22_000002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -458,6 +458,51 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_22_000001) do
     t.index ["provider", "external_id"], name: "index_paper_sources_on_provider_and_external_id", unique: true
   end
 
+  create_table "paper_subscription_matches", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.json "evidence", default: {}, null: false
+    t.bigint "paper_source_id", null: false
+    t.bigint "paper_subscription_id", null: false
+    t.datetime "reviewed_at"
+    t.string "status", default: "pending", null: false
+    t.datetime "updated_at", null: false
+    t.index ["paper_source_id"], name: "index_paper_subscription_matches_on_paper_source_id"
+    t.index ["paper_subscription_id", "paper_source_id"], name: "index_paper_matches_on_subscription_source", unique: true
+    t.index ["paper_subscription_id"], name: "index_paper_subscription_matches_on_paper_subscription_id"
+  end
+
+  create_table "paper_subscriptions", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "display_name", null: false
+    t.boolean "enabled", default: true, null: false
+    t.json "name_variants", default: [], null: false
+    t.bigint "paper_author_id", null: false
+    t.bigint "seed_paper_id", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["paper_author_id"], name: "index_paper_subscriptions_on_paper_author_id"
+    t.index ["seed_paper_id"], name: "index_paper_subscriptions_on_seed_paper_id"
+    t.index ["user_id", "paper_author_id"], name: "index_paper_subscriptions_on_user_id_and_paper_author_id", unique: true
+    t.index ["user_id"], name: "index_paper_subscriptions_on_user_id"
+  end
+
+  create_table "paper_sync_runs", force: :cascade do |t|
+    t.datetime "completed_at"
+    t.datetime "created_at", null: false
+    t.datetime "cutoff_at", null: false
+    t.text "error_message"
+    t.json "name_variants", default: [], null: false
+    t.integer "next_offset", default: 0, null: false
+    t.integer "page_count", default: 0, null: false
+    t.bigint "paper_subscription_id", null: false
+    t.datetime "retry_at"
+    t.string "run_token", null: false
+    t.string "status", default: "queued", null: false
+    t.integer "total_count"
+    t.datetime "updated_at", null: false
+    t.index ["paper_subscription_id"], name: "index_paper_sync_runs_on_paper_subscription_id"
+  end
+
   create_table "papers", force: :cascade do |t|
     t.text "abstract"
     t.datetime "created_at", null: false
@@ -604,6 +649,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_22_000001) do
   add_foreign_key "paper_import_items", "papers"
   add_foreign_key "paper_import_tasks", "users"
   add_foreign_key "paper_sources", "papers"
+  add_foreign_key "paper_subscription_matches", "paper_sources"
+  add_foreign_key "paper_subscription_matches", "paper_subscriptions"
+  add_foreign_key "paper_subscriptions", "paper_authors"
+  add_foreign_key "paper_subscriptions", "papers", column: "seed_paper_id"
+  add_foreign_key "paper_subscriptions", "users"
+  add_foreign_key "paper_sync_runs", "paper_subscriptions"
   add_foreign_key "sessions", "users"
   add_foreign_key "tag_accounts", "accounts"
   add_foreign_key "tag_accounts", "tags"

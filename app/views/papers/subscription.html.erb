@@ -1,0 +1,73 @@
+<% content_for :head do %><meta name="turbo-cache-control" content="no-cache"><% end %>
+<div class="space-y-6">
+  <p><%= link_to "← 我的关注作者", paper_subscriptions_path, class: "text-sm text-primary hover:underline" %></p>
+  <div>
+    <h1 class="text-2xl font-bold text-text-primary"><%= @subscription.display_name %></h1>
+    <p class="mt-2 text-sm text-text-secondary">种子论文：<%= link_to @subscription.seed_paper.title, paper_path(@subscription.seed_paper), class: "text-primary hover:underline" %></p>
+    <p class="mt-2 text-sm text-text-secondary">本轮遍历 arXiv 姓名查询结果，不代表已确认作者的全部学术成果。所有署名位置都会检查。</p>
+  </div>
+  <div class="rounded-lg border border-border-primary bg-bg-card p-5 space-y-3">
+    <h2 class="font-semibold">历史回溯</h2>
+    <p><%= @subscription.enabled? ? "关注中" : "已暂停关注" %></p>
+    <% if @run %>
+      <p>状态：<%= @run.status_label %> · 已扫描 <%= @run.next_offset %> / <%= @run.total_count || "待查询" %> 条 · <%= @run.page_count %> 页</p>
+      <p class="text-sm text-text-secondary">查询截止：<%= @run.cutoff_at.strftime("%Y-%m-%d %H:%M %Z") %>。刷新页面查看进度。</p>
+      <% if @run.error_message.present? %><p class="text-sm text-error"><%= @run.error_message %></p><% end %>
+    <% end %>
+    <div class="flex flex-wrap gap-3">
+      <%= link_to "刷新进度", paper_subscription_path(@subscription), class: "btn btn-secondary" %>
+      <% if @subscription.enabled? %>
+        <%= button_to "暂停关注与回溯", paper_subscription_path(@subscription), method: :patch, params: { operation: "pause" }, class: "btn btn-secondary" %>
+        <% unless @run&.active? %>
+          <% if @run&.resumable? && @run.name_variants == @subscription.name_variants %>
+            <%= button_to "从检查点继续回溯", resume_paper_subscription_path(@subscription), class: "btn btn-primary" %>
+          <% end %>
+          <%= button_to "重新回溯历史", sync_paper_subscription_path(@subscription), class: "btn btn-secondary" %>
+        <% end %>
+      <% else %>
+        <%= button_to "恢复关注", paper_subscription_path(@subscription), method: :patch, params: { operation: "enable" }, class: "btn btn-primary" %>
+      <% end %>
+    </div>
+    <%= form_with url: paper_subscription_path(@subscription), method: :patch, class: "space-y-2" do |form| %>
+      <%= form.label :name_variants, "用于检索的姓名与别名（每行一个，最多五个）", class: "block text-sm" %>
+      <%= form.text_area :name_variants, value: @subscription.name_variants.join("\n"), rows: 3, maxlength: 504, class: "w-full rounded border border-border-primary bg-bg-primary p-3 text-text-primary" %>
+      <p class="text-xs text-text-secondary">别名只扩大候选范围，不自动确认身份。修改前先暂停，保存后恢复关注并重新回溯。</p>
+      <%= form.submit "保存姓名别名", class: "btn btn-secondary" %>
+    <% end %>
+  </div>
+  <div class="flex flex-wrap gap-4 text-sm">
+    <%= link_to "全部（#{@counts.values.sum}）", paper_subscription_path(@subscription), class: "text-primary" %>
+    <% { "pending" => "待确认", "confirmed" => "已确认", "excluded" => "已排除" }.each do |status, label| %>
+      <%= link_to "#{label}（#{@counts.fetch(status, 0)}）", paper_subscription_path(@subscription, status: status), class: "text-primary" %>
+    <% end %>
+  </div>
+  <% if @matches.empty? %><p class="text-text-secondary">此筛选下暂无论文；任务失败与没有查询结果是不同状态，请查看回溯进度。</p><% end %>
+  <% @matches.each do |match| %>
+    <% paper = match.paper_source.paper %>
+    <div class="rounded-lg border border-border-primary bg-bg-card p-5 space-y-3">
+      <h2 class="font-semibold"><%= link_to paper.title, paper_path(paper), class: "text-primary hover:underline" %></h2>
+      <p class="text-sm"><%= match.status_label %> · <%= paper.published_at&.strftime("%Y-%m-%d") || "发表时间未知" %></p>
+      <p class="text-sm text-text-secondary"><%= Array(match.evidence["authors"]).map { |name| name.presence || "署名缺失" }.join("、") %></p>
+      <p class="text-sm text-text-secondary">
+        <% positions = Array(match.evidence["positions"]) %>
+        <% if positions.empty? %>
+          API 姓名检索返回，但完整姓名尚未匹配，请核对身份。
+        <% else %>
+          姓名命中：
+          <%= positions.map { |position| "#{position + 1}/#{match.evidence['author_count']} 位#{position.zero? ? '（首位）' : position == match.evidence['author_count'].to_i - 1 ? '（末位）' : '（中间）'}" }.join("、") %>
+        <% end %>
+      </p>
+      <% if Array(match.evidence["common_authors"]).any? %>
+        <p class="text-sm text-text-secondary">与种子论文共同署名：<%= match.evidence["common_authors"].join("、") %>（辅助证据）</p>
+      <% end %>
+      <div class="flex flex-wrap gap-3">
+        <% { "confirmed" => "确认属于此作者", "excluded" => "排除此论文", "pending" => "改为待确认" }.each do |decision, label| %>
+          <% unless match.status == decision %>
+            <%= button_to label, review_paper_subscription_path(@subscription), params: { match_id: match.id, decision: decision }, class: "btn btn-secondary" %>
+          <% end %>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+  <%= paginate @matches %>
+</div>

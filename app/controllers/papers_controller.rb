@@ -32,6 +32,8 @@ class PapersController < ApplicationController
 
   def show
     @paper = Paper.includes(:sources, authorships: :paper_author).find(params[:id])
+    @subscriptions_by_author = current_user.paper_subscriptions
+      .where(paper_author_id: @paper.authorships.map(&:paper_author_id)).index_by(&:paper_author_id)
   end
 
   def download_full_text
