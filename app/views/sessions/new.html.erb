@@ -54,7 +54,7 @@
         </div>
       </details>
 
-      <p class="auth-help">需要开通账户？请联系管理员。</p>
+      <p class="auth-help"><%= link_to "使用企业邮箱注册", new_registration_path %>，注册后直接使用密码登录。</p>
 
       <% if Rails.env.development? || Rails.env.test? %>
         <div class="auth-dev">

@@ -44,6 +44,22 @@ class User < ApplicationRecord
   end
 
   validates :email_address, presence: true, uniqueness: true, format: { with: URI::MailTo::EMAIL_REGEXP }
+  validate :email_address_unchanged, on: :update
+  validates :password, length: { minimum: 12 }, confirmation: true, on: :registration
+  validates :password_confirmation, presence: true, on: :registration
+  validate :enterprise_registration, on: :registration
+
+  def enterprise_email?
+    email_address.to_s.split("@", -1).length == 2 && email_address.split("@").last == "archon.tech"
+  end
+
+  def enterprise_email_verified?
+    enterprise_email? && email_confirmed? && settings["mailbox_verified"] == true
+  end
+
+  def password_login_allowed?
+    email_confirmed? || enterprise_email?
+  end
 
   def email_confirmed?
     email_confirmed_at.present?
@@ -112,5 +128,17 @@ class User < ApplicationRecord
 
   def self.ransackable_associations(auth_object = nil)
     %w[]
+  end
+
+  private
+
+  def enterprise_registration
+    errors.add(:email_address, "仅支持 @archon.tech 企业邮箱") unless enterprise_email?
+  end
+
+  def email_address_unchanged
+    if will_save_change_to_email_address?
+      errors.add(:email_address, "暂不支持更换邮箱，请联系管理员")
+    end
   end
 end

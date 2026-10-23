@@ -6,8 +6,17 @@ class ProfilesController < ApplicationController
 
   def update
     @user = current_user
+    requested_email = params.dig(:user, :email_address)
+    if requested_email && requested_email.to_s.strip.downcase != @user.email_address
+      redirect_to edit_profile_path, alert: "暂不支持更换邮箱"
+      return
+    end
 
-    if @user.update(user_params)
+    attributes = user_params
+    if attributes[:settings]
+      attributes[:settings] = @user.settings.merge(attributes[:settings].to_h)
+    end
+    if @user.update(attributes)
       flash[:success] = "个人信息已更新"
       redirect_to edit_profile_path
     else
@@ -77,6 +86,6 @@ class ProfilesController < ApplicationController
   private
 
   def user_params
-    params.require(:user).permit(:email_address, :name, settings: [:notify_api_key_expiry])
+    params.require(:user).permit(:name, settings: [ :notify_api_key_expiry ])
   end
 end

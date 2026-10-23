@@ -10,7 +10,7 @@ class SessionsController < ApplicationController
 
   def create
     if user = User.authenticate_by(params.permit(:email_address, :password))
-      unless user.email_confirmed?
+      unless user.password_login_allowed?
         redirect_to new_session_path, alert: "请先验证您的邮箱，检查您的收件箱。"
         return
       end

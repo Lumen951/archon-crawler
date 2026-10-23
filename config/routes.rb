@@ -1,4 +1,5 @@
 Rails.application.routes.draw do
+  resource :registration, only: [ :new, :create ], controller: "registrations"
   # Authentication routes
   resource :session, only: [:new, :create, :destroy] do
     post :magic_link
