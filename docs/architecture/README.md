@@ -24,6 +24,8 @@ arXiv 元数据导入完成后，按来源与版本创建 `PaperFullText` 并投
 
 作者关注从论文署名创建当前用户的 `PaperSubscription`；`PaperAuthorSyncJob` 按 arXiv `au:` 查询和 `start/max_results` 分页保存检查点。每页先在事务中导入共享论文和待确认匹配，再推进 `PaperSyncRun.next_offset`；失败不推进检查点。姓名命中证据和人工确认保存在 `PaperSubscriptionMatch`，确认后才安排全文下载。旧任务令牌会失效，用户只能访问自己的关注记录。
 
+`SemanticScholarClient` 是尚未接入上述流程的只读试验适配器：按 arXiv 编号读取来源署名，再按来源作者 ID 获取资料，返回带观察时间的未确认身份证据，不落库、不绑定作者。客户端有单实例串行与有界同步重试，未来接入必须在后台任务执行，并另行处理跨进程冷却和证据持久化；不能从网页请求直接调用。当前验证限制见论文规格的 2026-10-23 记录。
+
 ### 访问与授权
 
 网页 Session / API Key / Doorkeeper OAuth 分别进入对应控制器；MCP 在 `McpController` 中分流 OAuth 与 API Key，只有 OAuth 路径校验 scope 和 resource，再调用 [app/mcp_server/tools/](../../app/mcp_server/tools/)。具体兼容行为见访问领域文档。
