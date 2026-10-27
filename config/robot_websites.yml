@@ -1,0 +1,623 @@
+{
+  "sites": [
+    {
+      "name": "智元机器人",
+      "url": "https://agibot.com",
+      "twice_daily": true,
+      "sample_news_url": "https://agibot.com/article/231/detail/130.html",
+      "rule": {
+        "mode": "listing",
+        "entry_urls": [
+          "https://agibot.com/news"
+        ],
+        "item_selector": "a[href*=\"/article/231/detail/\"]",
+        "url": {
+          "selector": ":scope",
+          "attribute": "href"
+        },
+        "title": {
+          "selector": "h5"
+        },
+        "detail": {
+          "content_selector": ".newsxq-editbox"
+        },
+        "limits": {
+          "max_items": 20,
+          "interval_seconds": 5
+        },
+        "monitor_pages": [
+          {
+            "url": "https://agibot.com/products/A2_Ultra",
+            "selector": ".A2UltraMain"
+          }
+        ],
+        "fields": {
+          "published_at": {
+            "selector": ".time"
+          }
+        },
+        "weekly_review": true,
+        "strict_content": true
+      }
+    },
+    {
+      "name": "优必选",
+      "url": "https://www.ubtrobot.com/cn/",
+      "twice_daily": false,
+      "sample_news_url": "https://www.ubtrobot.com/cn/about/news/851243490943045",
+      "rule": {
+        "mode": "listing",
+        "entry_urls": [
+          "https://www.ubtrobot.com/cn/news-list"
+        ],
+        "item_selector": "a.uitem[href*=\"/cn/about/news/\"]",
+        "url": {
+          "selector": ":scope",
+          "attribute": "href"
+        },
+        "title": {
+          "selector": ".h_tit"
+        },
+        "detail": {
+          "content_selector": ".news_dat1 .text"
+        },
+        "limits": {
+          "max_items": 20,
+          "interval_seconds": 5
+        },
+        "monitor_pages": [
+          {
+            "url": "https://www.ubtrobot.com/cn/humanoid/products/walker-s2",
+            "selector": "main.WalkerS2"
+          },
+          {
+            "url": "https://www.ubtrobot.com/cn/news-list",
+            "selector": "main",
+            "type": "news"
+          }
+        ],
+        "fields": {
+          "published_at": {
+            "selector": ".time"
+          }
+        },
+        "weekly_review": true,
+        "strict_content": true
+      }
+    },
+    {
+      "name": "星海图",
+      "url": "https://www.galaxea-ai.com/zh/index.html",
+      "twice_daily": false,
+      "sample_news_url": "https://www.galaxea-ai.com/zh/news/galaxea-lanches-roscon.html",
+      "rule": {
+        "mode": "listing",
+        "entry_urls": [
+          "https://www.galaxea-ai.com/zh/news.html"
+        ],
+        "item_selector": "a.cbcn-news-item",
+        "url": {
+          "selector": ":scope",
+          "attribute": "href"
+        },
+        "title": {
+          "selector": ".cbcn-news-txt"
+        },
+        "detail": {
+          "content_selector": "#cbcn-dom-container"
+        },
+        "limits": {
+          "max_items": 20,
+          "interval_seconds": 5
+        },
+        "monitor_pages": [
+          {
+            "url": "https://www.galaxea-ai.com/zh/product1.html",
+            "selector": "#cbcn-dom-container"
+          }
+        ],
+        "fields": {
+          "published_at": {
+            "selector": ".cbcn-news-p1"
+          }
+        },
+        "weekly_entry_urls": [
+          "https://www.galaxea-ai.com/zh/news/page-2.html",
+          "https://www.galaxea-ai.com/zh/news/page-3.html"
+        ],
+        "weekly_review": true,
+        "strict_content": true
+      }
+    },
+    {
+      "name": "千寻智能",
+      "url": "https://www.spirit-ai.com/",
+      "twice_daily": false,
+      "sample_news_url": "https://www.spirit-ai.com/news/33",
+      "rule": {
+        "mode": "listing",
+        "entry_urls": [
+          "https://www.spirit-ai.com/news"
+        ],
+        "item_selector": "a[data-id][href^=\"/news/\"]",
+        "url": {
+          "selector": ":scope",
+          "attribute": "href"
+        },
+        "title": {
+          "selector": "h4"
+        },
+        "detail": {
+          "content_selector": ".new_d_con"
+        },
+        "limits": {
+          "max_items": 20,
+          "interval_seconds": 5
+        },
+        "monitor_pages": [
+          {
+            "url": "https://www.spirit-ai.com/product",
+            "selector": "main#products"
+          }
+        ],
+        "weekly_review": true,
+        "strict_content": true
+      }
+    },
+    {
+      "name": "逐际动力",
+      "url": "https://www.limxdynamics.com/zh",
+      "twice_daily": false,
+      "sample_news_url": "https://www.limxdynamics.com/zh/news/BK000026",
+      "rule": {
+        "mode": "listing",
+        "entry_urls": [
+          "https://www.limxdynamics.com/zh/news"
+        ],
+        "item_selector": "a[href^=\"/zh/news/\"]",
+        "url": {
+          "selector": ":scope",
+          "attribute": "href"
+        },
+        "title": {
+          "selector": "h3, h4"
+        },
+        "detail": {
+          "content_selector": "article.content-prose"
+        },
+        "limits": {
+          "max_items": 20,
+          "interval_seconds": 5
+        },
+        "monitor_pages": [
+          {
+            "url": "https://www.limxdynamics.com/zh/products/luna",
+            "selector": "main"
+          }
+        ],
+        "weekly_review": true,
+        "strict_content": true
+      }
+    },
+    {
+      "name": "众擎机器人",
+      "url": "https://www.engineai.com.cn/",
+      "twice_daily": false,
+      "sample_news_url": "https://www.engineai.com.cn/about-news-media/62.html",
+      "rule": {
+        "mode": "listing",
+        "entry_urls": [
+          "https://www.engineai.com.cn/about-news-media.html"
+        ],
+        "item_selector": ".public-news-list a[href*=\"/about-news-media/\"]",
+        "url": {
+          "selector": ":scope",
+          "attribute": "href"
+        },
+        "title": {
+          "selector": "h3"
+        },
+        "detail": {
+          "content_selector": ".public-content"
+        },
+        "limits": {
+          "max_items": 20,
+          "interval_seconds": 5
+        },
+        "monitor_pages": [
+          {
+            "url": "https://www.engineai.com.cn/product-pm01.html",
+            "selector": "main"
+          }
+        ],
+        "fields": {
+          "published_at": {
+            "selector": ".c-text span:last-child"
+          }
+        },
+        "weekly_review": true,
+        "strict_content": true
+      }
+    },
+    {
+      "name": "擎朗智能",
+      "url": "https://www.keenon.com/en",
+      "twice_daily": true,
+      "sample_news_url": "https://www.keenon.com/en/news/gcsrslkphtwaw2",
+      "rule": {
+        "mode": "listing",
+        "entry_urls": [
+          "https://www.keenon.com/en/news"
+        ],
+        "item_selector": ".medium-item-title a[href^=\"/en/news/\"]",
+        "url": {
+          "selector": ":scope",
+          "attribute": "href"
+        },
+        "title": {
+          "selector": ":scope"
+        },
+        "detail": {
+          "content_selector": ".news-main .text"
+        },
+        "limits": {
+          "max_items": 20,
+          "interval_seconds": 5
+        },
+        "monitor_pages": [
+          {
+            "url": "https://www.keenon.com/en/product/C55",
+            "selector": ".product-detail"
+          }
+        ],
+        "weekly_review": true,
+        "strict_content": true
+      }
+    },
+    {
+      "name": "极智嘉 Geek+",
+      "url": "https://www.geekplus.com/en",
+      "twice_daily": false,
+      "sample_news_url": "https://www.geekplus.com/resources/news/geek-debuts-gravity-and-its-one-core-dual-engine-strategy-at-waic-2026-accelerating-the-next-era-of-embodied-ai",
+      "rule": {
+        "mode": "listing",
+        "entry_urls": [
+          "https://www.geekplus.com/resources/news"
+        ],
+        "item_selector": ".blog-item h3 a",
+        "url": {
+          "selector": ":scope",
+          "attribute": "href"
+        },
+        "title": {
+          "selector": ":scope"
+        },
+        "detail": {
+          "content_selector": ".blog-post__body"
+        },
+        "limits": {
+          "max_items": 20,
+          "interval_seconds": 5
+        },
+        "monitor_pages": [
+          {
+            "url": "https://www.geekplus.com/solutions",
+            "selector": "main"
+          }
+        ],
+        "weekly_review": true,
+        "strict_content": true
+      }
+    },
+    {
+      "name": "灵初智能 PsiBot",
+      "url": "https://www.psibot.ai/",
+      "twice_daily": false,
+      "sample_news_url": "https://www.psibot.ai/%e7%81%b5%e5%88%9d%e6%99%ba%e8%83%bd%e8%8d%a3%e7%99%bbeai-100%e5%85%b7%e8%ba%ab%e6%99%ba%e8%83%bd%e5%b9%b4%e5%ba%a6%e7%99%be%e5%bc%ba%e6%a6%9c%e5%8d%95%ef%bc%8c%e6%8f%bd%e5%8f%8c%e5%a5%96%e5%bc%95/",
+      "rule": {
+        "mode": "listing",
+        "entry_urls": [
+          "https://www.psibot.ai/category/news_zh/"
+        ],
+        "item_selector": "article.latest-news-grid-item",
+        "url": {
+          "selector": ".news-title a",
+          "attribute": "href"
+        },
+        "title": {
+          "selector": ".news-title a"
+        },
+        "detail": {
+          "content_selector": ".entry-content"
+        },
+        "limits": {
+          "max_items": 20,
+          "interval_seconds": 5
+        },
+        "monitor_pages": [
+          {
+            "url": "https://www.psibot.ai/en/products/product_psibot-v1/",
+            "selector": "main"
+          }
+        ],
+        "fields": {
+          "published_at": {
+            "selector": ".news-date"
+          }
+        },
+        "weekly_entry_urls": [
+          "https://www.psibot.ai/category/news_zh/page/2/",
+          "https://www.psibot.ai/category/news_zh/page/3/"
+        ],
+        "weekly_review": true,
+        "strict_content": true
+      }
+    },
+    {
+      "name": "非夕科技 Flexiv",
+      "url": "https://flexiv.com",
+      "twice_daily": false,
+      "sample_news_url": "https://flexiv.com/news/Flexiv_IROS%202026",
+      "rule": {
+        "mode": "listing",
+        "entry_urls": [
+          "https://flexiv.com/news"
+        ],
+        "item_selector": "a[href^=\"/news/\"]",
+        "url": {
+          "selector": ":scope",
+          "attribute": "href"
+        },
+        "title": {
+          "selector": ":scope"
+        },
+        "detail": {
+          "content_selector": "main"
+        },
+        "limits": {
+          "max_items": 20,
+          "interval_seconds": 5
+        },
+        "monitor_pages": [
+          {
+            "url": "https://flexiv.com/product/rizon",
+            "selector": "main"
+          }
+        ],
+        "weekly_review": true,
+        "strict_content": true
+      }
+    },
+    {
+      "name": "艾利特 ELITE",
+      "url": "https://www.elibot.com/",
+      "twice_daily": false,
+      "sample_news_url": "https://www.elibot.com/about/news/11",
+      "rule": {
+        "mode": "listing",
+        "entry_urls": [
+          "https://www.elibot.com/about/news"
+        ],
+        "item_selector": ".home_news_li",
+        "url": {
+          "selector": "a",
+          "attribute": "href"
+        },
+        "title": {
+          "selector": "a .std_title5"
+        },
+        "detail": {
+          "content_selector": ".newdet_cont_le_edr"
+        },
+        "limits": {
+          "max_items": 20,
+          "interval_seconds": 5
+        },
+        "monitor_pages": [
+          {
+            "url": "https://www.elibot.com/product/collaborative",
+            "selector": "main"
+          }
+        ],
+        "fields": {
+          "published_at": {
+            "selector": ".hnlt_time"
+          }
+        },
+        "weekly_review": true,
+        "strict_content": true
+      }
+    },
+    {
+      "name": "Figure",
+      "url": "https://www.figure.ai/",
+      "twice_daily": false,
+      "sample_news_url": "https://www.figure.ai/news/figure-and-nscale-sign-strategic-partnership",
+      "rule": {
+        "mode": "listing",
+        "entry_urls": [
+          "https://www.figure.ai/news"
+        ],
+        "item_selector": "a.article-list-item",
+        "url": {
+          "selector": ":scope",
+          "attribute": "href"
+        },
+        "title": {
+          "selector": "h1, h2, h3"
+        },
+        "detail": {
+          "content_selector": "article.article"
+        },
+        "limits": {
+          "max_items": 20,
+          "interval_seconds": 5
+        },
+        "monitor_pages": [
+          {
+            "url": "https://www.figure.ai/figure",
+            "selector": "main"
+          }
+        ],
+        "fields": {
+          "published_at": {
+            "selector": "time",
+            "attribute": "datetime"
+          }
+        },
+        "weekly_review": true,
+        "strict_content": true
+      }
+    },
+    {
+      "name": "Boston Dynamics",
+      "url": "https://bostondynamics.com",
+      "twice_daily": false,
+      "sample_news_url": "https://bostondynamics.com/news/boston-dynamics-appoints-rohit-prasad-as-chief-executive-officer/",
+      "rule": {
+        "mode": "listing",
+        "entry_urls": [
+          "https://bostondynamics.com/news/"
+        ],
+        "item_selector": "article.PostAjaxFilter-card",
+        "url": {
+          "selector": "a",
+          "attribute": "href"
+        },
+        "title": {
+          "selector": "h3 a, h2 a, h4 a"
+        },
+        "detail": {
+          "content_selector": ".post-content"
+        },
+        "limits": {
+          "max_items": 20,
+          "interval_seconds": 5
+        },
+        "monitor_pages": [
+          {
+            "url": "https://bostondynamics.com/products/atlas/",
+            "selector": ".fl-builder-content-primary"
+          }
+        ],
+        "weekly_review": true,
+        "strict_content": true
+      }
+    },
+    {
+      "name": "Sunday Robotics",
+      "url": "https://www.sunday.ai/",
+      "twice_daily": false,
+      "sample_news_url": "https://www.sunday.ai/blog/act-2-preview",
+      "rule": {
+        "mode": "listing",
+        "entry_urls": [
+          "https://www.sunday.ai/blog"
+        ],
+        "item_selector": "a[href^=\"/blog/\"]:has(article)",
+        "url": {
+          "selector": ":scope",
+          "attribute": "href"
+        },
+        "title": {
+          "selector": "h2, h3"
+        },
+        "detail": {
+          "content_selector": "main"
+        },
+        "limits": {
+          "max_items": 20,
+          "interval_seconds": 5
+        },
+        "monitor_pages": [
+          {
+            "url": "https://www.sunday.ai/technology",
+            "selector": "main"
+          }
+        ],
+        "weekly_review": true,
+        "strict_content": true
+      }
+    },
+    {
+      "name": "Dexterity",
+      "url": "https://dexterity.ai",
+      "twice_daily": false,
+      "sample_news_url": "https://dexterity.ai/blog/fedex-hagerstown-physical-ai-deployment",
+      "rule": {
+        "mode": "listing",
+        "entry_urls": [
+          "https://dexterity.ai/blog"
+        ],
+        "item_selector": "a[href^=\"/blog/\"]:has(article)",
+        "url": {
+          "selector": ":scope",
+          "attribute": "href"
+        },
+        "title": {
+          "selector": "h2, h3"
+        },
+        "detail": {
+          "content_selector": "main"
+        },
+        "limits": {
+          "max_items": 20,
+          "interval_seconds": 5
+        },
+        "monitor_pages": [
+          {
+            "url": "https://dexterity.ai/platform",
+            "selector": "main"
+          }
+        ],
+        "fields": {
+          "published_at": {
+            "selector": "time"
+          }
+        },
+        "weekly_review": true,
+        "strict_content": true
+      }
+    },
+    {
+      "name": "Hexagon Robotics",
+      "url": "https://robotics.hexagon.com",
+      "twice_daily": true,
+      "sample_news_url": "https://robotics.hexagon.com/aeon-fast-company-next-big-things-tech-2026/",
+      "rule": {
+        "mode": "listing",
+        "entry_urls": [
+          "https://robotics.hexagon.com/news/"
+        ],
+        "item_selector": ".e-loop-item",
+        "url": {
+          "selector": "h3 a",
+          "attribute": "href"
+        },
+        "title": {
+          "selector": "h3 a"
+        },
+        "detail": {
+          "content_selector": ".elementor-widget-theme-post-content"
+        },
+        "limits": {
+          "max_items": 20,
+          "interval_seconds": 5
+        },
+        "monitor_pages": [
+          {
+            "url": "https://robotics.hexagon.com/product/",
+            "selector": ".elementor-location-single"
+          }
+        ],
+        "weekly_entry_urls": [
+          "https://robotics.hexagon.com/news/2/",
+          "https://robotics.hexagon.com/news/3/",
+          "https://robotics.hexagon.com/news/4/"
+        ],
+        "weekly_review": true,
+        "strict_content": true
+      }
+    }
+  ]
+}

@@ -1,6 +1,11 @@
 namespace :website_monitor do
+  desc "Import the reviewed robot company website rules (idempotent)"
+  task import_robots: :environment do
+    puts Website::Importer.import_robot_websites.to_json
+  end
+
   desc "Check one website account by ID, domain or URL (crawls via CrawlTask)"
-  task :check, [:url_or_id] => :environment do |_task, args|
+  task :check, [ :url_or_id ] => :environment do |_task, args|
     value = args.fetch(:url_or_id)
     account =
       if value.match?(/\A\d+\z/)
@@ -15,7 +20,7 @@ namespace :website_monitor do
   end
 
   desc "Fetch a URL without persisting monitor data"
-  task :probe, [:url] => :environment do |_task, args|
+  task :probe, [ :url ] => :environment do |_task, args|
     result = WebsiteCrawler::Fetcher.new.fetch(args.fetch(:url))
     puts({ url: result.url, status: result.status, kind: result.kind, error: result.error }.to_json)
   end

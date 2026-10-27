@@ -64,6 +64,45 @@ class WebsiteAccount < Account
     WebsiteCrawler
   end
 
+  # Separate from activity-tier scheduling: a quiet official site still needs checking.
+  def self.enqueue_robot_checks(period = "morning")
+    raise ArgumentError, "Unknown monitoring period" unless %w[morning evening].include?(period)
+    return [] unless crawl_enabled?
+
+    scope = active.where("metadata ->> 'monitoring_group' = ?", "robot_websites")
+    scope = scope.where("metadata ->> 'twice_daily' = ?", "true") if period == "evening"
+    slot = "#{Time.current.to_date}:#{period}"
+    tasks = []
+    scope.order(:id).each_with_index do |account, index|
+      task = nil
+      account.with_lock do
+        next if account.metadata.dig("monitoring_slots", period) == slot || account.metadata["monitoring_slot"] == slot
+        next if CrawlTask.where(status: %i[pending running paused]).where("account_ids::jsonb @> ?::jsonb", [ account.id ].to_json).exists?
+
+        task = CrawlTask.create!(account_ids: [ account.id ], status: :pending, account_concurrency: 1, article_concurrency: 1)
+        slots = account.metadata.fetch("monitoring_slots", {}).merge(period => slot)
+        account.update!(metadata: account.metadata.merge("monitoring_slots" => slots))
+      end
+      next unless task
+
+      begin
+        job = CrawlJob.set(wait: index * 45.seconds).perform_later(task.id)
+        raise "Queue rejected monitoring task" unless job
+        tasks << task.id
+      rescue StandardError => e
+        task.mark_failed!("定时任务入队失败：#{e.message}")
+        account.with_lock do
+          if account.metadata.dig("monitoring_slots", period) == slot
+            slots = account.metadata.fetch("monitoring_slots", {}).except(period)
+            account.update!(metadata: account.metadata.merge("monitoring_slots" => slots))
+          end
+        end
+        raise
+      end
+    end
+    tasks
+  end
+
   def website?
     true
   end
@@ -122,6 +161,13 @@ class WebsiteAccount < Account
     update_columns(metadata: meta)
     refresh_activity_counters!
     mark_crawled!(at: now)
+    if metadata["monitoring_group"] == "robot_websites"
+      hours = metadata["twice_daily"] ? [ 8, 20 ] : [ 8 ]
+      candidates = [ now.to_date, now.to_date + 1 ].flat_map do |date|
+        hours.map { |hour| Time.zone.local(date.year, date.month, date.day, hour) }
+      end
+      update_columns(next_crawl_at: candidates.select { |time| time > now }.min)
+    end
   end
 
   private

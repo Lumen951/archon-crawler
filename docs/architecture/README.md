@@ -12,6 +12,8 @@
 
 Sitemap 路径：`WebsiteAccount` → `WebsiteCrawler::Discovery` → Fetcher → `WebsiteCrawler::ArticleSynchronizer` → 版本/变化/文章。Listing 路径：`WebsiteCrawler::ListingCrawler` → `ListingArticleSynchronizer` → 文章；列表入口不生成监测版本。这些类都位于 [lib/website_crawler.rb](../../lib/website_crawler.rb)。
 
+机器人官网配置在 Listing 之外可指定同站 `monitor_pages`，复用 `ArticleSynchronizer` 保存所选正文的版本与文章。`WebsiteAccount.enqueue_robot_checks` 为配置批次创建独立账号任务并错峰入队，避免发布活跃度降频导致漏查；网络操作仍由既有 Job 执行。详细频率与边界见 [官网监测](../specs/website-monitoring.md)。
+
 ### 活动研究
 
 `EventAccount` → 创建 `EventResearchTask` → `EventResearchTaskJob` → `EventResearchTaskOrchestrator` 并发处理成员 → `EventResearchRun` 调用 [lib/event_research/](../../lib/event_research/) → `EventWeeklyDigestJob` 生成站内报告，定时任务按目标选择性推送飞书。

@@ -12,6 +12,30 @@ module Website
       new.import_lines(lines, crawl_mode: crawl_mode)
     end
 
+    def self.import_robot_websites
+      definitions = YAML.safe_load_file(Rails.root.join("config/robot_websites.yml"))
+      WebsiteAccount.transaction do
+        definitions.fetch("sites").map do |definition|
+          domain = URI.parse(definition.fetch("url")).host.downcase.sub(/\Awww\./, "")
+          account = WebsiteAccount.find_or_initialize_by(fakeid: domain)
+          if account.persisted? && account.metadata["monitoring_group"] != "robot_websites"
+            raise ArgumentError, "Existing account needs explicit review: #{domain}"
+          end
+          account.assign_attributes(
+            nickname: definition.fetch("name"),
+            crawl_rule: definition.fetch("rule"),
+            metadata: (account.metadata || {}).merge(
+              "url" => definition.fetch("url"), "monitoring_group" => "robot_websites",
+              "twice_daily" => definition.fetch("twice_daily", false)
+            )
+          )
+          account.status = :active if account.new_record?
+          account.save!
+          account.id
+        end
+      end
+    end
+
     def import_lines(lines, crawl_mode: "sitemap")
       crawl_mode = crawl_mode.to_s
       raise ArgumentError, "抓取模式只能是 sitemap 或 listing" unless %w[sitemap listing].include?(crawl_mode)
@@ -63,7 +87,7 @@ module Website
       parts = line.to_s.split(/[,，\t]/).map(&:strip).reject(&:blank?)
       url = normalize_url(parts.last)
       name = parts.size >= 2 ? parts.first : nil
-      [name, url]
+      [ name, url ]
     end
 
     def normalize_url(value)

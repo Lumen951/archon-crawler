@@ -70,6 +70,11 @@ class WebsiteCrawler < BaseCrawler
 
     render_fetcher = RenderFallbackChain.build
     result = ListingCrawler.new(render_fetcher: render_fetcher).crawl(account: account, rule: rule, crawl_task: crawl_task)
+    monitored = crawl_configured_pages(account, rule, crawl_task)
+    if crawl_task.reload.paused? || crawl_task.failed?
+      task_account&.update!(status: :pending)
+      return result.to_h.merge(changed: result.created_count.positive?, error: "任务已暂停或停止")
+    end
     entry_unavailable = result.entry_errors.positive? && result.candidates_count.zero?
     error = if entry_unavailable
       "列表页抓取失败（#{result.entry_errors} 个入口不可用）"
@@ -77,16 +82,19 @@ class WebsiteCrawler < BaseCrawler
       message = "未从列表页发现可抓取内容，请检查 crawl_rule"
       message += "；未配置可用的渲染兜底（本地 headless browser / ScrapingAnt）" if render_fetcher.nil?
       message
+    elsif result.entry_errors.positive? || result.detail_errors.positive?
+      "部分新闻抓取失败（入口 #{result.entry_errors}，正文 #{result.detail_errors}）"
     end
+    error = [ error, monitored[:error] ].compact.join("；").presence
 
-    account.mark_checked!(changed: result.created_count.positive?, error: error)
+    account.mark_checked!(changed: result.created_count.positive? || monitored[:changed], error: error)
     if error
       crawl_task.log(:warn, "#{account.nickname}: #{error}")
     else
       crawl_task.log(:info, "#{account.nickname}: 列表抓取完成（发现 #{result.candidates_count} 条，新增 #{result.created_count} 条）")
     end
 
-    if entry_unavailable
+    if error
       task_account&.mark_failed!(error)
     else
       task_account&.mark_completed!
@@ -96,6 +104,41 @@ class WebsiteCrawler < BaseCrawler
     task_account&.mark_failed!(e.message)
     crawl_task.increment_error_count!(account.class.name)
     crawl_task.log(:error, "#{account.nickname}: 列表抓取出错 - #{e.message}")
+  end
+
+  def self.crawl_configured_pages(account, rule, crawl_task)
+    changed = false
+    errors = []
+    rule.monitor_pages.each do |source|
+      break if crawl_task.reload.paused? || crawl_task.failed?
+
+      page = nil
+      page = account.monitor_pages.find_or_create_by!(url: source.fetch("url")) do |record|
+        record.page_type = source.fetch("type", "product")
+        record.discovered_via = "configured"
+        record.active = true
+      end
+      next unless page.active?
+      next if page.last_status == "success" && page.last_checked_at&.in_time_zone&.to_date == Time.current.to_date
+
+      DEFAULT_LISTING_HOST_RATE_LIMITER.wait(page.url, interval_seconds: 5)
+      response = Fetcher.new.fetch(page.url)
+      raise response.error.to_s unless response.success?
+
+      extracted = Extractor.new.extract_article(response.html, page.url, selector: source.fetch("selector"), strict_selector: true, allow_body_fallback: false)
+      raise "Configured product content is missing" unless extracted.html.present? && extracted.text_length >= 80
+
+      # Capture only the selected product content, excluding navigation and recommendations.
+      html = "<html><head><title>#{ERB::Util.html_escape(extracted.title)}</title></head><body><article>#{extracted.html}</article></body></html>"
+      capture = ArticleSynchronizer.new.capture_page(account: account, page: page, html: html, http_status: response.status, crawl_task: crawl_task)
+      changed ||= capture[:changed]
+    rescue StandardError => e
+      errors << source["url"]
+      page&.update!(last_status: "error", last_error: e.message.to_s.truncate(500), error_count: page.error_count.to_i + 1)
+      crawl_task.increment_error_count!(account.class.name)
+      crawl_task.log(:warn, "产品页检查失败 #{source['url']}: #{e.message}")
+    end
+    { changed: changed, error: errors.any? ? "产品页检查失败：#{errors.join(', ')}" : nil }
   end
 
   # Fetches every active page, runs change detection + article sync on each,
@@ -290,6 +333,7 @@ class WebsiteCrawler < BaseCrawler
         return nil if href.empty?
         return nil if href.start_with?("#", "mailto:", "tel:", "javascript:")
 
+        href = href.gsub(/[^\x00-\x7F]/) { |character| character.bytes.map { |byte| "%%%02X" % byte }.join }
         url = URI.join(base, href)
         return nil unless %w[http https].include?(url.scheme)
 
@@ -715,6 +759,7 @@ class WebsiteCrawler < BaseCrawler
     ARTICLE_REMOVE = (BASE_REMOVE + %w[form aside]).freeze
     MIN_ARTICLE_TEXT_LENGTH = 80
     LISTING_MIN_ARTICLE_TEXT_LENGTH = 200
+    MEDIA_SELECTOR = "img[src], video[src], audio[src], video source[src], audio source[src]".freeze
     TEMPLATE_MARKUP_PATTERN = /\{\{.*?\}\}|\bv-(?:if|else|for|html|on:|bind:)\b|<\s*(?:el-|template\b)/im
 
     Result = Struct.new(:title, :content, :links, keyword_init: true)
@@ -752,16 +797,21 @@ class WebsiteCrawler < BaseCrawler
     # for Article#clean_content_html. This intentionally does not reuse the
     # page-level `content` string, because articles should remain readable in
     # the UI and preserve links/images from the source page.
-    def extract_article(html, base_url = nil, selector: nil, allow_body_fallback: true, minimum_text_length: MIN_ARTICLE_TEXT_LENGTH)
+    def extract_article(html, base_url = nil, selector: nil, strict_selector: false, allow_body_fallback: true, minimum_text_length: MIN_ARTICLE_TEXT_LENGTH)
       doc = Nokogiri::HTML(html.to_s)
 
       container = selector.present? ? doc.at_css(selector) : nil
+      return article_result(doc, reason: "configured_content_not_found") if strict_selector && selector.present? && !container
       container ||= doc.at("article") || doc.at("main")
       container ||= doc.at("body") if allow_body_fallback
       return article_result(doc, reason: "content_not_found") unless container
 
       fragment = content_fragment(container)
       ARTICLE_REMOVE.each { |tag| fragment.css(tag).remove }
+      fragment.css("template").remove
+      fragment.traverse do |node|
+        node.content = node.content.gsub(/[\u200B-\u200D\uFEFF]/, "") if node.text?
+      end
       inner_html = fragment.to_html.strip
       return article_result(doc, reason: "template_markup") if inner_html.match?(TEMPLATE_MARKUP_PATTERN)
 
@@ -770,14 +820,23 @@ class WebsiteCrawler < BaseCrawler
       end
       absolutize_attributes(fragment, base_url)
       text = normalized_text(fragment)
-      media_count = fragment.css("img[src], video[src], audio[src]").size
+      video_links = fragment.css("a[href]").count do |link|
+        uri = URI.parse(link["href"])
+        %w[http https].include?(uri.scheme) &&
+          ((%w[youtube.com www.youtube.com].include?(uri.host) && uri.path == "/watch" && uri.query.to_s.include?("v=")) ||
+           (uri.host == "youtu.be" && uri.path.length > 1) ||
+           (%w[vimeo.com www.vimeo.com].include?(uri.host) && uri.path.match?(%r{\A/\d+})))
+      rescue URI::Error
+        false
+      end
+      media_count = fragment.css(MEDIA_SELECTOR).size + video_links
       return article_result(doc, text_length: text.length, media_count: media_count, reason: "content_too_short") if text.length < minimum_text_length && media_count.zero?
 
       inner_html = fragment.to_html.strip
       markdown = Html2Text.convert(inner_html, wrap_links: false).strip
-      image_markdown = media_markdown(fragment)
-      if image_markdown.present? && fragment.css("img[src]").any? { |image| !markdown.include?(image["src"]) }
-        markdown = [ markdown, image_markdown ].reject(&:blank?).join("\n\n")
+      media_links = media_markdown(fragment)
+      if media_links.present? && fragment.css(MEDIA_SELECTOR).any? { |media| !markdown.include?(media["src"]) }
+        markdown = [ markdown, media_links ].reject(&:blank?).join("\n\n")
       end
       ArticleResult.new(
         title: doc.at("title")&.text.to_s.strip,
@@ -813,12 +872,16 @@ class WebsiteCrawler < BaseCrawler
     end
 
     def media_markdown(fragment)
-      fragment.css("img[src]").filter_map do |image|
-        src = image["src"].to_s.strip
+      fragment.css(MEDIA_SELECTOR).filter_map do |media|
+        src = media["src"].to_s.strip
         next if src.empty?
 
-        "![#{image["alt"].to_s.strip}](#{src})"
-      end.join("\n")
+        if media.name == "img"
+          "![#{media["alt"].to_s.strip}](#{src})"
+        else
+          "[#{media.name == 'source' ? media.parent.name : media.name}](#{src})"
+        end
+      end.uniq.join("\n")
     end
 
     def normalized_text(container)
@@ -832,8 +895,8 @@ class WebsiteCrawler < BaseCrawler
     def absolutize_attributes(container, base_url)
       return unless base_url.present?
 
-      container.css("a[href], img[src]").each do |node|
-        attribute = node.name == "img" ? "src" : "href"
+      container.css("a[href], #{MEDIA_SELECTOR}").each do |node|
+        attribute = node.name == "a" ? "href" : "src"
         value = Fetcher.normalize(base_url, node[attribute])
         node[attribute] = value if value
       end
@@ -960,7 +1023,7 @@ class WebsiteCrawler < BaseCrawler
     attr_reader :account, :definition, :mode, :entry_urls, :item_selector,
                 :url_mapping, :title_mapping, :image_mapping, :field_mappings,
                 :detail_selector, :max_items, :interval_seconds, :allow_path_prefixes,
-                :strip_query_params
+                :strip_query_params, :monitor_pages, :weekly_entry_urls
 
     def self.from_json(account, value)
       parsed = value.is_a?(String) ? JSON.parse(value) : value
@@ -979,6 +1042,17 @@ class WebsiteCrawler < BaseCrawler
       return unless listing?
 
       @entry_urls = validate_entry_urls
+      @weekly_entry_urls = Array(@definition["weekly_entry_urls"])
+      raise InvalidRule, "weekly_entry_urls 最多 10 项" if @weekly_entry_urls.size > MAX_ENTRY_URLS
+      @weekly_entry_urls.each { |url| validate_same_site_url(url) }
+      @monitor_pages = Array(@definition["monitor_pages"])
+      raise InvalidRule, "monitor_pages 最多 10 项" if @monitor_pages.size > 10
+      @monitor_pages.each do |page|
+        raise InvalidRule, "monitor_pages 必须是对象列表" unless page.is_a?(Hash)
+        validate_same_site_url(page["url"])
+        validate_selector(page["selector"], "monitor_pages.selector")
+        raise InvalidRule, "monitor_pages.type 无效" unless %w[product news].include?(page.fetch("type", "product"))
+      end
       @item_selector = validate_selector(@definition["item_selector"], "item_selector")
       @url_mapping = validate_mapping(@definition["url"], "url")
       @title_mapping = validate_mapping(@definition["title"], "title")
@@ -1019,6 +1093,15 @@ class WebsiteCrawler < BaseCrawler
     end
 
     private
+
+    def validate_same_site_url(url)
+      uri = URI.parse(url.to_s)
+      unless %w[http https].include?(uri.scheme) && uri.host.present? && Fetcher.same_site?(account.url, url)
+        raise InvalidRule, "监测入口只能包含同站 HTTP(S) 地址"
+      end
+    rescue URI::Error
+      raise InvalidRule, "监测入口包含无效地址"
+    end
 
     def validate_entry_urls
       values = Array(@definition["entry_urls"]).filter_map { |value| value.to_s.strip.presence }.first(MAX_ENTRY_URLS)
@@ -1119,7 +1202,7 @@ class WebsiteCrawler < BaseCrawler
     def value_for(item, mapping, absolute: false, base_url: nil)
       return nil unless mapping
 
-      node = item.at_css(mapping.fetch("selector"))
+      node = mapping.fetch("selector") == ":scope" ? item : item.at_css(mapping.fetch("selector"))
       return nil unless node
 
       value = mapping["attribute"].present? ? node[mapping["attribute"]] : node.text
@@ -1146,9 +1229,9 @@ class WebsiteCrawler < BaseCrawler
         attributes = {
           account: account,
           crawl_task: crawl_task,
-          title: candidate.title.presence || extracted&.title,
+          title: candidate.title == candidate.url ? extracted&.title.presence || candidate.title : candidate.title.presence || extracted&.title,
           cover_url: candidate.image.presence || article.cover_url,
-          published_at: article.published_at || Time.current,
+          published_at: publication_time(candidate, detail_result) || article.published_at,
           raw_data: merged_raw_data(article, candidate, detail_result, extracted)
         }
         if content_available?(extracted)
@@ -1181,6 +1264,7 @@ class WebsiteCrawler < BaseCrawler
         detail_result.html,
         candidate.url,
         selector: rule.detail_selector,
+        strict_selector: rule.definition["strict_content"] == true,
         allow_body_fallback: false,
         minimum_text_length: Extractor::LISTING_MIN_ARTICLE_TEXT_LENGTH
       )
@@ -1193,6 +1277,25 @@ class WebsiteCrawler < BaseCrawler
     end
 
     private
+
+    def publication_time(candidate, detail_result)
+      value = candidate.fields["published_at"]
+      if value.blank? && detail_result&.success?
+        doc = Nokogiri::HTML(detail_result.html)
+        value = doc.at_css("meta[property='article:published_time']")&.[]("content")
+        value ||= doc.at_css("time[datetime]")&.[]("datetime")
+      end
+      return nil unless value.to_s.match?(/\b20\d{2}\b|20\d{2}年/)
+
+      text = value.to_s.gsub("年", "-").gsub("月", "-").gsub("日", "").strip
+      text = text.tr(".", "-") if text.match?(/\A\d{4}\.\d{1,2}\.\d{1,2}\z/)
+      date = Date.parse(text)
+      return nil unless date.year.between?(2000, Time.current.year + 1)
+
+      Time.zone.parse(text)
+    rescue ArgumentError, TypeError
+      nil
+    end
 
     def merged_raw_data(article, candidate, detail_result, extracted)
       (article.raw_data || {}).merge(
@@ -1271,8 +1374,17 @@ class WebsiteCrawler < BaseCrawler
       extractor = ListingExtractor.new(rule)
       candidates = []
       entry_errors = 0
+      reviewed_at = begin
+        Time.zone.parse(account.metadata["listing_reviewed_at"].to_s)
+      rescue ArgumentError
+        nil
+      end
+      weekly_review = rule.definition["weekly_review"] == true
+      review = !weekly_review || reviewed_at.nil? || reviewed_at < 7.days.ago
+      entries = (rule.entry_urls + (review ? rule.weekly_entry_urls : [])).uniq
+      item_limit = review && weekly_review ? ListingRule::MAX_ITEMS : rule.max_items
 
-      rule.entry_urls.each_with_index do |entry_url, index|
+      entries.each_with_index do |entry_url, index|
         break if stopped?(crawl_task)
         @host_rate_limiter.wait(entry_url, interval_seconds: rule.interval_seconds)
 
@@ -1284,14 +1396,14 @@ class WebsiteCrawler < BaseCrawler
           next
         end
 
-        extracted = extractor.extract(result.html, entry_url)
+        extracted = extractor.extract(result.html, entry_url, limit: item_limit)
         if extracted.empty?
           # Plain HTTP answered but the rule matched nothing — the usual reason
           # is a client-side-rendered shell. Give the render API one shot at it.
           rendered = rendered_fetch(entry_url, rule, crawl_task)
           if rendered
             entry_errors += 1 unless rendered.success?
-            extracted = extractor.extract(rendered.html, entry_url) if rendered.success?
+            extracted = extractor.extract(rendered.html, entry_url, limit: item_limit) if rendered.success?
           end
         end
         candidates.concat(extracted)
@@ -1301,13 +1413,16 @@ class WebsiteCrawler < BaseCrawler
         crawl_task&.log(:warn, "列表页解析失败 #{entry_url}: #{e.message}")
       end
 
-      candidates = candidates.uniq(&:url).first(rule.max_items)
+      candidates = candidates.uniq(&:url).first(item_limit)
       synchronizer = ListingArticleSynchronizer.new
       created_count = 0
       detail_errors = 0
 
       candidates.each_with_index do |candidate, index|
         break if stopped?(crawl_task)
+        existing = account.articles.find_by(url: candidate.url)
+        next if !review && existing&.content_markdown.present? && existing.raw_data.dig("listing", "content_status") == "available"
+
         @host_rate_limiter.wait(candidate.url, interval_seconds: rule.interval_seconds)
 
         detail_result = @fetcher.fetch(candidate.url)
@@ -1333,6 +1448,10 @@ class WebsiteCrawler < BaseCrawler
         end
 
         status = synchronizer.sync(account: account, candidate: candidate, detail_result: detail_result, rule: rule, crawl_task: crawl_task, extracted: extracted)
+        if (detail_result.success? && !ListingArticleSynchronizer.usable_content?(extracted)) || status == :error
+          detail_errors += 1
+          crawl_task&.log(:warn, "正文未通过验收 #{candidate.url}")
+        end
         created_count += 1 if status == :created
       rescue StandardError => e
         detail_errors += 1
@@ -1340,6 +1459,9 @@ class WebsiteCrawler < BaseCrawler
         crawl_task&.log(:warn, "列表项处理失败 #{candidate.url}: #{e.message}")
       end
 
+      if weekly_review && review && entry_errors.zero? && detail_errors.zero? && candidates.any? && !stopped?(crawl_task)
+        account.update!(metadata: account.metadata.merge("listing_reviewed_at" => Time.current.iso8601))
+      end
       Result.new(candidates.size, created_count, entry_errors, detail_errors)
     end
 

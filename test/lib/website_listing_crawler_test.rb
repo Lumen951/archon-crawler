@@ -518,6 +518,121 @@ class WebsiteListingCrawlerTest < ActiveSupport::TestCase
     end
   end
 
+  test "configured monitoring rejects foreign URLs and missing selectors" do
+    definition = listing_rule.merge("monitor_pages" => [ { "url" => "https://foreign.test/product", "selector" => "main" } ])
+    assert_raises(WebsiteCrawler::ListingRule::InvalidRule) { WebsiteCrawler::ListingRule.new(@account, definition) }
+    definition["monitor_pages"] = [ { "url" => "https://example.com/product" } ]
+    assert_raises(WebsiteCrawler::ListingRule::InvalidRule) { WebsiteCrawler::ListingRule.new(@account, definition) }
+  end
+
+  test "paused listing leaves the account pending for resume" do
+    @account.update!(crawl_rule: listing_rule)
+    task = CrawlTask.create!(account_ids: [ @account.id ], status: :paused)
+    task.setup_account_tracking!
+    stub_class_method(WebsiteCrawler::RenderFallbackChain, :build, -> { nil }) do
+      WebsiteCrawler.crawl_account(@account, task, article_concurrency: 1, max_pages: 1)
+    end
+    assert_predicate task.crawl_task_accounts.find_by!(account: @account), :pending?
+    assert_nil @account.reload.last_crawled_at
+  end
+
+  test "non ASCII news URLs are escaped without corrupting existing byte escapes" do
+    assert_equal "https://example.com/%E6%96%B0%E9%97%BB/%E2%80%91?a=%D1%EE",
+      WebsiteCrawler::Fetcher.normalize("https://example.com", "/新闻/‑?a=%D1%EE")
+  end
+
+  test "video only official news retains its nested source URL as usable content" do
+    html = '<html><body><article><video controls><source src="/demo.mp4" type="video/mp4"></video></article></body></html>'
+    extracted = WebsiteCrawler::Extractor.new.extract_article(html, "https://example.com/news", selector: "article", strict_selector: true)
+    assert_equal 1, extracted.media_count
+    assert_equal 0, extracted.text_length
+    assert WebsiteCrawler::ListingArticleSynchronizer.usable_content?(extracted)
+    assert_includes extracted.html, 'src="https://example.com/demo.mp4"'
+    assert_includes extracted.markdown, "[video](https://example.com/demo.mp4)"
+  end
+
+  test "short video announcements retain a video link but not unrelated short links" do
+    extractor = WebsiteCrawler::Extractor.new
+    html = '<article><a href="https://www.youtube.com/watch?v=demo">Watch the interview</a></article>'
+    result = extractor.extract_article(html, "https://example.com/news", selector: "article")
+    assert_equal 1, result.media_count
+    assert_includes result.markdown, "youtube.com/watch?v=demo"
+    unrelated = extractor.extract_article(html.sub("www.youtube.com", "example.com"), selector: "article")
+    assert_nil unrelated.html
+  end
+
+  test "strict content selection never falls back to recommendations" do
+    extracted = WebsiteCrawler::Extractor.new.extract_article(detail_html, selector: ".missing", strict_selector: true)
+    assert_nil extracted.html
+    assert_equal "configured_content_not_found", extracted.reason
+  end
+
+  test "weekly review skips stored bodies daily but revisits them after seven days" do
+    rule = WebsiteCrawler::ListingRule.new(@account, listing_rule.merge("weekly_review" => true))
+    entry = rule.entry_urls.first
+    detail = "https://example.com/events/1"
+    fetcher = FakeFetcher.new(
+      entry => WebsiteCrawler::FetchResult.success(url: entry, html: listing_html),
+      detail => WebsiteCrawler::FetchResult.success(url: detail, html: detail_html)
+    )
+    listing_crawler(fetcher).crawl(account: @account, rule: rule, crawl_task: nil)
+    assert_nil Article.find_by!(url: detail).published_at
+    fetcher.calls.clear
+    listing_crawler(fetcher).crawl(account: @account, rule: rule, crawl_task: nil)
+    assert_equal [ entry ], fetcher.calls
+    @account.update!(metadata: @account.metadata.merge("listing_reviewed_at" => 8.days.ago.iso8601))
+    fetcher.calls.clear
+    listing_crawler(fetcher).crawl(account: @account, rule: rule, crawl_task: nil)
+    assert_equal [ entry, detail ], fetcher.calls
+  end
+
+  test "empty detail increments errors and does not advance weekly review" do
+    rule = WebsiteCrawler::ListingRule.new(@account, listing_rule.merge("weekly_review" => true))
+    entry = rule.entry_urls.first
+    detail = "https://example.com/events/1"
+    fetcher = FakeFetcher.new(
+      entry => WebsiteCrawler::FetchResult.success(url: entry, html: listing_html),
+      detail => WebsiteCrawler::FetchResult.success(url: detail, html: "<html><body></body></html>")
+    )
+    result = listing_crawler(fetcher).crawl(account: @account, rule: rule, crawl_task: nil)
+    assert_equal 1, result.detail_errors
+    assert_nil @account.reload.metadata["listing_reviewed_at"]
+  end
+
+  test "configured product capture saves a baseline and skips a second check on the same day" do
+    rule = WebsiteCrawler::ListingRule.new(@account, listing_rule.merge(
+      "monitor_pages" => [ { "url" => "https://example.com/product", "selector" => "main" } ]
+    ))
+    task = CrawlTask.create!(account_ids: [ @account.id ], status: :running)
+    fetcher = FakeFetcher.new("https://example.com/product" => WebsiteCrawler::FetchResult.success(url: "https://example.com/product", html: detail_html))
+    stub_class_method(WebsiteCrawler::Fetcher, :new, -> { fetcher }) do
+      stub_class_method(WebsiteCrawler::DEFAULT_LISTING_HOST_RATE_LIMITER, :wait, ->(*) { }) do
+        result = WebsiteCrawler.crawl_configured_pages(@account, rule, task)
+        assert_nil result[:error]
+        assert_equal 1, @account.monitor_pages.first.monitor_page_versions.count
+        assert Article.exists?(url: "https://example.com/product")
+        WebsiteCrawler.crawl_configured_pages(@account, rule, task)
+        assert_equal 1, fetcher.calls.size
+      end
+    end
+  end
+
+  test "failed product capture records an error without a false baseline" do
+    rule = WebsiteCrawler::ListingRule.new(@account, listing_rule.merge(
+      "monitor_pages" => [ { "url" => "https://example.com/product", "selector" => ".missing" } ]
+    ))
+    task = CrawlTask.create!(account_ids: [ @account.id ], status: :running)
+    fetcher = FakeFetcher.new("https://example.com/product" => WebsiteCrawler::FetchResult.success(url: "https://example.com/product", html: detail_html))
+    stub_class_method(WebsiteCrawler::Fetcher, :new, -> { fetcher }) do
+      stub_class_method(WebsiteCrawler::DEFAULT_LISTING_HOST_RATE_LIMITER, :wait, ->(*) { }) do
+        result = WebsiteCrawler.crawl_configured_pages(@account, rule, task)
+        assert result[:error].present?
+        assert_nil @account.monitor_pages.first.current_version_id
+        assert_equal "error", @account.monitor_pages.first.last_status
+      end
+    end
+  end
+
   private
 
   def render_fetcher(connection)
