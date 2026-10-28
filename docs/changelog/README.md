@@ -33,6 +33,14 @@
 - 验证：arXiv 论文样本、OpenReview 会议配置读取成功；OpenReview 论文列表样本返回 403，待排查。Windows/WSL Git 状态差异已确认与换行符处理有关；Docker 引擎尚未运行。
 - 入口：[论文追踪规格](../specs/paper-tracking.md)、[本地验证说明](../runbook/README.md)。
 
+## 2026-10-28 — 浏览器图标使用源策未来品牌标志
+
+- 背景：页面左上角已使用品牌素材，但浏览器标签页仍引用蓝底白色 A 图标。
+- 变化：复用 `public/archon-logo.webp`，在现有 `public/icon.svg` 中内嵌原图并加白色圆角底，便于深色标签栏显示；布局提供 WebP 备用图标，并为图标地址增加版本参数。
+- 范围：仅修改布局中的 favicon、现有 SVG 和本记录；不改业务页面、认证、爬虫、部署或其他未提交文件。Apple touch 图标不属于本轮浏览器标签页调整范围，保持原状。
+- 验证：SVG XML 解析通过，内嵌素材与原文件逐字节一致，差异格式检查通过；布局已引用带版本参数的图标。本地 Docker 引擎未启动，未验证浏览器实际显示。用户已授权提交及部署；发布采用线上现有镜像加图标/布局补丁，只更新 web，保留 worker、存储和数据库，失败恢复原 Compose 配置。
+- 入口：[页面布局](../../app/views/layouts/application.html.erb)、[浏览器图标](../../public/icon.svg)、[品牌素材](../../public/archon-logo.webp)。
+
 ## 待确认事项
 
 - 高校专业分布数据集成：数据来源、用户和产出未确认。
