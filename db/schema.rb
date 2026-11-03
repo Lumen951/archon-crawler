@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_22_000002) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_03_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -210,6 +210,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_22_000002) do
     t.datetime "updated_at", null: false
     t.date "week_start", null: false
     t.index ["event_research_task_id"], name: "index_event_weekly_digests_on_event_research_task_id", unique: true
+  end
+
+  create_table "daily_reports", force: :cascade do |t|
+    t.date "report_date", null: false
+    t.datetime "window_start", null: false
+    t.datetime "window_end", null: false
+    t.integer "status", default: 0, null: false
+    t.integer "article_count", default: 0, null: false
+    t.integer "paper_count", default: 0, null: false
+    t.jsonb "sections", default: {}, null: false
+    t.text "error_message"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["report_date"], name: "index_daily_reports_on_report_date", unique: true
+    t.index ["status"], name: "index_daily_reports_on_status"
   end
 
   create_table "group_accounts", force: :cascade do |t|

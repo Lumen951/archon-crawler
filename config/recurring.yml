@@ -22,6 +22,10 @@ development:
     class: WeeklyEventResearchJob
     queue: default
     schedule: every monday at 2am
+  daily_report:
+    class: DailyReportJob
+    queue: default
+    schedule: every day at 9am
   # weread_login_reminder:
   #   class: FeishuLoginReminderJob
   #   queue: default
@@ -62,6 +66,10 @@ production:
     class: WeeklyEventResearchJob
     queue: default
     schedule: every monday at 2am
+  daily_report:
+    class: DailyReportJob
+    queue: default
+    schedule: every day at 9am
   # weread_login_reminder:
   #   class: FeishuLoginReminderJob
   #   queue: default

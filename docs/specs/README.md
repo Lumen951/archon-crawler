@@ -16,6 +16,7 @@
 | 领域 | 文档 | 状态 |
 |---|---|---|
 | 论文导入与追踪 | [paper-tracking.md](paper-tracking.md) | 单篇导入通过本地回归与 arXiv 联调；OpenReview 403 待解决。第 10 节记录阶段 0/1 结果及首末位作者筛选设计；阶段 2 待评审 |
+| 每日简报 | [daily-report.md](daily-report.md) | 每日 09:00 汇总前一日新入库文章与论文，并补入当天已收录的活动行文章 |
 
 ## 规格生命周期
 
@@ -39,6 +40,7 @@ Sunset 应记录冻结时间、替代方案、兼容期、迁移验收和清理�
 | 抓取 | `/accounts`、`/accounts/import`、`/crawl_tasks`、`/wechat_content_download_tasks` | [test/models/account_test.rb](../../test/models/account_test.rb)、[test/lib/wechat_crawler_content_download_test.rb](../../test/lib/wechat_crawler_content_download_test.rb) |
 | 官网 | `/accounts/import/website`、`/monitor_pages/:id`、`/monitor_changes` | [test/lib/website_listing_crawler_test.rb](../../test/lib/website_listing_crawler_test.rb)、[test/lib/article_synchronizer_test.rb](../../test/lib/article_synchronizer_test.rb) |
 | 研究 | `/event_accounts/:id`、`/event_research_tasks`、`/event_weekly_digests` | [test/models/event_research_task_test.rb](../../test/models/event_research_task_test.rb)、[test/jobs/weekly_event_research_job_test.rb](../../test/jobs/weekly_event_research_job_test.rb) |
+| 简报 | `/daily_reports`、`/daily_reports/:id` | [test/jobs/daily_report_job_test.rb](../../test/jobs/daily_report_job_test.rb)、[test/services/daily_report_generator_test.rb](../../test/services/daily_report_generator_test.rb) |
 | 访问 | `/session/new`、`/profile`、`/rss`、`/api-docs`、`/mcp` | [test/services/mcp_oauth_test.rb](../../test/services/mcp_oauth_test.rb)、[test/integration/event_research_api_test.rb](../../test/integration/event_research_api_test.rb) |
 
 实际路径和 HTTP 方法以 [config/routes.rb](../../config/routes.rb) 为准；表中只列导航，不授予调用权限。

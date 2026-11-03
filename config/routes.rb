@@ -21,6 +21,7 @@ Rails.application.routes.draw do
       post :download_content
     end
   end
+  resources :daily_reports, only: [:index, :show]
 
   resources :papers, only: [:index, :show] do
     member do
