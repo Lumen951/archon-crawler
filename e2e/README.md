@@ -55,6 +55,10 @@ bin/e2e --ui                     # Playwright UI 调试模式
 - 扫码登录的状态机在 handlers 里：每次重置后第 1 次轮询 waiting → 第 2 次
   scanned → 第 3 次起 success，随后走完整的 bizlogin/home 链路落库会话。
 
+## 日报与共享密钥定向验收
+
+使用 `DAILY_REPORT_E2E=1 bin/e2e tests/07-rss-api.spec.ts --grep '日报可阅读'`。该开关额外创建离线日报和普通测试用户，并清除 E2E 库中的模拟 LLM 密钥，以验证首次添加、添加者修改和其他用户只读状态；不要与需要预设 LLM 密钥的活动研究用例混跑。
+
 ## 数据隔离
 
 - `bin/e2e` 用 `E2E_DB_NAME`（默认 `mp_crawler_e2e`）指向**独立数据库**

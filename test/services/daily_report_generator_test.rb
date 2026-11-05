@@ -27,13 +27,10 @@ class DailyReportGeneratorTest < ActiveSupport::TestCase
   test "includes previous-day records and already imported event articles from report morning" do
     captured_prompt = nil
     llm = Object.new
-    llm.define_singleton_method(:generate_json) do |prompt|
+    paper_id = @paper.id
+    llm.define_singleton_method(:generate) do |prompt|
       captured_prompt = prompt
-      { "items" => [
-        { "source_type" => "article", "source_id" => @article.id, "kind" => "event", "event_name" => "具身智能活动" },
-        { "source_type" => "paper", "source_id" => @paper.id, "kind" => "technical", "summary" => "研究摘要" },
-        { "source_type" => "paper", "source_id" => 999_999, "kind" => "technical", "summary" => "无效来源" }
-      ] }
+      "# 每日研究简报\n\n具身智能活动\n\n机器人研究 [paper:#{paper_id}]"
     end
 
     result = nil
@@ -43,8 +40,7 @@ class DailyReportGeneratorTest < ActiveSupport::TestCase
 
     assert_includes captured_prompt, "具身智能活动"
     assert_includes captured_prompt, "机器人研究"
-    assert_equal [ @article.id, @paper.id ], result.fetch("items").map { |item| item.fetch("source_id") }
-    assert_equal "https://events.example.test/event/1", result.fetch("items").first.fetch("url")
+    assert_includes result, "机器人研究"
     assert_equal 1, @report.reload.article_count
     assert_equal 1, @report.paper_count
   end
@@ -54,14 +50,24 @@ class DailyReportGeneratorTest < ActiveSupport::TestCase
     PaperSource.delete_all
     Paper.delete_all
     llm = Object.new
-    llm.define_singleton_method(:generate_json) { |_prompt| raise "should not be called" }
+    llm.define_singleton_method(:generate) { |_prompt| raise "should not be called" }
 
-    assert_equal({ "items" => [] }, DailyReportGenerator.new(llm: llm).call(@report))
+    assert_includes DailyReportGenerator.new(llm: llm).call(@report), "当天没有新增内容"
   end
 
-  test "rejects invalid model response shape" do
+  test "rejects unknown and missing source references" do
+    [ "日报 [paper:999999999]", "日报没有来源" ].each do |response|
+      llm = Object.new
+      llm.define_singleton_method(:generate) { |_prompt| response }
+      assert_raises(DailyReportGenerator::GenerationError) do
+        DailyReportGenerator.new(llm: llm).call(@report)
+      end
+    end
+  end
+
+  test "rejects empty model response" do
     llm = Object.new
-    llm.define_singleton_method(:generate_json) { |_prompt| { "entries" => [] } }
+    llm.define_singleton_method(:generate) { |_prompt| "" }
 
     assert_raises(DailyReportGenerator::GenerationError) do
       DailyReportGenerator.new(llm: llm).call(@report)

@@ -166,6 +166,7 @@ Rails.application.routes.draw do
   resource :profile, only: [:edit, :update] do
     patch :update_password
     patch :update_followed_tags
+    patch :update_llm_api_key
     post :create_api_key
     delete :revoke_api_key
   end

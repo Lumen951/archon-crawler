@@ -40,6 +40,7 @@ module E2e
       seed_accounts
       seed_samples
       write_assets
+      seed_daily_report if ENV["DAILY_REPORT_E2E"] == "1"
       print_summary
     end
 
@@ -51,6 +52,16 @@ module E2e
         abort("e2e:seed 只能在 development 且设置了 E2E_DB_NAME 时运行（由 bin/e2e 负责）。" \
               "当前 E2E_DB_NAME=#{ENV['E2E_DB_NAME'].inspect}")
       end
+    end
+
+    def seed_daily_report
+      Option.where(opt_key: %w[openai_api_key openai_api_key_owner_id openai_api_key_modified]).delete_all
+      User.find_or_create_by!(email_address: "daily-reader@archon.tech") do |user|
+        user.password = "e2ePassword123"
+      end
+      report = DailyReport.find_or_initialize_by(report_date: Date.new(2026, 11, 4))
+      report.update!(window_start: Time.zone.local(2026, 11, 4), window_end: Time.zone.local(2026, 11, 5),
+        status: :completed, markdown_content: "# 离线日报验收\n\n这是一份离线测试日报。")
     end
 
     def seed_options

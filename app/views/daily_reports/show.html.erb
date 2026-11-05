@@ -1,46 +1,16 @@
-<% items = Array(@report.sections.is_a?(Hash) ? @report.sections["items"] : []) %>
 <div class="space-y-6">
   <div>
     <p><%= link_to "← 返回每日简报", daily_reports_path, class: "text-primary hover:underline text-sm" %></p>
     <h1 class="mt-2 text-2xl font-bold text-text-primary"><%= @report.title %></h1>
-    <p class="mt-1 text-sm text-text-secondary">收录文章 <%= @report.article_count %> 篇，论文 <%= @report.paper_count % 篇。状态：<%= @report.status %></p>
+    <p class="mt-1 text-sm text-text-secondary">收录文章 <%= @report.article_count %> 篇，论文 <%= @report.paper_count %> 篇。状态：<%= @report.status %></p>
   </div>
 
   <% if @report.error_message.present? %>
     <div class="rounded-lg bg-red-50 border border-red-100 px-4 py-3 text-sm text-red-700"><%= @report.error_message %></div>
   <% end %>
 
-  <% if items.any? %>
-    <div class="space-y-5">
-      <% items.each do |item| %>
-        <article class="border-b border-border-primary pb-5">
-          <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <h2 class="text-lg font-semibold text-text-primary"><%= item["title"].presence || "未命名内容" %></h2>
-            <span class="text-xs text-text-muted"><%= { "technical" => "技术", "commercial" => "商业化", "event" => "活动", "other" => "其他" }.fetch(item["kind"], "其他") %></span>
-            <% if item["url"].present? %><%= link_to "原文", item["url"], target: "_blank", rel: "noopener", class: "text-xs text-primary hover:underline" %><% end %>
-          </div>
-
-          <% if item["kind"] == "technical" %>
-            <% [["摘要", "summary"], ["结果", "result"], ["核心方法", "core_method"]].each do |label, key| %>
-              <% if item[key].present? %><section class="mt-3"><h3 class="text-sm font-semibold text-text-primary"><%= label %></h3><p class="mt-1 text-sm text-text-secondary whitespace-pre-wrap"><%= item[key] %></p></section><% end %>
-            <% end %>
-          <% elsif item["kind"] == "commercial" %>
-            <% [["行业趋势", "industry_trends"], ["核心问题", "core_question"], ["进攻方向", "attack_direction"], ["用户定位", "user_position"], ["时间节奏", "time_rhythm"], ["目标要求", "goals"]].each do |label, key| %>
-              <% if item[key].present? %><section class="mt-3"><h3 class="text-sm font-semibold text-text-primary"><%= label %></h3><p class="mt-1 text-sm text-text-secondary whitespace-pre-wrap"><%= item[key] %></p></section><% end %>
-            <% end %>
-          <% elsif item["kind"] == "event" %>
-            <dl class="mt-3 grid gap-2 sm:grid-cols-2 text-sm">
-              <% [["活动名称", "event_name"], ["活动时间", "event_time"], ["地点", "event_location"], ["主办方", "organizer"], ["报名方式", "registration"]].each do |label, key| %>
-                <% if item[key].present? %><div><dt class="text-text-muted"><%= label %></dt><dd class="text-text-primary"><%= item[key] %></dd></div><% end %>
-              <% end %>
-            </dl>
-            <% if item["summary"].present? %><p class="mt-3 text-sm text-text-secondary whitespace-pre-wrap"><%= item["summary"] %></p><% end %>
-          <% else %>
-            <p class="mt-3 text-sm text-text-secondary whitespace-pre-wrap"><%= item["summary"].presence || item["note"] %></p>
-          <% end %>
-        </article>
-      <% end %>
-    </div>
+  <% if @report.readable_markdown.present? %>
+    <article class="prose max-w-none text-text-primary"><%= daily_report_content(@report.readable_markdown) %></article>
   <% elsif @report.completed? %>
     <div class="card text-center py-12"><p class="text-text-secondary">该日期没有可整理的文章或论文。</p></div>
   <% else %>

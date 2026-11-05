@@ -15,6 +15,9 @@
         <li>
           <a href="#api-keys" class="block px-3 py-2 text-sm font-medium text-text-primary hover:bg-bg-secondary rounded-lg">API Key 管理</a>
         </li>
+        <li>
+          <a href="#llm-settings" class="block px-3 py-2 text-sm font-medium text-text-primary hover:bg-bg-secondary rounded-lg">LLM 配置</a>
+        </li>
       </ul>
     </div>
   </nav>
@@ -105,6 +108,25 @@
           <% end %>
         <% else %>
           <p class="text-sm text-text-secondary text-center py-4">暂无标签。管理员可在帐号管理页面批量创建标签。</p>
+        <% end %>
+      </div>
+    </section>
+
+    <section id="llm-settings">
+      <div class="bg-bg-card rounded-lg shadow-sm p-6">
+        <h2 class="text-2xl font-bold mb-2">全站 LLM 配置</h2>
+        <p class="text-sm text-text-secondary mb-4">此密钥供全站日报和其他 LLM 功能共用。任何用户均可首次添加，添加后仅添加者可以修改。</p>
+        <p class="text-sm mb-4">当前状态：<%= Option.llm_key_status %></p>
+        <% if Option.llm_key_editable_by?(current_user) %>
+        <%= form_with url: update_llm_api_key_profile_path, method: :patch, local: true do %>
+          <%= label_tag :openai_api_key, "LLM API 密钥", class: "block text-sm font-medium text-text-primary mb-1" %>
+          <%= password_field_tag :openai_api_key, nil, class: "form-input", autocomplete: "off", required: true %>
+          <div class="flex justify-end mt-4">
+            <%= submit_tag(Option.openai_api_key_valid? ? "修改密钥" : "添加密钥", class: "btn btn-primary") %>
+          </div>
+        <% end %>
+        <% else %>
+          <p class="text-sm text-text-secondary">密钥已由其他用户添加，你无需重复配置。</p>
         <% end %>
       </div>
     </section>

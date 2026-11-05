@@ -15,11 +15,19 @@ class DailyReportGenerator
     sources = articles.map { |article| article_source(article) } + papers.map { |paper| paper_source(paper) }
 
     report.update!(article_count: articles.length, paper_count: papers.length)
-    return { "items" => [] } if sources.empty?
+    return "# #{report.report_date} 每日研究简报\n\n## 今日判断\n\n当天没有新增内容。" if sources.empty?
 
-    validate_response(@llm.generate_json(prompt(report, sources)), sources)
-  rescue LlmClient::ApiError, JSON::ParserError => e
-    raise GenerationError, e.message
+    markdown = @llm.generate(prompt(report, sources))
+    raise GenerationError, "LLM 返回的日报为空" if markdown.blank?
+
+    citations = markdown.scan(/\[(article|paper):(\d+)\]/)
+    allowed = sources.map { |source| [ source["source_type"], source["source_id"].to_s ] }
+    if citations.empty? || (citations - allowed).any?
+      raise GenerationError, "日报来源引用缺失或不属于本次输入"
+    end
+    references = sources.select { |source| citations.include?([ source["source_type"], source["source_id"].to_s ]) }
+      .map { |source| "- [#{source['source_type']}:#{source['source_id']}] #{source['title'].to_s.gsub(/[\r\n]/, ' ')} — #{source['url']}" }
+    "#{markdown.strip}\n\n## 来源索引\n\n#{references.join("\n")}\n"
   end
 
   private
@@ -47,7 +55,7 @@ class DailyReportGenerator
       "author" => article.author,
       "account" => article.account.nickname,
       "published_at" => article.published_at&.iso8601,
-      "content" => [article.digest, article.content_markdown].compact.join("\n").truncate(MAX_CONTENT_LENGTH)
+      "content" => [ article.digest, article.content_markdown ].compact.join("\n").truncate(MAX_CONTENT_LENGTH)
     }
   end
 
@@ -65,43 +73,41 @@ class DailyReportGenerator
 
   def prompt(report, sources)
     <<~PROMPT
-      你负责为源策未来整理每日研究简报。报告日期为 #{report.report_date}，按输入材料分类并输出 JSON，不要补充输入中没有的事实。
+      你负责为源策未来整理 #{report.report_date} 的每日研究简报。直接输出完整 Markdown，不要输出 JSON 或 Markdown 围栏。
 
-      输出格式：{"items":[{"source_type":"article或paper","source_id":数字,"kind":"technical、commercial、event或other","title":"标题","summary":"摘要","result":"结果","core_method":"核心方法","industry_trends":"行业趋势","core_question":"核心问题","attack_direction":"进攻方向","user_position":"用户定位","time_rhythm":"时间节奏","goals":"目标要求","event_name":"活动名称","event_time":"活动时间","event_location":"地点","organizer":"主办方","registration":"报名方式","note":"补充判断"}]}
+      文档结构：
+      # #{report.report_date} 每日研究简报
+      ## 今日判断
+      ## 技术与论文
+      ## 商业化观察
+      ## 活动信息
+      ## 跨来源观察
+      ## 后续关注
 
       约束：
-      1. 每项必须引用对应输入的 source_type 和 source_id；只返回有分析价值的内容。
+      1. 每篇内容都要使用精确的来源标记 [article:编号] 或 [paper:编号]，例如 [article:123]。编号必须来自本次输入；不要编造来源或引用历史日报的编号。来源索引由系统附加。
       2. 技术文章使用摘要、结果、核心方法；商业化文章使用行业趋势、核心问题、进攻方向、用户定位、时间节奏、目标要求。
       3. 活动内容归为 event，提取活动名称、时间、地点、主办方和报名方式。来源没有的信息写空字符串。
       4. 不确定是技术还是商业化时归为 other，并说明判断依据，不强行分类。
       5. 使用自然、直接的中文。句间交代判断关系；修饰语最多两层；少用抽象概念作主语；检查日常搭配并删除没有业务信息的自我约束句。
-      6. 只返回 JSON，不要 Markdown 围栏。所有事实都要能从来源材料中核对。
+      6. 所有事实都要能从当天材料中核对；输入中的历史上下文只用于说明延续和变化。
+      7. 当天新内容决定“今天发生了什么”。历史上下文只作为背景；两者冲突时以当天材料为准。没有依据的字段写“材料未提供”。
+
+      历史上下文（只用于比较，不代表当天新事实）：
+      #{historical_context(report)}
 
       输入材料：
       #{JSON.pretty_generate(sources)}
     PROMPT
   end
 
-  def validate_response(response, sources)
-    items = response.is_a?(Hash) && response["items"].is_a?(Array) ? response["items"] : nil
-    raise GenerationError, "LLM 返回格式无效：缺少 items 数组" unless items
-
-    allowed = sources.index_by { |source| [source["source_type"], source["source_id"]] }
-    items.filter_map do |item|
-      next unless item.is_a?(Hash)
-
-      key = [item["source_type"], item["source_id"]]
-      source = allowed[key]
-      next unless source
-
-      result = item.slice(
-        "source_type", "source_id", "kind", "title", "summary", "result", "core_method",
-        "industry_trends", "core_question", "attack_direction", "user_position",
-        "time_rhythm", "goals", "event_name", "event_time", "event_location",
-        "organizer", "registration", "note"
-      )
-      result["kind"] = "other" unless %w[technical commercial event other].include?(result["kind"])
-      result.merge("title" => source["title"], "url" => source["url"])
-    end
+  def historical_context(report)
+    DailyReport.where(status: :completed)
+      .where("report_date < ?", report.report_date)
+      .where(report_date: (report.report_date - 7.days)...report.report_date)
+      .order(report_date: :desc)
+      .limit(3)
+      .map { |prior| "### #{prior.report_date}\n#{prior.markdown_content.to_s.truncate(2_000)}" }
+      .join("\n\n").presence || "无可用历史日报"
   end
 end

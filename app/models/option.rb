@@ -328,6 +328,35 @@ class Option < ApplicationRecord
       openai_api_key.present?
     end
 
+    def llm_key_editable_by?(user)
+      return false unless user
+      return true unless openai_api_key_valid?
+
+      owner_id = get("openai_api_key_owner_id")
+      owner_id.present? ? owner_id == user.id.to_s : user.admin?
+    end
+
+    def llm_key_status
+      return "未添加" unless openai_api_key_valid?
+
+      get("openai_api_key_modified") == "true" ? "已修改" : "已添加"
+    end
+
+    def configure_llm_key!(user:, key:)
+      return :blank if key.to_s.strip.blank?
+
+      transaction do
+        connection.execute("SELECT pg_advisory_xact_lock(72419002)")
+        next :forbidden unless llm_key_editable_by?(user)
+
+        replacing = openai_api_key_valid?
+        self.openai_api_key = key.to_s.strip
+        set("openai_api_key_owner_id", user.id)
+        set("openai_api_key_modified", replacing)
+        replacing ? :updated : :added
+      end
+    end
+
     def openai_model
       get("openai_model").presence || OPENAI_DEFAULT_MODEL
     end

@@ -508,8 +508,7 @@
         <div class="panel-body">
           <% if @openai_api_key.present? %>
             <div class="notice notice-success mb-4">
-              <p class="font-medium">当前 API 密钥</p>
-              <p class="mt-0.5 font-mono"><%= mask_api_key(@openai_api_key) %></p>
+              <p class="font-medium">LLM 密钥：<%= Option.llm_key_status %></p>
               <p class="mt-0.5 text-text-secondary">
                 模型：<code class="bg-bg-card px-1.5 py-0.5 rounded text-xs"><%= @openai_model %></code>
                 · 代理：<code class="bg-bg-card px-1.5 py-0.5 rounded text-xs"><%= @openai_proxy_url %></code>
@@ -526,8 +525,12 @@
                 <p class="form-hint">通过 MiraclePlus OpenAI 代理访问，密钥仅存于数据库</p>
               </div>
               <div>
-                <%= text_field_tag :openai_api_key, nil, class: "form-input",
-                    placeholder: "输入 OpenAI API 密钥（留空则保持不变）" %>
+                <% if Option.llm_key_editable_by?(current_user) %>
+                  <%= password_field_tag :openai_api_key, nil, class: "form-input", autocomplete: "off",
+                      placeholder: "输入 LLM API 密钥（留空则保持不变）" %>
+                <% else %>
+                  <p class="form-hint">密钥已由其他用户添加，仅添加者可以修改。</p>
+                <% end %>
               </div>
             </div>
             <div class="form-row">

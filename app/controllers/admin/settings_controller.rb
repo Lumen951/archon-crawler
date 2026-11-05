@@ -248,8 +248,11 @@ class Admin::SettingsController < Admin::BaseController
 
     # OpenAI settings
     if params[:openai_api_key].present?
-      Option.openai_api_key = params[:openai_api_key].to_s.strip
-      message = "OpenAI API 密钥更新成功"
+      result = Option.configure_llm_key!(user: current_user, key: params[:openai_api_key])
+      if result == :forbidden
+        return head :forbidden
+      end
+      message = result == :added ? "LLM 密钥已添加" : "LLM 密钥已修改"
     end
 
     if params[:openai_model].present?

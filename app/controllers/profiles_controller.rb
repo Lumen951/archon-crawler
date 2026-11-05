@@ -56,6 +56,21 @@ class ProfilesController < ApplicationController
     redirect_to edit_profile_path(anchor: "followed-tags")
   end
 
+  def update_llm_api_key
+    result = Option.configure_llm_key!(user: current_user, key: params[:openai_api_key])
+    case result
+    when :added
+      flash[:success] = "全站 LLM 密钥已添加"
+    when :updated
+      flash[:success] = "全站 LLM 密钥已修改"
+    when :forbidden
+      flash[:error] = "全站 LLM 密钥已添加，仅添加者可以修改"
+    else
+      flash[:error] = "请输入 LLM 密钥，现有配置未改变"
+    end
+    redirect_to edit_profile_path(anchor: "llm-settings")
+  end
+
   def update_password
     @user = current_user
 

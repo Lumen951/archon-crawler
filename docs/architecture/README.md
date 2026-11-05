@@ -36,6 +36,8 @@ arXiv 元数据导入完成后，按来源与版本创建 `PaperFullText` 并投
 
 | 数据 | 关联与用途 | 源码 |
 |---|---|---|
+个人资料页允许登录用户首次添加共享 LLM 密钥，后续仅添加者可修改；历史无归属密钥由管理员接管。`Option.configure_llm_key!` 使用事务级 advisory lock 串行检查归属并写入密钥，两处设置入口共享此授权逻辑。页面仅展示“未添加 / 已添加 / 已修改”。管理员设置仍负责模型和代理地址，`LlmClient` 从同一配置读取密钥供日报等功能使用。
+
 | Account / Article | 账号 STI 与文章归属；URL 唯一；活动账号不产出抓取文章 | [app/models/account.rb](../../app/models/account.rb)、[app/models/article.rb](../../app/models/article.rb) |
 | CrawlTask / CrawlTaskAccount | 任务配置、成员进度和失败；CrawlLog 保存运行证据 | [app/models/crawl_task.rb](../../app/models/crawl_task.rb)、[app/models/crawl_task_account.rb](../../app/models/crawl_task_account.rb) |
 | WebsiteAccount / MonitorPage / Version / Change | 官网账号关联页面、页面版本和变化 | [app/models/website_account.rb](../../app/models/website_account.rb)、[app/models/monitor_page.rb](../../app/models/monitor_page.rb) |
